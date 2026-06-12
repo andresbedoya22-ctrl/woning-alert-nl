@@ -6,12 +6,13 @@ from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-INPUT_CSV = BASE_DIR / "data" / "processed" / "sources_seed_noord_brabant.csv"
+DEFAULT_INPUT_CSV = BASE_DIR / "data" / "processed" / "sources_seed_noord_brabant.csv"
+ENRICHED_INPUT_CSV = BASE_DIR / "data" / "discovery" / "processed" / "sources_seed_with_gemeente.csv"
 OUTPUT_CSV = BASE_DIR / "data" / "discovery" / "processed" / "gemeente_coverage.csv"
 OUTPUT_REPORT = BASE_DIR / "data" / "discovery" / "reports" / "gemeente_coverage_report.md"
 
 OUTPUT_COLUMNS = [
-    "plaats",
+    "gemeente",
     "total_sources",
     "with_website",
     "with_valid_koopaanbod_url",
@@ -73,6 +74,12 @@ def read_csv_rows(path: Path) -> list[dict[str, str]]:
     raise RuntimeError(f"No se pudo leer el CSV con encodings soportados: {last_error}")
 
 
+def resolve_input_csv() -> Path:
+    if ENRICHED_INPUT_CSV.exists():
+        return ENRICHED_INPUT_CSV
+    return DEFAULT_INPUT_CSV
+
+
 def normalize_place(value: str) -> str:
     return " ".join((value or "").strip().lower().split())
 
@@ -128,16 +135,24 @@ def build_recommendation(row: dict[str, str]) -> str:
     return "Improve valid aanbod coverage and reduce manual review."
 
 
-def aggregate_by_place(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+def get_group_name(row: dict[str, str]) -> str:
+    gemeente = (row.get("gemeente") or "").strip()
+    if gemeente:
+        return gemeente
+    plaats = (row.get("plaats") or "").strip()
+    if plaats:
+        return plaats
+    return "Unknown"
+
+
+def aggregate_by_gemeente(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     grouped: dict[str, dict[str, int | str]] = {}
     for row in rows:
-        plaats = (row.get("plaats") or "").strip()
-        if not plaats:
-            plaats = "Unknown"
+        gemeente = get_group_name(row)
         bucket = grouped.setdefault(
-            plaats,
+            gemeente,
             {
-                "plaats": plaats,
+                "gemeente": gemeente,
                 "total_sources": 0,
                 "with_website": 0,
                 "with_valid_koopaanbod_url": 0,
@@ -160,13 +175,13 @@ def aggregate_by_place(rows: list[dict[str, str]]) -> list[dict[str, str]]:
             bucket["needs_review_count"] += 1
 
     output_rows: list[dict[str, str]] = []
-    for plaats, bucket in grouped.items():
+    for gemeente, bucket in grouped.items():
         total_sources = int(bucket["total_sources"])
         with_valid = int(bucket["with_valid_koopaanbod_url"])
         needs_review_count = int(bucket["needs_review_count"])
         needs_review_rate = rate(needs_review_count, total_sources)
         valid_aanbod_rate = rate(with_valid, total_sources)
-        important_city = normalize_place(plaats) in IMPORTANT_CITIES
+        important_city = normalize_place(gemeente) in IMPORTANT_CITIES
         priority_score = compute_priority_score(
             total_sources=total_sources,
             with_valid_koopaanbod_url=with_valid,
@@ -175,7 +190,7 @@ def aggregate_by_place(rows: list[dict[str, str]]) -> list[dict[str, str]]:
             important_city=important_city,
         )
         output_row = {
-            "plaats": plaats,
+            "gemeente": gemeente,
             "total_sources": str(total_sources),
             "with_website": str(int(bucket["with_website"])),
             "with_valid_koopaanbod_url": str(with_valid),
@@ -200,9 +215,13 @@ def aggregate_by_place(rows: list[dict[str, str]]) -> list[dict[str, str]]:
             -float(row["needs_review_rate"]),
             float(row["valid_aanbod_rate"]),
             int(row["total_sources"]),
-            row["plaats"].lower(),
+            row["gemeente"].lower(),
         ),
     )
+
+
+def aggregate_by_place(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    return aggregate_by_gemeente(rows)
 
 
 def compute_summary(rows: list[dict[str, str]]) -> CoverageSummary:
@@ -246,7 +265,7 @@ def top_best_coverage(rows: list[dict[str, str]], limit: int = 20) -> list[dict[
             float(row["needs_review_rate"]),
             -int(row["with_valid_koopaanbod_url"]),
             -int(row["total_sources"]),
-            row["plaats"].lower(),
+            row["gemeente"].lower(),
         ),
     )[:limit]
 
@@ -260,7 +279,7 @@ def top_worst_coverage(rows: list[dict[str, str]], limit: int = 20) -> list[dict
             int(row["with_valid_koopaanbod_url"]),
             int(row["total_sources"]),
             -int(row["priority_score"]),
-            row["plaats"].lower(),
+            row["gemeente"].lower(),
         ),
     )[:limit]
 
@@ -268,7 +287,7 @@ def top_worst_coverage(rows: list[dict[str, str]], limit: int = 20) -> list[dict
 def important_city_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     return [
         row
-        for row in sorted(rows, key=lambda item: (-int(item["priority_score"]), item["plaats"].lower()))
+        for row in sorted(rows, key=lambda item: (-int(item["priority_score"]), item["gemeente"].lower()))
         if row["important_city"] == "true"
     ]
 
@@ -281,7 +300,7 @@ def top_recommendations(rows: list[dict[str, str]], limit: int = 10) -> list[dic
             -float(row["needs_review_rate"]),
             float(row["valid_aanbod_rate"]),
             int(row["total_sources"]),
-            row["plaats"].lower(),
+            row["gemeente"].lower(),
         ),
     )[:limit]
 
@@ -310,7 +329,7 @@ def write_report(path: Path, rows: list[dict[str, str]]) -> None:
     recommendation_rows = top_recommendations(rows)
 
     overview_table_columns = [
-        "plaats",
+        "gemeente",
         "total_sources",
         "with_valid_koopaanbod_url",
         "needs_review_rate",
@@ -318,7 +337,7 @@ def write_report(path: Path, rows: list[dict[str, str]]) -> None:
         "priority_score",
     ]
     important_table_columns = [
-        "plaats",
+        "gemeente",
         "total_sources",
         "with_valid_koopaanbod_url",
         "needs_review_count",
@@ -329,7 +348,7 @@ def write_report(path: Path, rows: list[dict[str, str]]) -> None:
     ]
 
     recommendation_lines = [
-        f"- `{row['plaats']}`: {recommendation_reason(row)}."
+        f"- `{row['gemeente']}`: {recommendation_reason(row)}."
         for row in recommendation_rows
     ]
 
@@ -339,25 +358,25 @@ def write_report(path: Path, rows: list[dict[str, str]]) -> None:
             "",
             "## Resumen total del seed",
             f"- Total sources: {summary.total_rows}",
-            f"- Total places: {summary.total_places}",
+            f"- Total gemeenten: {summary.total_places}",
             f"- With valid koopaanbod_url: {summary.total_valid} ({seed_valid_rate:.2%})",
             f"- With suspect koopaanbod_url: {summary.total_suspect}",
             f"- Missing koopaanbod_url: {summary.total_missing}",
             f"- Needs review: {summary.total_needs_review} ({seed_review_rate:.2%})",
-            f"- Places with zero valid aanbod: {summary.places_with_zero_valid}",
-            f"- Important cities present in seed: {summary.important_places_in_seed}",
+            f"- Gemeenten with zero valid aanbod: {summary.places_with_zero_valid}",
+            f"- Important gemeenten present in seed: {summary.important_places_in_seed}",
             "",
-            "## Top 20 places con mejor cobertura",
+            "## Top 20 gemeenten con mejor cobertura",
             markdown_table(best_rows, overview_table_columns),
             "",
-            "## Top 20 places con peor cobertura",
+            "## Top 20 gemeenten con peor cobertura",
             markdown_table(worst_rows, overview_table_columns),
             "",
-            "## Important cities",
+            "## Important gemeenten",
             markdown_table(important_rows, important_table_columns),
             "",
             "## Recomendaciones concretas",
-            "### Top 10 places a atacar primero",
+            "### Top 10 gemeenten a atacar primero",
             *recommendation_lines,
             "",
         ]
@@ -367,8 +386,8 @@ def write_report(path: Path, rows: list[dict[str, str]]) -> None:
 
 
 def run_analysis() -> CoverageSummary:
-    source_rows = read_csv_rows(INPUT_CSV)
-    coverage_rows = aggregate_by_place(source_rows)
+    source_rows = read_csv_rows(resolve_input_csv())
+    coverage_rows = aggregate_by_gemeente(source_rows)
     write_csv(OUTPUT_CSV, coverage_rows)
     write_report(OUTPUT_REPORT, coverage_rows)
     return compute_summary(coverage_rows)
@@ -377,6 +396,6 @@ def run_analysis() -> CoverageSummary:
 if __name__ == "__main__":
     summary = run_analysis()
     print(
-        f"Coverage analysis complete: places={summary.total_places} "
-        f"sources={summary.total_rows} zero_valid_places={summary.places_with_zero_valid}"
+        f"Coverage analysis complete: gemeenten={summary.total_places} "
+        f"sources={summary.total_rows} zero_valid_gemeenten={summary.places_with_zero_valid}"
     )

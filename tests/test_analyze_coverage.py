@@ -4,13 +4,13 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.analyze_coverage import (
-    aggregate_by_place,
+    aggregate_by_gemeente,
     compute_priority_score,
     recommendation_reason,
 )
 
 
-def test_aggregate_by_place_computes_expected_counts_and_flags() -> None:
+def test_aggregate_by_gemeente_computes_expected_counts_and_flags() -> None:
     rows = [
         {
             "plaats": "Breda",
@@ -32,9 +32,9 @@ def test_aggregate_by_place_computes_expected_counts_and_flags() -> None:
         },
     ]
 
-    result = aggregate_by_place(rows)
+    result = aggregate_by_gemeente(rows)
 
-    assert result[0]["plaats"] == "Breda"
+    assert result[0]["gemeente"] == "Breda"
     assert result[0]["total_sources"] == "3"
     assert result[0]["with_website"] == "2"
     assert result[0]["with_valid_koopaanbod_url"] == "1"
