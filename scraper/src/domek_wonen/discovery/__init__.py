@@ -6,6 +6,8 @@ from .aanbod_finder import (
 from .dedupe import dedupe_candidates
 from .engine import run_discovery
 from .models import DiscoveryResult, GeneratedQuery, SourceCandidate
+from .overpass_adapter import OverpassAdapter, OverpassDiscoveryResponse
+from .place_mapper import normalize_overpass_city
 from .query_generator import generate_queries_for_gemeente, generate_queries_from_reference
 from .search_api_adapter import SearchApiAdapter, SearchApiResponse, SearchResult
 from .scorer import score_candidate
@@ -16,6 +18,8 @@ __all__ = [
     "AanbodClassification",
     "DiscoveryResult",
     "GeneratedQuery",
+    "OverpassAdapter",
+    "OverpassDiscoveryResponse",
     "SearchApiAdapter",
     "SearchApiResponse",
     "SearchResult",
@@ -27,6 +31,7 @@ __all__ = [
     "generate_queries_for_gemeente",
     "generate_queries_from_reference",
     "load_seed_candidates",
+    "normalize_overpass_city",
     "run_discovery",
     "score_candidate",
     "suggest_common_aanbod_paths",

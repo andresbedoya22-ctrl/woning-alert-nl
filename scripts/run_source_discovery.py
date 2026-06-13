@@ -17,6 +17,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mode", default="full", help="Execution mode. v1 accepts local/dry/full")
     parser.add_argument("--max-queries", type=int, default=500, help="Maximum number of generated queries to keep")
     parser.add_argument("--max-sites", type=int, default=1000, help="Maximum number of seed candidates to analyze")
+    parser.add_argument("--skip-overpass", action="store_true", help="Skip free Overpass external discovery")
     return parser.parse_args()
 
 
@@ -27,6 +28,7 @@ def main() -> int:
         mode=args.mode,
         max_queries=args.max_queries,
         max_sites=args.max_sites,
+        skip_overpass=args.skip_overpass,
     )
     print(output.report_path)
     return 0

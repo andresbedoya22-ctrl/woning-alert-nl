@@ -18,6 +18,7 @@ def test_dedupe_eliminates_duplicate_by_root_domain_and_gemeente() -> None:
             score=20,
             confidence=0.65,
             aanbod_url_quality="missing",
+            source_origin="seed",
         ),
         SourceCandidate(
             office_name="Example Makelaar Breda",
@@ -27,6 +28,8 @@ def test_dedupe_eliminates_duplicate_by_root_domain_and_gemeente() -> None:
             score=80,
             confidence=0.85,
             aanbod_url_quality="valid",
+            source_origin="overpass_osm",
+            osm_id="123",
         ),
     ]
 
@@ -34,3 +37,5 @@ def test_dedupe_eliminates_duplicate_by_root_domain_and_gemeente() -> None:
 
     assert len(deduped) == 1
     assert deduped[0].score == 80
+    assert deduped[0].source_origin == "overpass_osm+seed"
+    assert deduped[0].osm_id == "123"
