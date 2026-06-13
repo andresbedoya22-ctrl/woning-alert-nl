@@ -4,7 +4,7 @@ import csv
 from collections import Counter
 from pathlib import Path
 
-from .models import DiscoveryResult, GeneratedQuery, SourceCandidate
+from .models import AanbodAuditAttempt, DiscoveryResult, GeneratedQuery, LiveAanbodAttempt, SourceCandidate
 
 
 def load_expected_gemeenten(path: Path) -> list[str]:
@@ -196,12 +196,32 @@ def render_discovery_run_report(
     overpass_new_domains_added: int,
     overpass_duplicates_vs_seed: int,
     overpass_errors: list[str],
+    live_aanbod_enabled: bool,
+    live_sites_attempted: int,
+    live_sites_success: int,
+    live_sites_failed: int,
+    existing_valid_aanbod_kept: int,
+    new_valid_aanbod_found: int,
+    new_suspect_aanbod_found: int,
+    live_attempts: list[LiveAanbodAttempt],
+    audit_aanbod_enabled: bool,
+    audited_sites_count: int,
+    browser_audit_valid_found: int,
+    browser_audit_suspect_found: int,
+    browser_audit_missing_or_failed: int,
+    browser_audit_unique_valid_domains: int,
+    browser_audit_unique_valid_urls: int,
+    browser_audit_duplicate_valid_rows: int,
+    valid_aanbod_after_audit: int,
+    missing_aanbod_after_audit: int,
+    audit_attempts: list[AanbodAuditAttempt],
 ) -> str:
     analyzed_count = len(analyzed_results) + skipped_candidates_count
     valid_aanbod_count = sum(1 for result in analyzed_results if result.candidate.aanbod_url_quality == "valid")
     suspect_count = sum(1 for result in analyzed_results if result.candidate.aanbod_url_quality == "suspect")
     missing_count = sum(1 for result in analyzed_results if result.candidate.aanbod_url_quality == "missing")
     rejected_count = sum(1 for result in analyzed_results if result.status == "rejected")
+    still_missing_aanbod = sum(1 for result in analyzed_results if result.candidate.aanbod_url_quality == "missing")
 
     coverage_rows = build_coverage_rows(discovered_sources + rejected_candidates)
     missing_summary = split_missing_expected_gemeenten(expected_gemeenten, discovered_sources, rejected_candidates)
@@ -236,6 +256,86 @@ def render_discovery_run_report(
     unmapped_place_lines = [
         f"- {row['raw_place']}: {row['count']}" for row in unmapped_place_rows
     ] or ["- None"]
+    live_breakdown = Counter(attempt.final_status for attempt in live_attempts)
+    live_breakdown_lines = [f"- {status}: {count}" for status, count in sorted(live_breakdown.items())] or ["- None"]
+    failure_reasons = Counter(
+        attempt.failure_reason for attempt in live_attempts if attempt.attempted and attempt.failure_reason
+    )
+    failure_reason_lines = [f"- {reason}: {count}" for reason, count in failure_reasons.most_common(10)] or ["- None"]
+    repaired_domains = Counter(
+        attempt.root_domain or "(unknown)"
+        for attempt in live_attempts
+        if attempt.attempted and attempt.final_status in {"valid", "suspect"}
+    )
+    failed_domains = Counter(
+        attempt.root_domain or "(unknown)"
+        for attempt in live_attempts
+        if attempt.attempted and attempt.final_status not in {"valid", "suspect"}
+    )
+    repaired_domain_lines = [f"- {domain}: {count}" for domain, count in repaired_domains.most_common(10)] or ["- None"]
+    failed_domain_lines = [f"- {domain}: {count}" for domain, count in failed_domains.most_common(10)] or ["- None"]
+    success_rows = sorted(
+        (attempt for attempt in live_attempts if attempt.attempted and attempt.final_status in {"valid", "suspect"}),
+        key=lambda attempt: (attempt.detection_score, attempt.elapsed_ms * -1),
+        reverse=True,
+    )[:10]
+    success_lines = [
+        f"- {attempt.root_domain or '(unknown)'}: {attempt.final_status} via {attempt.detection_method} "
+        f"score={attempt.detection_score} url={attempt.final_aanbod_url}"
+        for attempt in success_rows
+    ] or ["- None"]
+    audit_breakdown = Counter(attempt.final_status for attempt in audit_attempts)
+    audit_average_confidence = (
+        sum(attempt.confidence for attempt in audit_attempts) / len(audit_attempts) if audit_attempts else 0.0
+    )
+    audit_valid_lines = [
+        f"- {attempt.root_domain or '(unknown)'}: score={attempt.confidence} type={attempt.final_page_type} url={attempt.final_aanbod_url}"
+        for attempt in sorted(
+            (attempt for attempt in audit_attempts if attempt.final_status == "valid"),
+            key=lambda attempt: attempt.confidence,
+            reverse=True,
+        )[:10]
+    ] or ["- None"]
+    audit_suspect_lines = [
+        f"- {attempt.root_domain or '(unknown)'}: score={attempt.confidence} type={attempt.final_page_type} url={attempt.final_aanbod_url or attempt.best_candidate_url}"
+        for attempt in sorted(
+            (attempt for attempt in audit_attempts if attempt.final_status == "suspect"),
+            key=lambda attempt: attempt.confidence,
+            reverse=True,
+        )[:10]
+    ] or ["- None"]
+    audit_failed_domain_lines = [
+        f"- {domain}: {count}"
+        for domain, count in Counter(
+            attempt.root_domain or "(unknown)"
+            for attempt in audit_attempts
+            if attempt.final_status in {"failed_fetch", "missing", "rejected"}
+        ).most_common(10)
+    ] or ["- None"]
+    new_valid_lines = [
+        "| office_name | root_domain | aanbod_url | method | score |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for attempt in live_attempts:
+        if attempt.final_status == "valid":
+            new_valid_lines.append(
+                f"| {attempt.office_name} | {attempt.root_domain or '(unknown)'} | {attempt.final_aanbod_url} | "
+                f"{attempt.detection_method} | {attempt.detection_score} |"
+            )
+    if len(new_valid_lines) == 2:
+        new_valid_lines.append("| None | - | - | - | - |")
+    new_suspect_lines = [
+        "| office_name | root_domain | aanbod_url | method | score |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for attempt in live_attempts:
+        if attempt.final_status == "suspect":
+            new_suspect_lines.append(
+                f"| {attempt.office_name} | {attempt.root_domain or '(unknown)'} | {attempt.final_aanbod_url} | "
+                f"{attempt.detection_method} | {attempt.detection_score} |"
+            )
+    if len(new_suspect_lines) == 2:
+        new_suspect_lines.append("| None | - | - | - | - |")
     weak_lines = [
         f"- {row['gemeente']}: weak_score={row['weak_score']}, valid={row['valid']}, "
         f"suspect={row['suspect']}, missing={row['missing']}, rejected={row['rejected']}"
@@ -259,6 +359,8 @@ def render_discovery_run_report(
             f"- Seed count: {seed_count}",
             f"- Generated queries count: {len(generated_queries)}",
             f"- Free external discovery enabled: {'true' if external_discovery_enabled else 'false'}",
+            f"- Live aanbod enabled: {'true' if live_aanbod_enabled else 'false'}",
+            f"- Audit aanbod enabled: {'true' if audit_aanbod_enabled else 'false'}",
             f"- Overpass status: {overpass_status}",
             f"- Overpass raw candidates: {overpass_raw_candidates}",
             f"- Overpass candidates with website: {overpass_candidates_with_website}",
@@ -270,6 +372,22 @@ def render_discovery_run_report(
             f"- Valid aanbod_url after Overpass: {valid_aanbod_count}",
             f"- Suspect after Overpass: {suspect_count}",
             f"- Missing aanbod_url after Overpass: {missing_count}",
+            f"- Live sites attempted: {live_sites_attempted}",
+            f"- Live sites success: {live_sites_success}",
+            f"- Live sites failed: {live_sites_failed}",
+            f"- Audited sites count: {audited_sites_count}",
+            f"- Browser audit valid found: {browser_audit_valid_found}",
+            f"- Browser audit suspect found: {browser_audit_suspect_found}",
+            f"- Browser audit missing/failed: {browser_audit_missing_or_failed}",
+            f"- Browser audit unique valid domains: {browser_audit_unique_valid_domains}",
+            f"- Browser audit unique valid URLs: {browser_audit_unique_valid_urls}",
+            f"- Browser audit duplicate valid rows: {browser_audit_duplicate_valid_rows}",
+            f"- Existing valid aanbod_url kept: {existing_valid_aanbod_kept}",
+            f"- New valid aanbod_url found: {new_valid_aanbod_found}",
+            f"- New suspect aanbod_url found: {new_suspect_aanbod_found}",
+            f"- Valid aanbod_url after audit: {valid_aanbod_after_audit}",
+            f"- Missing aanbod_url after audit: {missing_aanbod_after_audit}",
+            f"- Still missing aanbod_url: {still_missing_aanbod}",
             f"- Rejected count: {rejected_count}",
             f"- Discovered sources count: {len(discovered_sources)}",
             f"- Rejected candidates count: {len(rejected_candidates)}",
@@ -288,6 +406,49 @@ def render_discovery_run_report(
             "",
             "## Overpass unmapped places",
             *unmapped_place_lines,
+            "",
+            "## Live Aanbod Repair Summary",
+            "### Live Aanbod Attempts Breakdown",
+            *live_breakdown_lines,
+            "",
+            "### Top failure reasons",
+            *failure_reason_lines,
+            "",
+            "### Top domains repaired",
+            *repaired_domain_lines,
+            "",
+            "### Top failed domains",
+            *failed_domain_lines,
+            "",
+            "### Top successful detections",
+            *success_lines,
+            "",
+            "### New valid URLs table",
+            *new_valid_lines,
+            "",
+            "### New suspect URLs table",
+            *new_suspect_lines,
+            "",
+            "## Aanbod Auditor Summary",
+            f"- Audit aanbod enabled: {'true' if audit_aanbod_enabled else 'false'}",
+            f"- Audited sites count: {audited_sites_count}",
+            f"- Browser audit valid found: {browser_audit_valid_found}",
+            f"- Browser audit suspect found: {browser_audit_suspect_found}",
+            f"- Browser audit missing: {audit_breakdown.get('missing', 0)}",
+            f"- Browser audit failed_fetch: {audit_breakdown.get('failed_fetch', 0) + audit_breakdown.get('rejected', 0)}",
+            f"- Browser audit unique valid domains: {browser_audit_unique_valid_domains}",
+            f"- Browser audit unique valid URLs: {browser_audit_unique_valid_urls}",
+            f"- Browser audit duplicate valid rows: {browser_audit_duplicate_valid_rows}",
+            f"- Average confidence: {audit_average_confidence:.1f}",
+            "",
+            "### Top valid detections",
+            *audit_valid_lines,
+            "",
+            "### Top suspect detections",
+            *audit_suspect_lines,
+            "",
+            "### Top failed domains",
+            *audit_failed_domain_lines,
             "",
             "## Coverage By Gemeente",
             *coverage_lines,

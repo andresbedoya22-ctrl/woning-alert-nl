@@ -31,6 +31,7 @@ VALID_AANBOD_SIGNALS = (
     "woningen",
     "huizen",
     "objecten",
+    "te-koop",
 )
 
 EXCLUDED_AANBOD_TOKENS = (
@@ -38,6 +39,7 @@ EXCLUDED_AANBOD_TOKENS = (
     "gratis-verkoopadvies",
     "waardebepaling",
     "taxatie",
+    "taxaties",
     "contact",
     "over-ons",
     "diensten",
@@ -48,6 +50,9 @@ EXCLUDED_AANBOD_TOKENS = (
     "reviews",
     "aankoopmakelaar",
     "verkoopmakelaar",
+    "vacatures",
+    "team",
+    "about",
 )
 
 COMMON_AANBOD_PATHS = (
@@ -56,8 +61,18 @@ COMMON_AANBOD_PATHS = (
     "/koopwoningen",
     "/koop",
     "/wonen",
-    "/huizen-aanbod",
+    "/woningen",
+    "/huizen",
     "/objecten",
+    "/aanbod/koopwoningen",
+    "/aanbod/woningaanbod",
+    "/aanbod/koop",
+    "/nl/aanbod",
+    "/nl/koopwoningen",
+    "/nl/woningaanbod",
+    "/huizen-te-koop",
+    "/woningen-te-koop",
+    "/koopaanbod",
 )
 
 MAKELAAR_SIGNALS = (
@@ -74,4 +89,30 @@ MAKELAAR_SIGNALS = (
 COMMERCIAL_ONLY_TOKENS = (
     "bedrijfshuisvesting",
     "taxatie",
+)
+
+LIVE_AANBOD_USER_AGENT = "DomekWonenAanbodFinder/2.0 (+https://example.invalid/bot; contact=ops@domek.invalid)"
+LIVE_AANBOD_TIMEOUT_SECONDS = 8.0
+LIVE_AANBOD_DELAY_SECONDS = 0.35
+LIVE_AANBOD_MAX_SITEMAP_URLS = 40
+
+PAGE_LISTING_SIGNALS = (
+    "prijs",
+    "vraagprijs",
+    "k.k.",
+    "kosten koper",
+    "koop",
+    "verkocht",
+    "beschikbaar",
+    "onder bod",
+    "woonoppervlakte",
+    "perceel",
+    "kamers",
+    "slaapkamers",
+    "adres",
+    "postcode",
+    "woning",
+    "appartement",
+    "vrijstaand",
+    "tussenwoning",
 )

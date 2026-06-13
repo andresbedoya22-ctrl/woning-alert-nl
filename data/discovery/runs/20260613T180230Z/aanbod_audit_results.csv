@@ -1,0 +1,455 @@
+office_name,website,root_domain,gemeente,final_status,final_aanbod_url,confidence,detection_method,homepage_status,homepage_title,candidates_found_count,candidates_tested_count,best_candidate_url,final_page_type,residential_signals_count,residential_signals_found,commercial_signals_count,commercial_signals_found,page_quality_reason,commercial_hard_block,commercial_block_reason,is_duplicate_audit_result,listing_signals_count,listing_signals_found,rejection_reason,elapsed_ms
+Van Hoven & Oomen,https://www.vhno.nl,vhno.nl,Alphen-Chaam,valid,https://vhno.nl/aanbod,100,homepage_link,200,Home - Van Hoven & Oomen,7,1,https://vhno.nl/aanbod,listing_index,7,"woning,woningen,vrijstaand,tussenwoning,hoekwoning,woonoppervlakte,k.k.",0,,residential_listing_index,false,,false,10,"prijs,k.k.,koop,verkocht,woonoppervlakte,perceel,kamers,woning,vrijstaand,tussenwoning",,12850
+Hofstede Bedrijfshuisvesting B.V.,https://www.hofstedebedrijfshuisvesting.nl,hofstedebedrijfshuisvesting.nl,Altena,rejected,,45,homepage_link,200,Homepage | Hofstede Makelaardij,17,1,https://hofstedebedrijfshuisvesting.nl/aanbod/aanbod.html,commercial_listing,5,"woning,huis,huizen,k.k.,vraagprijs",4,"bedrijfsaanbod,bedrijfshuisvesting,bedrijfsruimte,kantoorruimte",commercial_only,true,path:bedrijfshuisvesting,false,8,"prijs,vraagprijs,k.k.,koop,verkocht,perceel,adres,woning",commercial_only,32691
+Hofstede Land van Heusden,https://www.hofstedelandvanheusden.nl,hofstedelandvanheusden.nl,Altena,valid,https://hofstedelandvanheusden.nl/aanbod,100,common_path,200,"Makelaar, taxateur & vastgoedadviseur in Land van Heusden",14,8,https://hofstedelandvanheusden.nl/aanbod,listing_index,9,"woning,woningen,appartement,huis,vrijstaand,tussenwoning,hoekwoning,woonoppervlakte,k.k.",0,,residential_listing_index,false,,false,12,"prijs,k.k.,koop,verkocht,onder bod,woonoppervlakte,perceel,kamers,woning,appartement,vrijstaand,tussenwoning",,16439
+Hofstede Makelaardij Werkendam,http://www.hofstedemakelaardij.nl,hofstedemakelaardij.nl,Altena,valid,https://hofstedemakelaardij.nl/aanbod,100,common_path,200,"Makelaar, taxateur & vastgoedadviseur - Hofstede Makelaardij",7,1,https://hofstedemakelaardij.nl/aanbod,listing_index,9,"woning,woningen,appartement,huis,vrijstaand,tussenwoning,hoekwoning,woonoppervlakte,k.k.",0,,residential_listing_index,false,,false,12,"prijs,k.k.,koop,verkocht,onder bod,woonoppervlakte,perceel,kamers,woning,appartement,vrijstaand,tussenwoning",,10702
+Kolpa OZP makelaars,http://www.kolpa-ozp.nl,kolpa-ozp.nl,Altena,suspect,https://kolpa.nl/vestigingen/dordrecht,73,common_path,200,Makelaar Dordrecht | Kolpa Makelaars & Taxateurs – Lokale Exp,7,1,https://kolpa.nl/vestigingen/dordrecht,project_page,2,"woning,woningen",0,,project_page,false,,false,4,"beschikbaar,adres,postcode,woning",project_page,12206
+Merwelanden Vastgoed Associatie BV,http://www.merwelanden-makelaardij.nl,merwelanden-makelaardij.nl,Altena,missing,,0,failed,200,,7,7,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,463
+Nouwen Makelaardij o.g. b.v.,http://www.nouwen.nl,nouwen.nl,Altena,suspect,https://nouwen.nl,86,homepage_link,200,Makelaar Dordrecht - NOUWEN Makelaardij,8,1,https://nouwen.nl,project_page,3,"woning,woningen,huis",0,,project_page,false,,false,4,"koop,verkocht,adres,woning",project_page,3433
+Taxanja Taxaties,https://www.taxanja.nl,taxanja.nl,Altena,missing,,0,failed,200,Taxanja - HOME,7,7,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,1169
+Zoomer Nijp Taxatieburo B.V.,http://www.nijpmakelaars.nl,nijpmakelaars.nl,Altena,missing,,0,failed,200,Web Server's Default Page,7,7,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,504
+Berkers Taxaties,https://www.berkerstaxaties.nl,berkerstaxaties.nl,Asten,missing,,0,failed,200,Professionele taxatie van uw woning - Berkers Taxaties,7,0,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,2305
+Peter van den Oetelaar Lommers Makelaars,http://www.lommersmakelaars.nl,lommersmakelaars.nl,Bergeijk,missing,,0,failed,200,Wij zijn Lommers. De makelaar die méér in huis heeft,7,7,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,3736
+Wijman & Jansen ERA makelaars,https://www.wijmanjansen.nl,wijmanjansen.nl,Bergeijk,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: net::ERR_CERT_AUTHORITY_INVALID at https://www.wijmanjansen.nl/
+Call log:
+  - navigating to ""https://www.wijmanjansen.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: net::ERR_CERT_AUTHORITY_INVALID at https://www.wijmanjansen.nl/
+Call log:
+  - navigating to ""https://www.wijmanjansen.nl/"", waiting until ""domcontentloaded""
+",34
+Brabant Makelaardij,http://www.brabantmakelaardij.nl,brabantmakelaardij.nl,Bergen op Zoom,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.brabantmakelaardij.nl/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""http://www.brabantmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.brabantmakelaardij.nl/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""http://www.brabantmakelaardij.nl/"", waiting until ""domcontentloaded""
+",208
+DE VIERWINDEN MAKELAARDIJ B.V.,http://www.devierwindenmakelaardij.nl,devierwindenmakelaardij.nl,Bergen op Zoom,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.devierwindenmakelaardij.nl/"" is interrupted by another navigation to ""https://www.brabantmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.devierwindenmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.devierwindenmakelaardij.nl/"" is interrupted by another navigation to ""https://www.brabantmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.devierwindenmakelaardij.nl/"", waiting until ""domcontentloaded""
+",859
+Van den Berk & Kerkhof Makelaars en Taxateurs,http://www.berkkerkhof.nl,berkkerkhof.nl,Best,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.berkkerkhof.nl/"" is interrupted by another navigation to ""https://www.devierwindenmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.berkkerkhof.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.berkkerkhof.nl/"" is interrupted by another navigation to ""https://www.devierwindenmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.berkkerkhof.nl/"", waiting until ""domcontentloaded""
+",139
+Nuyens Makelaars,http://www.nuyensmakelaars.nl,nuyensmakelaars.nl,Boxtel,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.nuyensmakelaars.nl/"" is interrupted by another navigation to ""https://www.berkkerkhof.nl/""
+Call log:
+  - navigating to ""http://www.nuyensmakelaars.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.nuyensmakelaars.nl/"" is interrupted by another navigation to ""https://www.berkkerkhof.nl/""
+Call log:
+  - navigating to ""http://www.nuyensmakelaars.nl/"", waiting until ""domcontentloaded""
+",200
+Bastiaansen van den Bemd Makelaars Taxateurs,https://www.b-vdb.nl,b-vdb.nl,Breda,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: net::ERR_CERT_AUTHORITY_INVALID at https://www.b-vdb.nl/
+Call log:
+  - navigating to ""https://www.b-vdb.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: net::ERR_CERT_AUTHORITY_INVALID at https://www.b-vdb.nl/
+Call log:
+  - navigating to ""https://www.b-vdb.nl/"", waiting until ""domcontentloaded""
+",191
+Bink & Partners,http://www.binkenpartners.nl,binkenpartners.nl,Breda,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.binkenpartners.nl/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""http://www.binkenpartners.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.binkenpartners.nl/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""http://www.binkenpartners.nl/"", waiting until ""domcontentloaded""
+",758
+ERA Focus Makelaars Breda B.V.,http://www.erafocus.nl,erafocus.nl,Breda,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.erafocus.nl/"" is interrupted by another navigation to ""https://binkenpartners.nl/""
+Call log:
+  - navigating to ""http://www.erafocus.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.erafocus.nl/"" is interrupted by another navigation to ""https://binkenpartners.nl/""
+Call log:
+  - navigating to ""http://www.erafocus.nl/"", waiting until ""domcontentloaded""
+",505
+Roga Makelaars B.V.,http://www.rogamakelaars.nl,rogamakelaars.nl,Breda,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.rogamakelaars.nl/"" is interrupted by another navigation to ""https://erafocus.nl/""
+Call log:
+  - navigating to ""http://www.rogamakelaars.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.rogamakelaars.nl/"" is interrupted by another navigation to ""https://erafocus.nl/""
+Call log:
+  - navigating to ""http://www.rogamakelaars.nl/"", waiting until ""domcontentloaded""
+",2282
+Storimans en Partners,https://www.storimansenpartners.nl,storimansenpartners.nl,Breda,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://www.storimansenpartners.nl/"" is interrupted by another navigation to ""https://rogamakelaars.nl/""
+Call log:
+  - navigating to ""https://www.storimansenpartners.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://www.storimansenpartners.nl/"" is interrupted by another navigation to ""https://rogamakelaars.nl/""
+Call log:
+  - navigating to ""https://www.storimansenpartners.nl/"", waiting until ""domcontentloaded""
+",736
+Hypodomus | Pieter Vriends,http://www.hypodomus-eindhoven.nl,hypodomus-eindhoven.nl,Deurne,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.hypodomus-eindhoven.nl/"" is interrupted by another navigation to ""https://www.storimansenpartners.nl/""
+Call log:
+  - navigating to ""http://www.hypodomus-eindhoven.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.hypodomus-eindhoven.nl/"" is interrupted by another navigation to ""https://www.storimansenpartners.nl/""
+Call log:
+  - navigating to ""http://www.hypodomus-eindhoven.nl/"", waiting until ""domcontentloaded""
+",171
+NEO makelaars,https://www.neomakelaars.nl,neomakelaars.nl,Deurne,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://www.neomakelaars.nl/"" is interrupted by another navigation to ""http://www.hypodomus-eindhoven.nl/""
+Call log:
+  - navigating to ""https://www.neomakelaars.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://www.neomakelaars.nl/"" is interrupted by another navigation to ""http://www.hypodomus-eindhoven.nl/""
+Call log:
+  - navigating to ""https://www.neomakelaars.nl/"", waiting until ""domcontentloaded""
+",4446
+Kanters Makelaars B.V.,https://www.kanters.net,kanters.net,Dongen,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: net::ERR_CERT_COMMON_NAME_INVALID at https://www.kanters.net/
+Call log:
+  - navigating to ""https://www.kanters.net/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: net::ERR_CERT_COMMON_NAME_INVALID at https://www.kanters.net/
+Call log:
+  - navigating to ""https://www.kanters.net/"", waiting until ""domcontentloaded""
+",57
+Van den Bosch Makelaars,http://www.vandenboschmakelaars.com,vandenboschmakelaars.com,Dongen,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.vandenboschmakelaars.com/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""http://www.vandenboschmakelaars.com/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.vandenboschmakelaars.com/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""http://www.vandenboschmakelaars.com/"", waiting until ""domcontentloaded""
+",94
+Biemans B.V.,http://www.biemansmakelaardij.nl,biemansmakelaardij.nl,Drimmelen,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.biemansmakelaardij.nl/"" is interrupted by another navigation to ""https://www.vandenboschmakelaars.com/""
+Call log:
+  - navigating to ""http://www.biemansmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.biemansmakelaardij.nl/"" is interrupted by another navigation to ""https://www.vandenboschmakelaars.com/""
+Call log:
+  - navigating to ""http://www.biemansmakelaardij.nl/"", waiting until ""domcontentloaded""
+",352
+"Biemans Made, Makelaardij o.z. en Hypotheken",http://www.biemansmade.nl,biemansmade.nl,Drimmelen,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.biemansmade.nl/"" is interrupted by another navigation to ""https://www.biemansmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.biemansmade.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.biemansmade.nl/"" is interrupted by another navigation to ""https://www.biemansmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.biemansmade.nl/"", waiting until ""domcontentloaded""
+",458
+Bogaers Makelaardij,http://www.bogaersmakelaardij.nl,bogaersmakelaardij.nl,Drimmelen,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.bogaersmakelaardij.nl/"" is interrupted by another navigation to ""https://www.biemansmade.nl/""
+Call log:
+  - navigating to ""http://www.bogaersmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.bogaersmakelaardij.nl/"" is interrupted by another navigation to ""https://www.biemansmade.nl/""
+Call log:
+  - navigating to ""http://www.bogaersmakelaardij.nl/"", waiting until ""domcontentloaded""
+",851
+ERA Makelaardij Amerstreek,http://www.eramakelaardijamerstreek.nl,eramakelaardijamerstreek.nl,Drimmelen,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.eramakelaardijamerstreek.nl/"" is interrupted by another navigation to ""https://bogaersmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.eramakelaardijamerstreek.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.eramakelaardijamerstreek.nl/"" is interrupted by another navigation to ""https://bogaersmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.eramakelaardijamerstreek.nl/"", waiting until ""domcontentloaded""
+",1397
+Cushman & Wakefield Eindhoven,https://www.cushmanwakefield.nl,cushmanwakefield.nl,Eindhoven,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: net::ERR_CERT_DATE_INVALID at https://www.cushmanwakefield.nl/
+Call log:
+  - navigating to ""https://www.cushmanwakefield.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: net::ERR_CERT_DATE_INVALID at https://www.cushmanwakefield.nl/
+Call log:
+  - navigating to ""https://www.cushmanwakefield.nl/"", waiting until ""domcontentloaded""
+",721
+ERA Focus Makelaars Eindhoven B.V.,http://www.erafocus.nl,erafocus.nl,Eindhoven,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.erafocus.nl/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""http://www.erafocus.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.erafocus.nl/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""http://www.erafocus.nl/"", waiting until ""domcontentloaded""
+",203
+Hoogveldt Makelaardij,https://hoogveldtmakelaardij.nl,hoogveldtmakelaardij.nl,Eindhoven,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://hoogveldtmakelaardij.nl/"" is interrupted by another navigation to ""https://erafocus.nl/""
+Call log:
+  - navigating to ""https://hoogveldtmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://hoogveldtmakelaardij.nl/"" is interrupted by another navigation to ""https://erafocus.nl/""
+Call log:
+  - navigating to ""https://hoogveldtmakelaardij.nl/"", waiting until ""domcontentloaded""
+",390
+JLL Eindhoven,http://www.jll.nl,jll.nl,Eindhoven,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.jll.nl/"" is interrupted by another navigation to ""https://hoogveldtmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.jll.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.jll.nl/"" is interrupted by another navigation to ""https://hoogveldtmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.jll.nl/"", waiting until ""domcontentloaded""
+",227
+Lemon Suites,http://www.lemonsuites.nl,lemonsuites.nl,Eindhoven,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.lemonsuites.nl/"" is interrupted by another navigation to ""https://www.jll.com/nl-nl/""
+Call log:
+  - navigating to ""http://www.lemonsuites.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.lemonsuites.nl/"" is interrupted by another navigation to ""https://www.jll.com/nl-nl/""
+Call log:
+  - navigating to ""http://www.lemonsuites.nl/"", waiting until ""domcontentloaded""
+",327
+Ligtvoet Makelaardij,https://www.ligtvoetmakelaardij.nl,ligtvoetmakelaardij.nl,Eindhoven,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: net::ERR_CERT_COMMON_NAME_INVALID at https://www.ligtvoetmakelaardij.nl/
+Call log:
+  - navigating to ""https://www.ligtvoetmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: net::ERR_CERT_COMMON_NAME_INVALID at https://www.ligtvoetmakelaardij.nl/
+Call log:
+  - navigating to ""https://www.ligtvoetmakelaardij.nl/"", waiting until ""domcontentloaded""
+",227
+MVGM Vastgoedtaxaties,https://www.mvgmvastgoedtaxaties.nl,mvgmvastgoedtaxaties.nl,Eindhoven,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Timeout 15000ms exceeded.
+Call log:
+  - navigating to ""https://www.mvgmvastgoedtaxaties.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Timeout 15000ms exceeded.
+Call log:
+  - navigating to ""https://www.mvgmvastgoedtaxaties.nl/"", waiting until ""domcontentloaded""
+",15017
+Pradium Vastgoed,https://www.pradium.nl,pradium.nl,Eindhoven,suspect,https://pradium.nl/aanbod,100,homepage_link,200,Pradium Vastgoed - Makelaar Eindhoven - NVM Makelaar,7,1,https://pradium.nl/aanbod,property_detail,4,"woning,woningen,te koop,k.k.",0,,property_detail,false,,false,9,"prijs,k.k.,koop,verkocht,onder bod,perceel,kamers,adres,woning",property_detail,7449
+Werner Sanders Makelaardij,http://www.wernersandersmakelaardij.nl,wernersandersmakelaardij.nl,Eindhoven,valid,https://www.wernersandersmakelaardij.nl/aanbod/woningaanbod,100,homepage_link,200,Home - Werner Sanders Makelaardij,18,1,https://www.wernersandersmakelaardij.nl/aanbod/woningaanbod,listing_index,12,"woning,woningen,appartement,huis,huizen,woonhuis,vrijstaand,tussenwoning,woonoppervlakte,te koop,k.k.,vraagprijs",0,,residential_listing_index,false,,false,13,"prijs,vraagprijs,k.k.,koop,verkocht,beschikbaar,woonoppervlakte,perceel,kamers,woning,appartement,vrijstaand,tussenwoning",,14735
+Valoris Vastgoedtaxaties+ B.V.,https://www.valoris-taxaties.nl,valoris-taxaties.nl,Etten-Leur,missing,,0,failed,200,Valoris Vastgoedtaxaties+ | Taxatie bedrijfspand Breda - Etten-Leur - Oosterhout - Roosendaal - Tilburg - Zevenbergen,7,0,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,1098
+Biemans B.V.,http://www.biemansmakelaardij.nl,biemansmakelaardij.nl,Geertruidenberg,valid,https://www.biemansmakelaardij.nl/makelaardij/qualis/qualis-woningaanbod-via-biemans,100,homepage_link,200,Home | Biemans Makelaardij,15,2,https://www.biemansmakelaardij.nl/makelaardij/qualis/qualis-woningaanbod-via-biemans,listing_index,5,"woning,woningen,huis,woonhuis,k.k.",2,"bedrijfsaanbod,belegging",residential_listing_index,false,,false,4,"k.k.,koop,verkocht,woning",,14674
+"Biemans Made, Makelaardij o.z. en Hypotheken",http://www.biemansmade.nl,biemansmade.nl,Geertruidenberg,suspect,https://www.biemansmade.nl/nl/woningaanbod,100,homepage_link,200,"Jouw makelaar in Made: voor de verkoop, aankoop en taxatie van je huis.",13,1,https://www.biemansmade.nl/nl/woningaanbod,project_page,6,"woning,appartement,huis,huizen,woonhuis,slaapkamers",2,"commercieel,commercieel vastgoed",project_page,false,,false,10,"prijs,koop,verkocht,beschikbaar,kamers,slaapkamers,adres,postcode,woning,appartement",project_page,9291
+Bogaers Makelaardij,http://www.bogaersmakelaardij.nl,bogaersmakelaardij.nl,Geertruidenberg,suspect,https://bogaersmakelaardij.nl/woningaanbod,100,common_path,200,NVM Makelaar Made - Bogaers Makelaardij meer dan 20 jaar ervaring,7,1,https://bogaersmakelaardij.nl/woningaanbod,project_page,7,"woning,appartement,huis,vrijstaand,hoekwoning,te koop,k.k.",0,,project_page,false,,false,7,"k.k.,koop,verkocht,adres,woning,appartement,vrijstaand",project_page,12493
+ERA Makelaardij Amerstreek,http://www.eramakelaardijamerstreek.nl,eramakelaardijamerstreek.nl,Geertruidenberg,suspect,https://www.era.nl/raamsdonksveer/era-makelaardij-amerstreek,84,homepage_link,200,Makelaar Raamsdonksveer | ERA makelaardij Amerstreek,23,1,https://www.era.nl/raamsdonksveer/era-makelaardij-amerstreek,unknown,9,"woning,woningen,appartement,huis,huizen,vrijstaand,tussenwoning,hoekwoning,k.k.",0,,unknown_residential_shape,false,,false,10,"prijs,k.k.,koop,verkocht,onder bod,kamers,woning,appartement,vrijstaand,tussenwoning",unknown_page_type,28935
+Van Helvoort Makelaardij o.z. B.V.,https://vanhelvoortmakelaardij.nl,vanhelvoortmakelaardij.nl,Gemert-Bakel,valid,https://www.vanhelvoortmakelaardij.nl/aanbod-beek-en-donk,100,common_path,200,Makelaar Gemert en Boekel | Van Helvoort Makelaardij sinds 2003,7,1,https://www.vanhelvoortmakelaardij.nl/aanbod-beek-en-donk,listing_index,9,"woning,woningen,appartement,huis,huizen,woonoppervlakte,te koop,k.k.,vraagprijs",0,,residential_listing_index,false,,false,9,"prijs,vraagprijs,k.k.,koop,verkocht,woonoppervlakte,perceel,woning,appartement",,19032
+Jouw Aankoopmakelaar & Taxateur,https://www.jouwamet.nl,jouwamet.nl,Gilze en Rijen,missing,,0,failed,200,Jouw aankoopmakelaar en taxateur,7,7,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,8120
+Snijders & de Werdt Makelaars,http://www.swmakelaars.nl,swmakelaars.nl,Heeze-Leende,failed_fetch,,0,failed,404,HTTP Status 404 – Not Found,0,0,,unknown,0,,0,,homepage_status=404,false,,false,0,,homepage_status=404,111
+A3 Taxaties,https://www.a3taxaties.nl,a3taxaties.nl,Helmond,missing,,0,failed,200,Home - A3 Taxaties,7,0,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,1570
+ERA Focus Makelaars Helmond B.V.,http://www.erafocus.nl,erafocus.nl,Helmond,missing,,0,failed,200,ERA Focus Makelaars - Jouw makelaar in de regio!,7,7,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,11020
+Van Tuijl makelaardij,https://www.vantuijl-makelaardij.nl,vantuijl-makelaardij.nl,Helmond,suspect,https://vantuijl-makelaardij.nl,84,homepage_link,200,Home - Van Tuijl Makelaardij,8,1,https://vantuijl-makelaardij.nl,unknown,6,"woning,woningen,huis,woonhuis,slaapkamers,te koop",0,,unknown_residential_shape,false,,false,6,"prijs,koop,verkocht,kamers,slaapkamers,woning",unknown_page_type,11373
+Bunt Taxaties en Vastgoedadvies B.V.,http://www.buntvastgoed.nl,buntvastgoed.nl,Heusden,missing,,0,failed,200,Voor een onafhankelijke en betrouwbare taxatie,7,7,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,5353
+Hofstede Land van Heusden,https://www.hofstedelandvanheusden.nl,hofstedelandvanheusden.nl,Heusden,valid,https://hofstedelandvanheusden.nl/aanbod,100,common_path,200,"Makelaar, taxateur & vastgoedadviseur in Land van Heusden",14,8,https://hofstedelandvanheusden.nl/aanbod,listing_index,9,"woning,woningen,appartement,huis,vrijstaand,tussenwoning,hoekwoning,woonoppervlakte,k.k.",0,,residential_listing_index,false,,true,12,"prijs,k.k.,koop,verkocht,onder bod,woonoppervlakte,perceel,kamers,woning,appartement,vrijstaand,tussenwoning",,18872
+Mulders Taxaties B.V.,https://www.mulderstaxaties.nl,mulderstaxaties.nl,Heusden,missing,,0,failed,200,Taxatie Drunen - Den Bosch - Tilburg | Mulders Taxaties,7,0,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,966
+Taxanja Taxaties,https://www.taxanja.nl,taxanja.nl,Heusden,missing,,0,failed,200,Taxanja - HOME,7,7,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,946
+Tivoli woningmakelaars,https://www.tivoliwoningmakelaars,tivoliwoningmakelaars,Heusden,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: net::ERR_NAME_NOT_RESOLVED at https://www.tivoliwoningmakelaars/
+Call log:
+  - navigating to ""https://www.tivoliwoningmakelaars/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: net::ERR_NAME_NOT_RESOLVED at https://www.tivoliwoningmakelaars/
+Call log:
+  - navigating to ""https://www.tivoliwoningmakelaars/"", waiting until ""domcontentloaded""
+",35
+Van Helvoort Makelaardij o.z. B.V.,https://vanhelvoortmakelaardij.nl,vanhelvoortmakelaardij.nl,Laarbeek,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://vanhelvoortmakelaardij.nl/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""https://vanhelvoortmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://vanhelvoortmakelaardij.nl/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""https://vanhelvoortmakelaardij.nl/"", waiting until ""domcontentloaded""
+",1841
+Hermens Vastgoed Advisering,http://www.hermensvastgoed.nl,hermensvastgoed.nl,Land van Cuijk,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.hermensvastgoed.nl/"" is interrupted by another navigation to ""https://www.vanhelvoortmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.hermensvastgoed.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.hermensvastgoed.nl/"" is interrupted by another navigation to ""https://www.vanhelvoortmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.hermensvastgoed.nl/"", waiting until ""domcontentloaded""
+",69
+Kolmeijer Land van Cuijk,https://kolmeijercuijk.nl,kolmeijercuijk.nl,Land van Cuijk,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://kolmeijercuijk.nl/"" is interrupted by another navigation to ""http://www.hermensvastgoed.nl/""
+Call log:
+  - navigating to ""https://kolmeijercuijk.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://kolmeijercuijk.nl/"" is interrupted by another navigation to ""http://www.hermensvastgoed.nl/""
+Call log:
+  - navigating to ""https://kolmeijercuijk.nl/"", waiting until ""domcontentloaded""
+",315
+Makelaardij Martijn Willems,http://www.makelaarmartijnwillems.nl,makelaarmartijnwillems.nl,Land van Cuijk,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.makelaarmartijnwillems.nl/"" is interrupted by another navigation to ""https://www.kolmeijernijmegen.nl/cuijk/""
+Call log:
+  - navigating to ""http://www.makelaarmartijnwillems.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.makelaarmartijnwillems.nl/"" is interrupted by another navigation to ""https://www.kolmeijernijmegen.nl/cuijk/""
+Call log:
+  - navigating to ""http://www.makelaarmartijnwillems.nl/"", waiting until ""domcontentloaded""
+",177
+Makelaardij Twan Poels,http://www.twanpoels.nl,twanpoels.nl,Land van Cuijk,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.twanpoels.nl/"" is interrupted by another navigation to ""https://makelaarmartijnwillems.nl/""
+Call log:
+  - navigating to ""http://www.twanpoels.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.twanpoels.nl/"" is interrupted by another navigation to ""https://makelaarmartijnwillems.nl/""
+Call log:
+  - navigating to ""http://www.twanpoels.nl/"", waiting until ""domcontentloaded""
+",392
+Dragt Makelaars o.g.,http://www.dragtmakelaars.nl,dragtmakelaars.nl,Meierijstad,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Timeout 15000ms exceeded.
+Call log:
+  - navigating to ""http://www.dragtmakelaars.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Timeout 15000ms exceeded.
+Call log:
+  - navigating to ""http://www.dragtmakelaars.nl/"", waiting until ""domcontentloaded""
+",15011
+ZoDus Makelaars,https://www.zodus.nl,zodus.nl,Meierijstad,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: net::ERR_CERT_COMMON_NAME_INVALID at https://www.zodus.nl/
+Call log:
+  - navigating to ""https://www.zodus.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: net::ERR_CERT_COMMON_NAME_INVALID at https://www.zodus.nl/
+Call log:
+  - navigating to ""https://www.zodus.nl/"", waiting until ""domcontentloaded""
+",231
+Advema B.V.,http://www.advema.nl,advema.nl,Moerdijk,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.advema.nl/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""http://www.advema.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.advema.nl/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""http://www.advema.nl/"", waiting until ""domcontentloaded""
+",494
+Woonschuijt Makelaars,http://www.woonschuijt.nl,woonschuijt.nl,Moerdijk,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.woonschuijt.nl/"" is interrupted by another navigation to ""https://www.advema.nl/""
+Call log:
+  - navigating to ""http://www.woonschuijt.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.woonschuijt.nl/"" is interrupted by another navigation to ""https://www.advema.nl/""
+Call log:
+  - navigating to ""http://www.woonschuijt.nl/"", waiting until ""domcontentloaded""
+",812
+Hoogveldt Makelaardij,https://hoogveldtmakelaardij.nl,hoogveldtmakelaardij.nl,"Nuenen, Gerwen en Nederwetten",failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://hoogveldtmakelaardij.nl/"" is interrupted by another navigation to ""https://www.woonschuijt.nl/""
+Call log:
+  - navigating to ""https://hoogveldtmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://hoogveldtmakelaardij.nl/"" is interrupted by another navigation to ""https://www.woonschuijt.nl/""
+Call log:
+  - navigating to ""https://hoogveldtmakelaardij.nl/"", waiting until ""domcontentloaded""
+",406
+Van Tuijl makelaardij,https://www.vantuijl-makelaardij.nl,vantuijl-makelaardij.nl,"Nuenen, Gerwen en Nederwetten",failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://www.vantuijl-makelaardij.nl/"" is interrupted by another navigation to ""https://hoogveldtmakelaardij.nl/""
+Call log:
+  - navigating to ""https://www.vantuijl-makelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://www.vantuijl-makelaardij.nl/"" is interrupted by another navigation to ""https://hoogveldtmakelaardij.nl/""
+Call log:
+  - navigating to ""https://www.vantuijl-makelaardij.nl/"", waiting until ""domcontentloaded""
+",3297
+Vollenbroek B.V.,http://www.vollenbroekbv.com,vollenbroekbv.com,"Nuenen, Gerwen en Nederwetten",failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.vollenbroekbv.com/"" is interrupted by another navigation to ""https://vantuijl-makelaardij.nl/""
+Call log:
+  - navigating to ""http://www.vollenbroekbv.com/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.vollenbroekbv.com/"" is interrupted by another navigation to ""https://vantuijl-makelaardij.nl/""
+Call log:
+  - navigating to ""http://www.vollenbroekbv.com/"", waiting until ""domcontentloaded""
+",746
+Gijs Claassen Vastgoed advies,https://www.gijsclaassen.nl,gijsclaassen.nl,Oirschot,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://www.gijsclaassen.nl/"" is interrupted by another navigation to ""https://vollenbroek.nl/""
+Call log:
+  - navigating to ""https://www.gijsclaassen.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://www.gijsclaassen.nl/"" is interrupted by another navigation to ""https://vollenbroek.nl/""
+Call log:
+  - navigating to ""https://www.gijsclaassen.nl/"", waiting until ""domcontentloaded""
+",941
+Quinten Vastgoed,https://www.funda.nl/makelaar/14351-jeroen-quinten-taxatie-en-aankoopbegeleiding,funda.nl,Oirschot,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://www.funda.nl/makelaar/14351-jeroen-quinten-taxatie-en-aankoopbegeleiding"" is interrupted by another navigation to ""https://www.gijsclaassen.nl/""
+Call log:
+  - navigating to ""https://www.funda.nl/makelaar/14351-jeroen-quinten-taxatie-en-aankoopbegeleiding"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://www.funda.nl/makelaar/14351-jeroen-quinten-taxatie-en-aankoopbegeleiding"" is interrupted by another navigation to ""https://www.gijsclaassen.nl/""
+Call log:
+  - navigating to ""https://www.funda.nl/makelaar/14351-jeroen-quinten-taxatie-en-aankoopbegeleiding"", waiting until ""domcontentloaded""
+",371
+Gijs Claassen Vastgoed advies,https://www.gijsclaassen.nl,gijsclaassen.nl,Oisterwijk,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://www.gijsclaassen.nl/"" is interrupted by another navigation to ""https://www.funda.nl/makelaar/14351-jeroen-quinten-taxatie-en-aankoopbegeleiding""
+Call log:
+  - navigating to ""https://www.gijsclaassen.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://www.gijsclaassen.nl/"" is interrupted by another navigation to ""https://www.funda.nl/makelaar/14351-jeroen-quinten-taxatie-en-aankoopbegeleiding""
+Call log:
+  - navigating to ""https://www.gijsclaassen.nl/"", waiting until ""domcontentloaded""
+",507
+Biemans B.V.,http://www.biemansmakelaardij.nl,biemansmakelaardij.nl,Oosterhout,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.biemansmakelaardij.nl/"" is interrupted by another navigation to ""https://www.gijsclaassen.nl/""
+Call log:
+  - navigating to ""http://www.biemansmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.biemansmakelaardij.nl/"" is interrupted by another navigation to ""https://www.gijsclaassen.nl/""
+Call log:
+  - navigating to ""http://www.biemansmakelaardij.nl/"", waiting until ""domcontentloaded""
+",310
+"Biemans Made, Makelaardij o.z. en Hypotheken",http://www.biemansmade.nl,biemansmade.nl,Oosterhout,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.biemansmade.nl/"" is interrupted by another navigation to ""https://www.biemansmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.biemansmade.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.biemansmade.nl/"" is interrupted by another navigation to ""https://www.biemansmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.biemansmade.nl/"", waiting until ""domcontentloaded""
+",781
+Bogaers Makelaardij,http://www.bogaersmakelaardij.nl,bogaersmakelaardij.nl,Oosterhout,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.bogaersmakelaardij.nl/"" is interrupted by another navigation to ""https://www.biemansmade.nl/""
+Call log:
+  - navigating to ""http://www.bogaersmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.bogaersmakelaardij.nl/"" is interrupted by another navigation to ""https://www.biemansmade.nl/""
+Call log:
+  - navigating to ""http://www.bogaersmakelaardij.nl/"", waiting until ""domcontentloaded""
+",916
+De Landerije Maas en Waal,https://www.landerije.nl/maasenwaal,landerije.nl,Oss,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://www.landerije.nl/maasenwaal"" is interrupted by another navigation to ""https://bogaersmakelaardij.nl/""
+Call log:
+  - navigating to ""https://www.landerije.nl/maasenwaal"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://www.landerije.nl/maasenwaal"" is interrupted by another navigation to ""https://bogaersmakelaardij.nl/""
+Call log:
+  - navigating to ""https://www.landerije.nl/maasenwaal"", waiting until ""domcontentloaded""
+",1112
+Ben Straatman Makelaardij,http://www.benstraatman.nl,benstraatman.nl,Reusel-De Mierden,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.benstraatman.nl/"" is interrupted by another navigation to ""https://www.landerije.nl/over-de-landerije/landerije-makelaars/hilde-kuus/""
+Call log:
+  - navigating to ""http://www.benstraatman.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.benstraatman.nl/"" is interrupted by another navigation to ""https://www.landerije.nl/over-de-landerije/landerije-makelaars/hilde-kuus/""
+Call log:
+  - navigating to ""http://www.benstraatman.nl/"", waiting until ""domcontentloaded""
+",1074
+Nathalie van Gisbergen Lommers Makelaars,http://www.lommersmakelaars.nl,lommersmakelaars.nl,Reusel-De Mierden,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.lommersmakelaars.nl/"" is interrupted by another navigation to ""https://benstraatman.nl/""
+Call log:
+  - navigating to ""http://www.lommersmakelaars.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.lommersmakelaars.nl/"" is interrupted by another navigation to ""https://benstraatman.nl/""
+Call log:
+  - navigating to ""http://www.lommersmakelaars.nl/"", waiting until ""domcontentloaded""
+",634
+In de Roos Makelaardij B.V.,https://www.inderoosmakelaardij.nl,inderoosmakelaardij.nl,Roosendaal,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://www.inderoosmakelaardij.nl/"" is interrupted by another navigation to ""https://lommersmakelaars.nl/""
+Call log:
+  - navigating to ""https://www.inderoosmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://www.inderoosmakelaardij.nl/"" is interrupted by another navigation to ""https://lommersmakelaars.nl/""
+Call log:
+  - navigating to ""https://www.inderoosmakelaardij.nl/"", waiting until ""domcontentloaded""
+",282
+Noortje van der Maat Makelaardij,http://www.noortjevandermaat.nl,noortjevandermaat.nl,Roosendaal,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.noortjevandermaat.nl/"" is interrupted by another navigation to ""https://inderoosmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.noortjevandermaat.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.noortjevandermaat.nl/"" is interrupted by another navigation to ""https://inderoosmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.noortjevandermaat.nl/"", waiting until ""domcontentloaded""
+",194
+SuijkerBuijk bedrijfs Onroerend Goed,http://www.cs-makelaars.nl,cs-makelaars.nl,Roosendaal,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.cs-makelaars.nl/"" is interrupted by another navigation to ""http://www.noortjevandermaat.nl/""
+Call log:
+  - navigating to ""http://www.cs-makelaars.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.cs-makelaars.nl/"" is interrupted by another navigation to ""http://www.noortjevandermaat.nl/""
+Call log:
+  - navigating to ""http://www.cs-makelaars.nl/"", waiting until ""domcontentloaded""
+",577
+Vermunt Makelaardij B.V.,http://www.vermunt-makelaardij.nl,vermunt-makelaardij.nl,Roosendaal,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.vermunt-makelaardij.nl/"" is interrupted by another navigation to ""https://www.suijkerbuijk-bog.nl/""
+Call log:
+  - navigating to ""http://www.vermunt-makelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.vermunt-makelaardij.nl/"" is interrupted by another navigation to ""https://www.suijkerbuijk-bog.nl/""
+Call log:
+  - navigating to ""http://www.vermunt-makelaardij.nl/"", waiting until ""domcontentloaded""
+",304
+Abelen Makelaars en Taxateurs b.v.,http://www.abelen.nl,abelen.nl,'s-Hertogenbosch,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.abelen.nl/"" is interrupted by another navigation to ""https://www.vermunt-makelaardij.nl/""
+Call log:
+  - navigating to ""http://www.abelen.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.abelen.nl/"" is interrupted by another navigation to ""https://www.vermunt-makelaardij.nl/""
+Call log:
+  - navigating to ""http://www.abelen.nl/"", waiting until ""domcontentloaded""
+",340
+Atenzijlstra Makelaars,http://www.atenzijlstra.nl,atenzijlstra.nl,'s-Hertogenbosch,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.atenzijlstra.nl/"" is interrupted by another navigation to ""https://www.abelen.nl/""
+Call log:
+  - navigating to ""http://www.atenzijlstra.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.atenzijlstra.nl/"" is interrupted by another navigation to ""https://www.abelen.nl/""
+Call log:
+  - navigating to ""http://www.atenzijlstra.nl/"", waiting until ""domcontentloaded""
+",928
+Het Waare Huis,http://www.hetwaarehuis.nl,hetwaarehuis.nl,'s-Hertogenbosch,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.hetwaarehuis.nl/"" is interrupted by another navigation to ""https://atenzijlstra.nl/""
+Call log:
+  - navigating to ""http://www.hetwaarehuis.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.hetwaarehuis.nl/"" is interrupted by another navigation to ""https://atenzijlstra.nl/""
+Call log:
+  - navigating to ""http://www.hetwaarehuis.nl/"", waiting until ""domcontentloaded""
+",384
+NEXT Nieuwbouwmakelaars,https://www.nextnieuwbouwmakelaars.nl,nextnieuwbouwmakelaars.nl,'s-Hertogenbosch,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""https://www.nextnieuwbouwmakelaars.nl/"" is interrupted by another navigation to ""https://www.hetwaarehuis.nl/""
+Call log:
+  - navigating to ""https://www.nextnieuwbouwmakelaars.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""https://www.nextnieuwbouwmakelaars.nl/"" is interrupted by another navigation to ""https://www.hetwaarehuis.nl/""
+Call log:
+  - navigating to ""https://www.nextnieuwbouwmakelaars.nl/"", waiting until ""domcontentloaded""
+",2471
+Otter Taxaties & Advies,https://www.ottertaxaties.nl,ottertaxaties.nl,'s-Hertogenbosch,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Timeout 15000ms exceeded.
+Call log:
+  - navigating to ""https://www.ottertaxaties.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Timeout 15000ms exceeded.
+Call log:
+  - navigating to ""https://www.ottertaxaties.nl/"", waiting until ""domcontentloaded""
+",15007
+RSP Taxaties & Vastgoedadvies B.V.,http://www.rsptaxaties.nl,rsptaxaties.nl,'s-Hertogenbosch,missing,,0,failed,200,Home - RSP Taxaties & Vastgoedadvies B.V.,7,0,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,4204
+Berkers Taxaties,https://www.berkerstaxaties.nl,berkerstaxaties.nl,Someren,missing,,0,failed,200,Professionele taxatie van uw woning - Berkers Taxaties,7,0,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,1498
+Kruijswijk Makelaardij o.g.,http://www.kruijswijkmakelaardij.nl,kruijswijkmakelaardij.nl,Son en Breugel,suspect,https://www.kruijswijkmakelaardij.nl/aanbod,100,homepage_link,200,Kruijswijk Makelaardij | Uw makelaar voor Son en Breugel e.o.,15,1,https://www.kruijswijkmakelaardij.nl/aanbod,project_page,12,"woning,woningen,appartement,huis,vrijstaand,tussenwoning,hoekwoning,slaapkamers,woonoppervlakte,te koop,k.k.,vraagprijs",4,"bedrijfsruimte,kantoorruimte,winkelruimte,horeca",project_page,false,,false,13,"prijs,vraagprijs,k.k.,koop,verkocht,woonoppervlakte,perceel,kamers,slaapkamers,woning,appartement,vrijstaand,tussenwoning",project_page,28251
+ViaLinda,https://www.vialinda.nl,vialinda.nl,Son en Breugel,missing,,0,failed,200,vialinda.nl,7,7,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,536
+De Bont Makelaardij B.V.,http://www.debontmakelaardij.nl,debontmakelaardij.nl,Tilburg,suspect,https://debontmakelaardij.nl/Nieuws/1200/Hulp-nodig-bij-aankoop-.html,91,sitemap,200,De Bont Makelaardij,12,5,https://debontmakelaardij.nl/Nieuws/1200/Hulp-nodig-bij-aankoop-.html,project_page,4,"woning,woningen,huis,te koop",0,,project_page,false,,false,3,"prijs,koop,woning",project_page,4240
+Hart van Brabant Makelaardij B.V.,http://www.hartvanbrabantmakelaardij.nl,hartvanbrabantmakelaardij.nl,Tilburg,suspect,https://hartvanbrabantmakelaardij.nl,100,homepage_link,200,Hart van Brabant Makelaardij - Op zoek naar dé perfecte woning? Dan bent u bij ons aan het juiste adres. : Hart van Brabant Makelaardij Op zoek naar dé perfecte woning? Dan bent u bij ons aan het juiste adres.,8,1,https://hartvanbrabantmakelaardij.nl,project_page,7,"woning,appartement,huis,vrijstaand,tussenwoning,slaapkamers,k.k.",0,,project_page,false,,false,10,"prijs,k.k.,koop,kamers,slaapkamers,adres,woning,appartement,vrijstaand,tussenwoning",project_page,32041
+Van den Bosch Makelaars B.V.,https://www.vandenboschmakelaars.com,vandenboschmakelaars.com,Tilburg,suspect,https://www.vandenboschmakelaars.com/woning-dongen,100,homepage_link,200,Makelaar Dongen - én vestiging Tilburg | Van den Bosch Makelaars,13,4,https://www.vandenboschmakelaars.com/woning-dongen,property_detail,5,"woning,woningen,appartement,huis,huizen",0,,property_detail,false,,false,4,"koop,adres,woning,appartement",property_detail,14020
+Van Heeswijk Jansen Makelaars,http://www.hj-makelaars.nl,hj-makelaars.nl,Tilburg,suspect,https://www.hj-makelaars.nl/huis-kopen-tilburg,95,homepage_link,200,Jouw makelaar in regio Tilburg - HJ Makelaars,10,2,https://www.hj-makelaars.nl/huis-kopen-tilburg,property_detail,4,"woning,woningen,huis,te koop",0,,property_detail,false,,false,4,"koop,adres,postcode,woning",property_detail,21694
+ATENZIJLSTRA Makelaars,http://www.atenzijlstra.nl,atenzijlstra.nl,Vught,suspect,https://atenzijlstra.nl/aanbod,100,homepage_link,200,Atenzijlstra makelaars actief in Vught en Den Bosch,7,1,https://atenzijlstra.nl/aanbod,project_page,10,"woning,woningen,appartement,huis,woonhuis,vrijstaand,tussenwoning,hoekwoning,slaapkamers,k.k.",1,bedrijfsruimte,project_page,false,,false,12,"prijs,k.k.,koop,verkocht,beschikbaar,onder bod,kamers,slaapkamers,woning,appartement,vrijstaand,tussenwoning",project_page,24121
+Buro t'sas Makelaardij o.g,http://www.tsas.nl,tsas.nl,Vught,valid,https://www.tsas.nl/aanbod,100,homepage_link,200,Welkom bij de makelaar in Vught,22,1,https://www.tsas.nl/aanbod,listing_index,10,"woning,woningen,appartement,huis,huizen,tussenwoning,slaapkamers,woonoppervlakte,te koop,k.k.",0,,residential_listing_index,false,,false,11,"prijs,k.k.,koop,verkocht,beschikbaar,woonoppervlakte,kamers,slaapkamers,woning,appartement,tussenwoning",,16051
+MATAX Makelaardij,http://www.matax.nl,matax.nl,Vught,missing,,0,failed,200,Matax – Matax,7,7,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,8569
+Elias Makelaars,https://www.eliasmakelaars.nl,eliasmakelaars.nl,Waalre,missing,,0,failed,200,"Elias Makelaars | makelaar Eindhoven e.o | De Kranssen 77, Waalre, Nederland",7,7,,unknown,0,,0,,no_candidate_found,false,,false,0,,no_candidate_found,1566
+Irene van Aken Makelaardij,http://www.vanakenmakelaardij.nl,vanakenmakelaardij.nl,Waalre,suspect,https://vanakenmakelaardij.nl/woningen,100,homepage_link,200,Makelaar Waalre - Irene Van Aken Makelaardij | Dit voelt als thuiskomen | Waalre,11,1,https://vanakenmakelaardij.nl/woningen,property_detail,5,"woning,woningen,huis,slaapkamers,k.k.",0,,property_detail,false,,false,10,"prijs,k.k.,koop,verkocht,beschikbaar,onder bod,kamers,slaapkamers,adres,woning",property_detail,14647
+Tivoli woningmakelaars,https://www.tivoliwoningmakelaars,tivoliwoningmakelaars,Waalwijk,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: net::ERR_NAME_NOT_RESOLVED at https://www.tivoliwoningmakelaars/
+Call log:
+  - navigating to ""https://www.tivoliwoningmakelaars/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: net::ERR_NAME_NOT_RESOLVED at https://www.tivoliwoningmakelaars/
+Call log:
+  - navigating to ""https://www.tivoliwoningmakelaars/"", waiting until ""domcontentloaded""
+",45
+Brabant Makelaardij,http://www.brabantmakelaardij.nl,brabantmakelaardij.nl,Woensdrecht,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.brabantmakelaardij.nl/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""http://www.brabantmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.brabantmakelaardij.nl/"" is interrupted by another navigation to ""chrome-error://chromewebdata/""
+Call log:
+  - navigating to ""http://www.brabantmakelaardij.nl/"", waiting until ""domcontentloaded""
+",171
+DE VIERWINDEN MAKELAARDIJ B.V.,http://www.devierwindenmakelaardij.nl,devierwindenmakelaardij.nl,Woensdrecht,failed_fetch,,0,failed,0,,0,0,,unknown,0,,0,,"Page.goto: Navigation to ""http://www.devierwindenmakelaardij.nl/"" is interrupted by another navigation to ""https://www.brabantmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.devierwindenmakelaardij.nl/"", waiting until ""domcontentloaded""
+",false,,false,0,,"Page.goto: Navigation to ""http://www.devierwindenmakelaardij.nl/"" is interrupted by another navigation to ""https://www.brabantmakelaardij.nl/""
+Call log:
+  - navigating to ""http://www.devierwindenmakelaardij.nl/"", waiting until ""domcontentloaded""
+",844

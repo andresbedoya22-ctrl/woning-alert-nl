@@ -17,6 +17,9 @@ class SourceCandidate:
     provincie: str = ""
     aanbod_url: str = ""
     aanbod_url_quality: str = "missing"
+    aanbod_detection_method: str = "failed"
+    aanbod_detection_score: int = 0
+    aanbod_validation_reason: str = ""
     confidence: float = 0.0
     needs_review: bool = False
     source_adapter: str = "seed"
@@ -55,3 +58,56 @@ class DiscoveryResult:
     score: int
     status: str
     reasons: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class LiveAanbodAttempt:
+    office_name: str
+    website: str
+    root_domain: str
+    gemeente: str
+    source_origin: str
+    attempted: bool
+    success: bool
+    final_status: str
+    final_aanbod_url: str
+    detection_method: str
+    detection_score: int
+    failure_stage: str
+    failure_reason: str
+    http_status_homepage: int
+    http_status_sitemap: int
+    tested_urls_count: int
+    best_candidate_url: str
+    best_candidate_reason: str
+    elapsed_ms: int
+
+
+@dataclass(slots=True)
+class AanbodAuditAttempt:
+    office_name: str
+    website: str
+    root_domain: str
+    gemeente: str
+    final_status: str
+    final_aanbod_url: str
+    confidence: int
+    detection_method: str
+    homepage_status: int
+    homepage_title: str
+    candidates_found_count: int
+    candidates_tested_count: int
+    best_candidate_url: str
+    final_page_type: str
+    listing_signals_count: int
+    residential_signals_count: int
+    commercial_signals_count: int
+    elapsed_ms: int = 0
+    residential_signals_found: list[str] = field(default_factory=list)
+    commercial_signals_found: list[str] = field(default_factory=list)
+    page_quality_reason: str = ""
+    listing_signals_found: list[str] = field(default_factory=list)
+    commercial_hard_block: bool = False
+    commercial_block_reason: str = ""
+    is_duplicate_audit_result: bool = False
+    rejection_reason: str = ""

@@ -6,16 +6,23 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .aanbod_finder import classify_aanbod_url, suggest_common_aanbod_paths
+from .aanbod_auditor import AanbodAuditor
+from .aanbod_finder import (
+    apply_aanbod_classification,
+    classify_aanbod_url,
+    detect_live_aanbod_url,
+    suggest_common_aanbod_paths,
+)
 from .config import DEFAULT_GEMEENTEN_REFERENCE_PATH, DISCOVERY_BASE_DIR
 from .dedupe import dedupe_candidates
-from .models import DiscoveryResult, GeneratedQuery, SourceCandidate
+from .models import AanbodAuditAttempt, DiscoveryResult, GeneratedQuery, LiveAanbodAttempt, SourceCandidate
 from .overpass_adapter import OverpassAdapter, OverpassDiscoveryResponse
 from .query_generator import generate_queries_from_reference
 from .reporter import load_expected_gemeenten, render_discovery_run_report, write_discovery_run_report
 from .scorer import score_candidate
 from .seed_adapter import load_seed_candidates
 from .website_analyzer import analyze_candidate_website
+from .website_fetcher import WebsiteFetcher
 
 
 RUNS_DIR = DISCOVERY_BASE_DIR / "data" / "discovery" / "runs"
@@ -43,6 +50,14 @@ class DiscoveryEngineOutput:
     overpass_candidates_without_website: int
     overpass_new_domains_added: int
     overpass_duplicates_vs_seed: int
+    live_aanbod_enabled: bool
+    live_sites_attempted: int
+    live_sites_success: int
+    live_sites_failed: int
+    existing_valid_aanbod_kept: int
+    new_valid_aanbod_found: int
+    new_suspect_aanbod_found: int
+    still_missing_aanbod: int
 
 
 def normalize_province_name(value: str) -> str:
@@ -67,6 +82,9 @@ def _candidate_to_row(candidate: SourceCandidate) -> dict[str, str]:
         "provincie": candidate.provincie,
         "aanbod_url": candidate.aanbod_url,
         "aanbod_url_quality": candidate.aanbod_url_quality,
+        "aanbod_detection_method": candidate.aanbod_detection_method,
+        "aanbod_detection_score": str(candidate.aanbod_detection_score),
+        "aanbod_validation_reason": candidate.aanbod_validation_reason,
         "confidence": f"{candidate.confidence:.2f}",
         "needs_review": "true" if candidate.needs_review else "false",
         "source_adapter": candidate.source_adapter,
@@ -101,6 +119,61 @@ def _query_to_row(query: GeneratedQuery) -> dict[str, str]:
     }
 
 
+def _live_attempt_to_row(attempt: LiveAanbodAttempt) -> dict[str, str]:
+    return {
+        "office_name": attempt.office_name,
+        "website": attempt.website,
+        "root_domain": attempt.root_domain,
+        "gemeente": attempt.gemeente,
+        "source_origin": attempt.source_origin,
+        "attempted": "true" if attempt.attempted else "false",
+        "success": "true" if attempt.success else "false",
+        "final_status": attempt.final_status,
+        "final_aanbod_url": attempt.final_aanbod_url,
+        "detection_method": attempt.detection_method,
+        "detection_score": str(attempt.detection_score),
+        "failure_stage": attempt.failure_stage,
+        "failure_reason": attempt.failure_reason,
+        "http_status_homepage": str(attempt.http_status_homepage),
+        "http_status_sitemap": str(attempt.http_status_sitemap),
+        "tested_urls_count": str(attempt.tested_urls_count),
+        "best_candidate_url": attempt.best_candidate_url,
+        "best_candidate_reason": attempt.best_candidate_reason,
+        "elapsed_ms": str(attempt.elapsed_ms),
+    }
+
+
+def _audit_attempt_to_row(attempt) -> dict[str, str]:
+    return {
+        "office_name": attempt.office_name,
+        "website": attempt.website,
+        "root_domain": attempt.root_domain,
+        "gemeente": attempt.gemeente,
+        "final_status": attempt.final_status,
+        "final_aanbod_url": attempt.final_aanbod_url,
+        "confidence": str(attempt.confidence),
+        "detection_method": attempt.detection_method,
+        "homepage_status": str(attempt.homepage_status),
+        "homepage_title": attempt.homepage_title,
+        "candidates_found_count": str(attempt.candidates_found_count),
+        "candidates_tested_count": str(attempt.candidates_tested_count),
+        "best_candidate_url": attempt.best_candidate_url,
+        "final_page_type": attempt.final_page_type,
+        "residential_signals_count": str(attempt.residential_signals_count),
+        "residential_signals_found": ",".join(attempt.residential_signals_found),
+        "commercial_signals_count": str(attempt.commercial_signals_count),
+        "commercial_signals_found": ",".join(attempt.commercial_signals_found),
+        "page_quality_reason": attempt.page_quality_reason,
+        "commercial_hard_block": "true" if attempt.commercial_hard_block else "false",
+        "commercial_block_reason": attempt.commercial_block_reason,
+        "is_duplicate_audit_result": "true" if attempt.is_duplicate_audit_result else "false",
+        "listing_signals_count": str(attempt.listing_signals_count),
+        "listing_signals_found": ",".join(attempt.listing_signals_found),
+        "rejection_reason": attempt.rejection_reason,
+        "elapsed_ms": str(attempt.elapsed_ms),
+    }
+
+
 def _write_csv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
@@ -118,13 +191,17 @@ def _copy_to_latest(run_dir: Path, latest_dir: Path, filenames: list[str]) -> No
 def _enrich_candidate(candidate: SourceCandidate) -> DiscoveryResult:
     website_analysis = analyze_candidate_website(candidate)
     aanbod_classification = classify_aanbod_url(candidate.aanbod_url)
+    if not candidate.aanbod_validation_reason:
+        apply_aanbod_classification(candidate, aanbod_classification)
 
     evidence: list[str] = []
     evidence.append(f"website_exists={str(website_analysis.website_exists).lower()}")
     if website_analysis.makelaar_signals:
         evidence.append("makelaar_signals=" + ",".join(website_analysis.makelaar_signals))
-    evidence.append(f"aanbod_url_status={aanbod_classification.status}")
-    evidence.append(f"aanbod_url_reason={aanbod_classification.reason}")
+    evidence.append(f"aanbod_url_status={candidate.aanbod_url_quality}")
+    evidence.append(f"aanbod_url_reason={candidate.aanbod_validation_reason or aanbod_classification.reason}")
+    evidence.append(f"aanbod_detection_method={candidate.aanbod_detection_method}")
+    evidence.append(f"aanbod_detection_score={candidate.aanbod_detection_score}")
 
     if not candidate.aanbod_url and candidate.website:
         suggestions = suggest_common_aanbod_paths(candidate.website)
@@ -134,9 +211,8 @@ def _enrich_candidate(candidate: SourceCandidate) -> DiscoveryResult:
     reasons = [candidate.review_reason] if candidate.review_reason else []
     if candidate.needs_review and not reasons:
         reasons.append("needs_review=true from source")
-    reasons.append(aanbod_classification.reason)
+    reasons.append(candidate.aanbod_validation_reason or aanbod_classification.reason)
 
-    candidate.aanbod_url_quality = aanbod_classification.status if aanbod_classification.status != "rejected" else "suspect"
     candidate.evidence = [item for item in evidence if item]
     candidate.review_reason = "; ".join(dict.fromkeys(reason for reason in reasons if reason))
 
@@ -152,6 +228,9 @@ def _mark_missing_website(candidate: SourceCandidate) -> DiscoveryResult:
     candidate.status = "rejected"
     candidate.score = 0
     candidate.aanbod_url_quality = "missing"
+    candidate.aanbod_detection_method = "failed"
+    candidate.aanbod_detection_score = 0
+    candidate.aanbod_validation_reason = "missing website"
     candidate.rejection_reason = "missing_website"
     candidate.review_reason = "; ".join(
         part for part in (candidate.review_reason, "missing website in Overpass candidate") if part
@@ -186,6 +265,53 @@ def _compute_overpass_domain_stats(
     return new_domains, duplicates
 
 
+def _candidate_needs_live_aanbod(candidate: SourceCandidate) -> bool:
+    if not candidate.website:
+        return False
+    return classify_aanbod_url(candidate.aanbod_url).status != "valid"
+
+
+def _build_live_attempt(
+    candidate: SourceCandidate,
+    *,
+    attempted: bool,
+    success: bool,
+    final_status: str,
+    final_aanbod_url: str = "",
+    detection_method: str = "",
+    detection_score: int = 0,
+    failure_stage: str = "unknown",
+    failure_reason: str = "",
+    http_status_homepage: int = 0,
+    http_status_sitemap: int = 0,
+    tested_urls_count: int = 0,
+    best_candidate_url: str = "",
+    best_candidate_reason: str = "",
+    elapsed_ms: int = 0,
+) -> LiveAanbodAttempt:
+    return LiveAanbodAttempt(
+        office_name=candidate.office_name,
+        website=candidate.website,
+        root_domain=candidate.root_domain,
+        gemeente=candidate.gemeente,
+        source_origin=candidate.source_origin,
+        attempted=attempted,
+        success=success,
+        final_status=final_status,
+        final_aanbod_url=final_aanbod_url,
+        detection_method=detection_method,
+        detection_score=detection_score,
+        failure_stage=failure_stage,
+        failure_reason=failure_reason,
+        http_status_homepage=http_status_homepage,
+        http_status_sitemap=http_status_sitemap,
+        tested_urls_count=tested_urls_count,
+        best_candidate_url=best_candidate_url,
+        best_candidate_reason=best_candidate_reason,
+        elapsed_ms=elapsed_ms,
+    )
+
+
 def run_discovery(
     *,
     province: str,
@@ -194,6 +320,12 @@ def run_discovery(
     max_sites: int,
     skip_overpass: bool = False,
     overpass_adapter: OverpassAdapter | None = None,
+    live_aanbod: bool = False,
+    max_live_sites: int = 0,
+    website_fetcher: WebsiteFetcher | None = None,
+    audit_aanbod: bool = False,
+    max_audited_sites: int = 50,
+    audit_confidence_threshold: int = 85,
 ) -> DiscoveryEngineOutput:
     normalized_province = normalize_province_name(province)
     run_timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -229,7 +361,89 @@ def run_discovery(
     direct_rejections = [_mark_missing_website(candidate) for candidate in overpass_candidates if not candidate.website]
     candidates_with_website = seed_candidates + [candidate for candidate in overpass_candidates if candidate.website]
     limited_candidates = candidates_with_website[:max_sites]
+    live_attempts: list[LiveAanbodAttempt] = []
+    audit_attempts: list[AanbodAuditAttempt] = []
+    existing_valid_aanbod_kept = sum(
+        1 for candidate in limited_candidates if classify_aanbod_url(candidate.aanbod_url).status == "valid"
+    )
+    new_valid_aanbod_found = 0
+    new_suspect_aanbod_found = 0
+    live_attempts_used = 0
+    live_fetcher = website_fetcher
+    owns_fetcher = False
+    if live_aanbod and max_live_sites > 0 and live_fetcher is None:
+        live_fetcher = WebsiteFetcher()
+        owns_fetcher = True
+
+    if live_aanbod:
+        for candidate in limited_candidates:
+            if not candidate.website:
+                live_attempts.append(_build_live_attempt(candidate, attempted=False, success=False, final_status="skipped_no_website"))
+                continue
+            if classify_aanbod_url(candidate.aanbod_url).status == "valid":
+                live_attempts.append(
+                    _build_live_attempt(
+                        candidate,
+                        attempted=False,
+                        success=False,
+                        final_status="skipped_existing_valid",
+                        final_aanbod_url=candidate.aanbod_url,
+                        detection_method=candidate.aanbod_detection_method,
+                        detection_score=candidate.aanbod_detection_score,
+                        best_candidate_url=candidate.aanbod_url,
+                        best_candidate_reason=candidate.aanbod_validation_reason,
+                    )
+                )
+                continue
+            if max_live_sites <= 0 or live_attempts_used >= max_live_sites or live_fetcher is None:
+                continue
+            live_result = detect_live_aanbod_url(candidate, live_fetcher)
+            live_attempts_used += 1
+            before_status = classify_aanbod_url(candidate.aanbod_url).status
+            apply_aanbod_classification(candidate, live_result.classification)
+            final_status = live_result.classification.status
+            if not live_result.succeeded and live_result.failure_stage == "homepage_fetch":
+                final_status = "failed_fetch"
+            if before_status != "valid" and candidate.aanbod_url_quality == "valid":
+                new_valid_aanbod_found += 1
+            elif before_status != "valid" and candidate.aanbod_url_quality == "suspect":
+                new_suspect_aanbod_found += 1
+            if live_result.failure_reason:
+                candidate.review_reason = "; ".join(
+                    part
+                    for part in (candidate.review_reason, f"live aanbod: {live_result.failure_reason}")
+                    if part
+                )
+            live_attempts.append(
+                _build_live_attempt(
+                    candidate,
+                    attempted=live_result.attempted,
+                    success=live_result.succeeded,
+                    final_status=final_status,
+                    final_aanbod_url=live_result.classification.url if final_status in {"valid", "suspect"} else "",
+                    detection_method=live_result.classification.detection_method,
+                    detection_score=live_result.classification.score,
+                    failure_stage=live_result.failure_stage,
+                    failure_reason=live_result.failure_reason,
+                    http_status_homepage=live_result.http_status_homepage,
+                    http_status_sitemap=live_result.http_status_sitemap,
+                    tested_urls_count=live_result.tested_urls_count,
+                    best_candidate_url=live_result.best_candidate_url,
+                    best_candidate_reason=live_result.best_candidate_reason,
+                    elapsed_ms=live_result.elapsed_ms,
+                )
+            )
+
+    if audit_aanbod:
+        auditor = AanbodAuditor(confidence_threshold=audit_confidence_threshold)
+        audit_attempts = auditor.audit_candidates(
+            limited_candidates,
+            max_audited_sites=max_audited_sites,
+        )
+
     analyzed_results = [_enrich_candidate(candidate) for candidate in limited_candidates]
+    if owns_fetcher and live_fetcher is not None:
+        live_fetcher.close()
 
     processed_results = analyzed_results + direct_rejections
     deduped_candidates = dedupe_candidates([result.candidate for result in processed_results])
@@ -243,6 +457,23 @@ def run_discovery(
     discovered_rows = [_candidate_to_row(candidate) for candidate in discovered_sources]
     rejected_rows = [_candidate_to_row(candidate) for candidate in rejected_candidates]
     query_rows = [_query_to_row(query) for query in generated_queries]
+    live_attempt_rows = [_live_attempt_to_row(attempt) for attempt in live_attempts]
+    audit_attempt_rows = [_audit_attempt_to_row(attempt) for attempt in audit_attempts]
+
+    live_sites_attempted = sum(1 for attempt in live_attempts if attempt.attempted)
+    live_sites_success = sum(1 for attempt in live_attempts if attempt.attempted and attempt.final_status in {"valid", "suspect"})
+    live_sites_failed = live_sites_attempted - live_sites_success
+    audited_sites_count = len(audit_attempts)
+    browser_audit_valid_found = sum(1 for attempt in audit_attempts if attempt.final_status == "valid")
+    browser_audit_suspect_found = sum(1 for attempt in audit_attempts if attempt.final_status == "suspect")
+    browser_audit_missing_or_failed = sum(1 for attempt in audit_attempts if attempt.final_status in {"missing", "failed_fetch", "rejected"})
+    browser_audit_unique_valid_domains = len(
+        {(attempt.root_domain or "").lower() for attempt in audit_attempts if attempt.final_status == "valid" and not attempt.is_duplicate_audit_result}
+    )
+    browser_audit_unique_valid_urls = len(
+        {attempt.final_aanbod_url.rstrip("/").lower() for attempt in audit_attempts if attempt.final_status == "valid" and attempt.final_aanbod_url and not attempt.is_duplicate_audit_result}
+    )
+    browser_audit_duplicate_valid_rows = sum(1 for attempt in audit_attempts if attempt.final_status == "valid" and attempt.is_duplicate_audit_result)
 
     fieldnames = [
         "office_name",
@@ -257,6 +488,9 @@ def run_discovery(
         "provincie",
         "aanbod_url",
         "aanbod_url_quality",
+        "aanbod_detection_method",
+        "aanbod_detection_score",
+        "aanbod_validation_reason",
         "confidence",
         "needs_review",
         "source_adapter",
@@ -289,6 +523,63 @@ def run_discovery(
         query_rows,
         ["gemeente", "provincie", "template", "query"],
     )
+    _write_csv(
+        run_dir / "live_aanbod_attempts.csv",
+        live_attempt_rows,
+        [
+            "office_name",
+            "website",
+            "root_domain",
+            "gemeente",
+            "source_origin",
+            "attempted",
+            "success",
+            "final_status",
+            "final_aanbod_url",
+            "detection_method",
+            "detection_score",
+            "failure_stage",
+            "failure_reason",
+            "http_status_homepage",
+            "http_status_sitemap",
+            "tested_urls_count",
+            "best_candidate_url",
+            "best_candidate_reason",
+            "elapsed_ms",
+        ],
+    )
+    _write_csv(
+        run_dir / "aanbod_audit_results.csv",
+        audit_attempt_rows,
+        [
+            "office_name",
+            "website",
+            "root_domain",
+            "gemeente",
+            "final_status",
+            "final_aanbod_url",
+            "confidence",
+            "detection_method",
+            "homepage_status",
+            "homepage_title",
+            "candidates_found_count",
+            "candidates_tested_count",
+            "best_candidate_url",
+            "final_page_type",
+            "residential_signals_count",
+            "residential_signals_found",
+            "commercial_signals_count",
+            "commercial_signals_found",
+            "page_quality_reason",
+            "commercial_hard_block",
+            "commercial_block_reason",
+            "is_duplicate_audit_result",
+            "listing_signals_count",
+            "listing_signals_found",
+            "rejection_reason",
+            "elapsed_ms",
+        ],
+    )
 
     report_text = render_discovery_run_report(
         province=normalized_province,
@@ -311,6 +602,25 @@ def run_discovery(
         overpass_new_domains_added=overpass_response.new_domains_added,
         overpass_duplicates_vs_seed=overpass_response.duplicates_vs_seed,
         overpass_errors=overpass_response.errors,
+        live_aanbod_enabled=live_aanbod,
+        live_sites_attempted=live_sites_attempted,
+        live_sites_success=live_sites_success,
+        live_sites_failed=live_sites_failed,
+        existing_valid_aanbod_kept=existing_valid_aanbod_kept,
+        new_valid_aanbod_found=new_valid_aanbod_found,
+        new_suspect_aanbod_found=new_suspect_aanbod_found,
+        live_attempts=live_attempts,
+        audit_aanbod_enabled=audit_aanbod,
+        audited_sites_count=audited_sites_count,
+        browser_audit_valid_found=browser_audit_valid_found,
+        browser_audit_suspect_found=browser_audit_suspect_found,
+        browser_audit_missing_or_failed=browser_audit_missing_or_failed,
+        browser_audit_unique_valid_domains=browser_audit_unique_valid_domains,
+        browser_audit_unique_valid_urls=browser_audit_unique_valid_urls,
+        browser_audit_duplicate_valid_rows=browser_audit_duplicate_valid_rows,
+        valid_aanbod_after_audit=sum(1 for result in processed_results if result.candidate.aanbod_url_quality == "valid"),
+        missing_aanbod_after_audit=sum(1 for result in processed_results if result.candidate.aanbod_url_quality == "missing"),
+        audit_attempts=audit_attempts,
     )
     report_path = run_dir / "discovery_run_report.md"
     write_discovery_run_report(report_path, report_text)
@@ -323,6 +633,8 @@ def run_discovery(
             "discovered_sources.csv",
             "rejected_candidates.csv",
             "generated_queries.csv",
+            "live_aanbod_attempts.csv",
+            "aanbod_audit_results.csv",
             "discovery_run_report.md",
         ],
     )
@@ -347,4 +659,12 @@ def run_discovery(
         overpass_candidates_without_website=overpass_response.candidates_without_website,
         overpass_new_domains_added=overpass_response.new_domains_added,
         overpass_duplicates_vs_seed=overpass_response.duplicates_vs_seed,
+        live_aanbod_enabled=live_aanbod,
+        live_sites_attempted=live_sites_attempted,
+        live_sites_success=live_sites_success,
+        live_sites_failed=live_sites_failed,
+        existing_valid_aanbod_kept=existing_valid_aanbod_kept,
+        new_valid_aanbod_found=new_valid_aanbod_found,
+        new_suspect_aanbod_found=new_suspect_aanbod_found,
+        still_missing_aanbod=sum(1 for candidate in discovered_sources if candidate.aanbod_url_quality == "missing"),
     )
