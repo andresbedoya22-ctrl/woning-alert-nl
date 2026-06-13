@@ -324,6 +324,14 @@ def render_discovery_run_report(
     ] or ["- None"]
     active_official_sources_count = sum(1 for row in source_master_rows if row["is_active"] == "true")
     suspect_review_queue_count = sum(1 for row in source_master_rows if row["aanbod_url_quality"] == "suspect")
+    inactive_missing_count = sum(
+        1
+        for row in source_master_rows
+        if (
+            (row["is_active"] != "true" and row["aanbod_url_quality"] in {"missing", "suspect"})
+            or row["legal_status"] == "missing_website"
+        )
+    )
     aggregator_disabled_count = sum(1 for row in aggregator_registry_rows if (row.get("adapter_enabled") or "").lower() == "false")
     aggregator_registry_lines = [
         f"- {row.get('aggregator_name', '')}: adapter_enabled={row.get('adapter_enabled', '')}, permission_status={row.get('permission_status', '')}"
@@ -474,9 +482,10 @@ def render_discovery_run_report(
             *audit_failed_domain_lines,
             "",
             "## Source Master Summary",
+            f"- Total master sources: {len(source_master_rows)}",
             f"- Active official sources count: {active_official_sources_count}",
             f"- Suspect review queue count: {suspect_review_queue_count}",
-            f"- Total source master rows: {len(source_master_rows)}",
+            f"- Inactive/missing count: {inactive_missing_count}",
             "",
             "## Overpass Cache Status",
             f"- Overpass cache used: {'true' if overpass_cache_used else 'false'}",

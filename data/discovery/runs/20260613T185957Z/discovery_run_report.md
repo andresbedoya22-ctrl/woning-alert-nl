@@ -2,13 +2,16 @@
 
 ## Summary
 - Province: Noord-Brabant
-- Run timestamp: 20260613T175006Z
+- Run timestamp: 20260613T185957Z
 - Seed count: 413
 - Generated queries count: 448
 - Free external discovery enabled: false
 - Live aanbod enabled: false
 - Audit aanbod enabled: true
 - Overpass status: skipped_cli
+- Overpass cache used: false
+- Overpass cache timestamp: (none)
+- Overpass source: none
 - Overpass raw candidates: 0
 - Overpass candidates with website: 0
 - Overpass candidates without website: 0
@@ -17,15 +20,15 @@
 - External candidates found: 0
 - Analyzed candidates count: 413
 - Valid aanbod_url after Overpass: 303
-- Suspect after Overpass: 35
-- Missing aanbod_url after Overpass: 75
+- Suspect after Overpass: 37
+- Missing aanbod_url after Overpass: 73
 - Live sites attempted: 0
 - Live sites success: 0
 - Live sites failed: 0
 - Audited sites count: 100
 - Browser audit valid found: 8
-- Browser audit suspect found: 14
-- Browser audit missing/failed: 78
+- Browser audit suspect found: 17
+- Browser audit missing/failed: 75
 - Browser audit unique valid domains: 7
 - Browser audit unique valid URLs: 7
 - Browser audit duplicate valid rows: 1
@@ -33,8 +36,11 @@
 - New valid aanbod_url found: 0
 - New suspect aanbod_url found: 0
 - Valid aanbod_url after audit: 303
-- Missing aanbod_url after audit: 75
-- Still missing aanbod_url: 75
+- Missing aanbod_url after audit: 73
+- Active official sources count: 292
+- Suspect review queue count: 37
+- Missing website review count: 0
+- Still missing aanbod_url: 73
 - Rejected count: 18
 - Discovered sources count: 384
 - Rejected candidates count: 18
@@ -84,13 +90,13 @@ Overpass discovery was skipped because --skip-overpass was provided.
 - Audit aanbod enabled: true
 - Audited sites count: 100
 - Browser audit valid found: 8
-- Browser audit suspect found: 14
+- Browser audit suspect found: 17
 - Browser audit missing: 17
-- Browser audit failed_fetch: 61
+- Browser audit failed_fetch: 58
 - Browser audit unique valid domains: 7
 - Browser audit unique valid URLs: 7
 - Browser audit duplicate valid rows: 1
-- Average confidence: 21.6
+- Average confidence: 24.4
 
 ### Top valid detections
 - vhno.nl: score=100 type=listing_index url=https://vhno.nl/aanbod
@@ -106,13 +112,13 @@ Overpass discovery was skipped because --skip-overpass was provided.
 - pradium.nl: score=100 type=property_detail url=https://pradium.nl/aanbod
 - biemansmade.nl: score=100 type=project_page url=https://www.biemansmade.nl/nl/woningaanbod
 - bogaersmakelaardij.nl: score=100 type=project_page url=https://bogaersmakelaardij.nl/woningaanbod
+- twanpoels.nl: score=100 type=property_detail url=https://www.twanpoels.nl/diensten/verkoop
+- dragtmakelaars.nl: score=100 type=property_detail url=https://www.dragtmakelaars.nl/koopwoningen
 - kruijswijkmakelaardij.nl: score=100 type=project_page url=https://www.kruijswijkmakelaardij.nl/aanbod
 - hartvanbrabantmakelaardij.nl: score=100 type=project_page url=https://hartvanbrabantmakelaardij.nl
 - vandenboschmakelaars.com: score=100 type=property_detail url=https://www.vandenboschmakelaars.com/woning-dongen
 - atenzijlstra.nl: score=100 type=project_page url=https://atenzijlstra.nl/aanbod
 - vanakenmakelaardij.nl: score=100 type=property_detail url=https://vanakenmakelaardij.nl/woningen
-- hj-makelaars.nl: score=95 type=property_detail url=https://www.hj-makelaars.nl/huis-kopen-tilburg
-- debontmakelaardij.nl: score=91 type=project_page url=https://debontmakelaardij.nl/Nieuws/1200/Hulp-nodig-bij-aankoop-.html
 
 ### Top failed domains
 - erafocus.nl: 3
@@ -125,6 +131,29 @@ Overpass discovery was skipped because --skip-overpass was provided.
 - biemansmade.nl: 2
 - bogaersmakelaardij.nl: 2
 - hoogveldtmakelaardij.nl: 2
+
+## Source Master Summary
+- Total master sources: 402
+- Active official sources count: 292
+- Suspect review queue count: 37
+- Inactive/missing count: 110
+
+## Overpass Cache Status
+- Overpass cache used: false
+- Overpass cache timestamp: (none)
+- Overpass source: none
+
+## WebsiteResolver Summary
+- WebsiteResolver resolved count: 0
+- WebsiteResolver unresolved count: 0
+- Missing website review count: 0
+
+## Aggregator Fallback Registry Status
+- Registry rows: 3
+- Disabled adapters count: 3
+- Huispedia: adapter_enabled=false, permission_status=needs_review
+- Huislijn: adapter_enabled=false, permission_status=needs_review
+- Funda: adapter_enabled=false, permission_status=not_allowed_for_scraping
 
 ## Coverage By Gemeente
 | gemeente | total | valid | suspect | missing | rejected | valid_aanbod | weak_score |
@@ -160,10 +189,10 @@ Overpass discovery was skipped because --skip-overpass was provided.
 | Heusden | 17 | 12 | 2 | 3 | 0 | 13 | 13 |
 | Hilvarenbeek | 4 | 4 | 0 | 0 | 0 | 4 | 0 |
 | Laarbeek | 6 | 5 | 1 | 0 | 0 | 5 | 2 |
-| Land van Cuijk | 16 | 9 | 2 | 2 | 3 | 9 | 22 |
+| Land van Cuijk | 16 | 10 | 0 | 3 | 3 | 9 | 21 |
 | Loon op Zand | 1 | 1 | 0 | 0 | 0 | 1 | 0 |
 | Maashorst | 11 | 9 | 2 | 0 | 0 | 11 | 4 |
-| Meierijstad | 18 | 16 | 2 | 0 | 0 | 16 | 4 |
+| Meierijstad | 18 | 17 | 1 | 0 | 0 | 16 | 2 |
 | Moerdijk | 9 | 5 | 1 | 2 | 1 | 6 | 12 |
 | Nuenen, Gerwen en Nederwetten | 9 | 5 | 3 | 1 | 0 | 6 | 9 |
 | Oirschot | 6 | 4 | 0 | 2 | 0 | 4 | 6 |
@@ -198,8 +227,8 @@ Overpass discovery was skipped because --skip-overpass was provided.
 - Skipped candidates during analysis: 0
 
 ## Top 15 Gemeenten Still Weak
-- Land van Cuijk: weak_score=22, valid=9, suspect=2, missing=2, rejected=3
 - Altena: weak_score=21, valid=12, suspect=4, missing=3, rejected=1
+- Land van Cuijk: weak_score=21, valid=10, suspect=0, missing=3, rejected=3
 - Breda: weak_score=20, valid=13, suspect=3, missing=2, rejected=2
 - Eindhoven: weak_score=18, valid=13, suspect=3, missing=4, rejected=0
 - 's-Hertogenbosch: weak_score=17, valid=13, suspect=4, missing=3, rejected=0
@@ -235,4 +264,4 @@ Overpass discovery was skipped because --skip-overpass was provided.
 - Investigate expected gemeenten with zero discovered sources after Overpass: Valkenswaard, Veldhoven.
 - Review offices with missing aanbod_url and validate suggested common paths on official websites.
 - Manually verify suspect aanbod_url pages that look commercial or ambiguous.
-- Prioritize weak gemeenten first: Land van Cuijk, Altena, Breda, Eindhoven, 's-Hertogenbosch.
+- Prioritize weak gemeenten first: Altena, Land van Cuijk, Breda, Eindhoven, 's-Hertogenbosch.

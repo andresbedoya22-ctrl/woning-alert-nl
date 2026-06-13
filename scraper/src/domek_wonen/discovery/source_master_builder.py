@@ -19,10 +19,10 @@ def _source_id(candidate: SourceCandidate) -> str:
 def _legal_status(candidate: SourceCandidate) -> str:
     if candidate.source_origin == "aggregator_fallback":
         return "disabled_legal_review"
+    if candidate.rejection_reason == "missing_website" or candidate.website_resolution_status == "needs_manual_review":
+        return "missing_website"
     if candidate.aanbod_url_quality == "valid":
         return "allowed_official_source"
-    if candidate.website_resolution_status == "needs_manual_review":
-        return "missing_website"
     if candidate.aanbod_url_quality == "suspect":
         return "needs_manual_review"
     if candidate.aanbod_url_quality == "missing":

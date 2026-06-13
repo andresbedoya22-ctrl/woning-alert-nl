@@ -125,6 +125,8 @@ def test_run_discovery_creates_expected_outputs() -> None:
         assert "Overpass candidates with website: 1" in report_text
         assert "Overpass candidates without website: 1" in report_text
         assert "Source Master Summary" in report_text
+        assert "Total master sources:" in report_text
+        assert "Inactive/missing count:" in report_text
         assert "WebsiteResolver Summary" in report_text
         assert "Aggregator Fallback Registry Status" in report_text
         assert "Overpass Place Normalization Summary" in report_text
@@ -161,6 +163,9 @@ def test_run_discovery_creates_expected_outputs() -> None:
         with (output.run_dir / "makelaar_sources_master.csv").open("r", encoding="utf-8", newline="") as handle:
             master_rows = list(csv.DictReader(handle))
         assert master_rows
+        with (LATEST_DIR / "makelaar_sources_master.csv").open("r", encoding="utf-8", newline="") as handle:
+            latest_master_rows = list(csv.DictReader(handle))
+        assert latest_master_rows
 
         with (output.run_dir / "generated_queries.csv").open("r", encoding="utf-8", newline="") as handle:
             query_rows = list(csv.DictReader(handle))

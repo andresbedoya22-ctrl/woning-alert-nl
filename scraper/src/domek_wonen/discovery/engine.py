@@ -494,7 +494,7 @@ def run_discovery(
     query_rows = [_query_to_row(query) for query in generated_queries]
     live_attempt_rows = [_live_attempt_to_row(attempt) for attempt in live_attempts]
     audit_attempt_rows = [_audit_attempt_to_row(attempt) for attempt in audit_attempts]
-    source_master_rows = build_source_master_rows([result.candidate for result in processed_results], run_timestamp=run_timestamp)
+    source_master_rows = build_source_master_rows(deduped_candidates, run_timestamp=run_timestamp)
 
     live_sites_attempted = sum(1 for attempt in live_attempts if attempt.attempted)
     live_sites_success = sum(1 for attempt in live_attempts if attempt.attempted and attempt.final_status in {"valid", "suspect"})

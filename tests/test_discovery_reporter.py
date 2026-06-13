@@ -189,10 +189,12 @@ def test_reporter_shows_failed_domains_from_live_attempts() -> None:
             {
                 "is_active": "true",
                 "aanbod_url_quality": "valid",
+                "legal_status": "allowed_official_source",
             },
             {
                 "is_active": "false",
                 "aanbod_url_quality": "suspect",
+                "legal_status": "needs_manual_review",
             },
         ],
         missing_website_review_count=1,
@@ -213,4 +215,6 @@ def test_reporter_shows_failed_domains_from_live_attempts() -> None:
     assert "Browser audit duplicate valid rows: 1" in report
     assert "Overpass Cache Status" in report
     assert "Source Master Summary" in report
+    assert "Total master sources: 2" in report
+    assert "Inactive/missing count: 1" in report
     assert "WebsiteResolver Summary" in report
