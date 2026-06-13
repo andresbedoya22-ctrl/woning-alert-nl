@@ -46,6 +46,8 @@ def _cleanup_output(output) -> None:
         "generated_queries.csv",
         "live_aanbod_attempts.csv",
         "aanbod_audit_results.csv",
+        "manual_website_review.csv",
+        "makelaar_sources_master.csv",
         "discovery_run_report.md",
     ):
         latest_file = LATEST_DIR / filename
@@ -106,17 +108,25 @@ def test_run_discovery_creates_expected_outputs() -> None:
         assert (output.run_dir / "generated_queries.csv").exists()
         assert (output.run_dir / "live_aanbod_attempts.csv").exists()
         assert (output.run_dir / "aanbod_audit_results.csv").exists()
+        assert (output.run_dir / "manual_website_review.csv").exists()
+        assert (output.run_dir / "makelaar_sources_master.csv").exists()
         assert (LATEST_DIR / "candidate_domains.csv").exists()
         assert (LATEST_DIR / "live_aanbod_attempts.csv").exists()
         assert (LATEST_DIR / "aanbod_audit_results.csv").exists()
+        assert (LATEST_DIR / "manual_website_review.csv").exists()
+        assert (LATEST_DIR / "makelaar_sources_master.csv").exists()
 
         report_text = output.report_path.read_text(encoding="utf-8")
         assert "Free external discovery enabled: true" in report_text
         assert "Live aanbod enabled: false" in report_text
         assert "Overpass status: ok" in report_text
         assert "Overpass raw candidates: 2" in report_text
+        assert "Overpass cache used: false" in report_text
         assert "Overpass candidates with website: 1" in report_text
         assert "Overpass candidates without website: 1" in report_text
+        assert "Source Master Summary" in report_text
+        assert "WebsiteResolver Summary" in report_text
+        assert "Aggregator Fallback Registry Status" in report_text
         assert "Overpass Place Normalization Summary" in report_text
         assert "Overpass unmapped places" in report_text
         assert "Coverage By Gemeente" in report_text
@@ -145,6 +155,12 @@ def test_run_discovery_creates_expected_outputs() -> None:
         with (output.run_dir / "rejected_candidates.csv").open("r", encoding="utf-8", newline="") as handle:
             rejected_rows = list(csv.DictReader(handle))
         assert any(row["rejection_reason"] == "missing_website" for row in rejected_rows)
+        with (output.run_dir / "manual_website_review.csv").open("r", encoding="utf-8", newline="") as handle:
+            manual_rows = list(csv.DictReader(handle))
+        assert any(row["office_name"] == "No Site Valkenswaard" for row in manual_rows)
+        with (output.run_dir / "makelaar_sources_master.csv").open("r", encoding="utf-8", newline="") as handle:
+            master_rows = list(csv.DictReader(handle))
+        assert master_rows
 
         with (output.run_dir / "generated_queries.csv").open("r", encoding="utf-8", newline="") as handle:
             query_rows = list(csv.DictReader(handle))

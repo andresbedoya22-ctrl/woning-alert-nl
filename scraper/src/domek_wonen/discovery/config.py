@@ -10,6 +10,10 @@ DEFAULT_SEED_PATH = (
 DEFAULT_GEMEENTEN_REFERENCE_PATH = (
     DISCOVERY_BASE_DIR / "data" / "discovery" / "reference" / "noord_brabant_gemeenten_expected.csv"
 )
+DEFAULT_AGGREGATOR_LEGAL_REGISTRY_PATH = (
+    DISCOVERY_BASE_DIR / "data" / "discovery" / "reference" / "aggregator_legal_registry.csv"
+)
+DISCOVERY_CACHE_DIR = DISCOVERY_BASE_DIR / "data" / "discovery" / "cache"
 
 QUERY_TEMPLATES = (
     "makelaar koopwoningen {gemeente}",

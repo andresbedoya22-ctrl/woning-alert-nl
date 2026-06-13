@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import json
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scraper" / "src"))
@@ -69,3 +70,37 @@ def test_overpass_parser_builds_source_candidates() -> None:
     assert without_website.place_status == "locality_to_gemeente"
     assert without_website.osm_lat == "51.35"
     assert without_website.osm_lon == "5.46"
+
+
+def test_overpass_uses_cache_when_mirrors_fail(tmp_path) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / "overpass_noord-brabant_latest.json").write_text(
+        json.dumps(
+            {
+                "elements": [
+                    {
+                        "type": "node",
+                        "id": 1,
+                        "tags": {"name": "Cached Makelaar", "website": "https://cached.example.nl", "addr:city": "Breda"},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (cache_dir / "overpass_noord-brabant_latest_meta.json").write_text(
+        json.dumps({"timestamp": "2026-06-13T00:00:00Z", "source": "primary", "mirror_used": "cached"}),
+        encoding="utf-8",
+    )
+
+    adapter = OverpassAdapter(cache_dir=cache_dir, sleep_func=lambda _: None)
+    adapter._post_query = lambda url, query: (_ for _ in ()).throw(RuntimeError("mirror down"))  # type: ignore[method-assign]
+
+    response = adapter.discover("Noord-Brabant")
+
+    assert response.status == "ok_cached"
+    assert response.cache_used is True
+    assert response.cache_timestamp == "2026-06-13T00:00:00Z"
+    assert response.source_label == "cache"
+    assert response.raw_candidates == 1

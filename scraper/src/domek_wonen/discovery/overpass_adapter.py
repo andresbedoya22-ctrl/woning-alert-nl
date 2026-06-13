@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
 
+from .config import DISCOVERY_CACHE_DIR
 from .models import SourceCandidate
 from .place_mapper import normalize_overpass_city
 
@@ -39,6 +43,9 @@ class OverpassDiscoveryResponse:
     duplicates_vs_seed: int = 0
     endpoint_used: str = ""
     errors: list[str] = field(default_factory=list)
+    cache_used: bool = False
+    cache_timestamp: str = ""
+    source_label: str = "none"
 
 
 def _normalize_url(value: str | None) -> str:
@@ -70,6 +77,7 @@ class OverpassAdapter:
         max_attempts: int = 3,
         backoff_seconds: float = 1.0,
         sleep_func: Any = time.sleep,
+        cache_dir: Path = DISCOVERY_CACHE_DIR,
     ) -> None:
         self.primary_url = primary_url
         self.fallback_url = fallback_url
@@ -77,10 +85,12 @@ class OverpassAdapter:
         self.max_attempts = max_attempts
         self.backoff_seconds = backoff_seconds
         self.sleep_func = sleep_func
+        self.cache_dir = cache_dir
 
     def discover(self, province: str) -> OverpassDiscoveryResponse:
         query = OVERPASS_QUERY_TEMPLATE.format(province=province)
         errors: list[str] = []
+        cache_payload_path, cache_meta_path = self._cache_paths(province)
 
         for index, url in enumerate((self.primary_url, self.fallback_url)):
             try:
@@ -89,6 +99,15 @@ class OverpassAdapter:
                 status = "ok" if index == 0 else "ok_fallback"
                 with_website = sum(1 for candidate in candidates if candidate.website)
                 without_website = len(candidates) - with_website
+                source_label = "primary" if index == 0 else "fallback"
+                self._write_cache(
+                    cache_payload_path=cache_payload_path,
+                    cache_meta_path=cache_meta_path,
+                    payload=payload,
+                    source_label=source_label,
+                    endpoint_used=url,
+                    raw_candidates=len(candidates),
+                )
                 return OverpassDiscoveryResponse(
                     status=status,
                     candidates=candidates,
@@ -97,11 +116,74 @@ class OverpassAdapter:
                     candidates_without_website=without_website,
                     endpoint_used=url,
                     errors=errors,
+                    cache_used=False,
+                    source_label=source_label,
                 )
             except Exception as exc:  # pragma: no cover - exercised via tests on status
                 errors.append(f"{url}: {exc}")
 
-        return OverpassDiscoveryResponse(status="failed", endpoint_used="", errors=errors)
+        cached = self._load_cache(cache_payload_path, cache_meta_path)
+        if cached is not None:
+            payload, meta = cached
+            candidates = self._parse_candidates(payload)
+            with_website = sum(1 for candidate in candidates if candidate.website)
+            without_website = len(candidates) - with_website
+            return OverpassDiscoveryResponse(
+                status="ok_cached",
+                candidates=candidates,
+                raw_candidates=len(candidates),
+                candidates_with_website=with_website,
+                candidates_without_website=without_website,
+                endpoint_used=str(cache_payload_path),
+                errors=errors,
+                cache_used=True,
+                cache_timestamp=str(meta.get("timestamp") or ""),
+                source_label="cache",
+            )
+
+        return OverpassDiscoveryResponse(status="failed", endpoint_used="", errors=errors, source_label="none")
+
+    def _cache_paths(self, province: str) -> tuple[Path, Path]:
+        slug = province.strip().lower().replace(" ", "-")
+        payload_path = self.cache_dir / f"overpass_{slug}_latest.json"
+        meta_path = self.cache_dir / f"overpass_{slug}_latest_meta.json"
+        return payload_path, meta_path
+
+    def _write_cache(
+        self,
+        *,
+        cache_payload_path: Path,
+        cache_meta_path: Path,
+        payload: dict[str, Any],
+        source_label: str,
+        endpoint_used: str,
+        raw_candidates: int,
+    ) -> None:
+        cache_payload_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_payload_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        meta = {
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "mirror_used": endpoint_used,
+            "source": source_label,
+            "raw_candidates_count": raw_candidates,
+        }
+        cache_meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _load_cache(self, cache_payload_path: Path, cache_meta_path: Path) -> tuple[dict[str, Any], dict[str, Any]] | None:
+        if not cache_payload_path.exists():
+            return None
+        try:
+            payload = json.loads(cache_payload_path.read_text(encoding="utf-8"))
+            meta = {}
+            if cache_meta_path.exists():
+                loaded_meta = json.loads(cache_meta_path.read_text(encoding="utf-8"))
+                if isinstance(loaded_meta, dict):
+                    meta = loaded_meta
+            if not isinstance(payload, dict):
+                return None
+            return payload, meta
+        except (OSError, json.JSONDecodeError):
+            return None
 
     def _post_query(self, url: str, query: str) -> dict[str, Any]:
         last_error: Exception | None = None

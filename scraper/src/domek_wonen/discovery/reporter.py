@@ -138,6 +138,8 @@ def overpass_status_explanation(overpass_status: str) -> str:
         return "Overpass external discovery completed using the primary mirror."
     if overpass_status == "ok_fallback":
         return "Overpass primary mirror failed; external discovery completed using the fallback mirror."
+    if overpass_status == "ok_cached":
+        return "Both Overpass mirrors failed; cached Overpass discovery data was reused."
     if overpass_status == "failed":
         return "Both Overpass mirrors failed; the engine continued with seed-only processing."
     if overpass_status == "skipped_cli":
@@ -215,6 +217,14 @@ def render_discovery_run_report(
     valid_aanbod_after_audit: int,
     missing_aanbod_after_audit: int,
     audit_attempts: list[AanbodAuditAttempt],
+    overpass_cache_used: bool,
+    overpass_cache_timestamp: str,
+    overpass_source_label: str,
+    source_master_rows: list[dict[str, str]],
+    missing_website_review_count: int,
+    website_resolver_resolved_count: int,
+    website_resolver_unresolved_count: int,
+    aggregator_registry_rows: list[dict[str, str]],
 ) -> str:
     analyzed_count = len(analyzed_results) + skipped_candidates_count
     valid_aanbod_count = sum(1 for result in analyzed_results if result.candidate.aanbod_url_quality == "valid")
@@ -312,6 +322,13 @@ def render_discovery_run_report(
             if attempt.final_status in {"failed_fetch", "missing", "rejected"}
         ).most_common(10)
     ] or ["- None"]
+    active_official_sources_count = sum(1 for row in source_master_rows if row["is_active"] == "true")
+    suspect_review_queue_count = sum(1 for row in source_master_rows if row["aanbod_url_quality"] == "suspect")
+    aggregator_disabled_count = sum(1 for row in aggregator_registry_rows if (row.get("adapter_enabled") or "").lower() == "false")
+    aggregator_registry_lines = [
+        f"- {row.get('aggregator_name', '')}: adapter_enabled={row.get('adapter_enabled', '')}, permission_status={row.get('permission_status', '')}"
+        for row in aggregator_registry_rows
+    ] or ["- None"]
     new_valid_lines = [
         "| office_name | root_domain | aanbod_url | method | score |",
         "| --- | --- | --- | --- | --- |",
@@ -362,6 +379,9 @@ def render_discovery_run_report(
             f"- Live aanbod enabled: {'true' if live_aanbod_enabled else 'false'}",
             f"- Audit aanbod enabled: {'true' if audit_aanbod_enabled else 'false'}",
             f"- Overpass status: {overpass_status}",
+            f"- Overpass cache used: {'true' if overpass_cache_used else 'false'}",
+            f"- Overpass cache timestamp: {overpass_cache_timestamp or '(none)'}",
+            f"- Overpass source: {overpass_source_label}",
             f"- Overpass raw candidates: {overpass_raw_candidates}",
             f"- Overpass candidates with website: {overpass_candidates_with_website}",
             f"- Overpass candidates without website: {overpass_candidates_without_website}",
@@ -387,6 +407,9 @@ def render_discovery_run_report(
             f"- New suspect aanbod_url found: {new_suspect_aanbod_found}",
             f"- Valid aanbod_url after audit: {valid_aanbod_after_audit}",
             f"- Missing aanbod_url after audit: {missing_aanbod_after_audit}",
+            f"- Active official sources count: {active_official_sources_count}",
+            f"- Suspect review queue count: {suspect_review_queue_count}",
+            f"- Missing website review count: {missing_website_review_count}",
             f"- Still missing aanbod_url: {still_missing_aanbod}",
             f"- Rejected count: {rejected_count}",
             f"- Discovered sources count: {len(discovered_sources)}",
@@ -449,6 +472,26 @@ def render_discovery_run_report(
             "",
             "### Top failed domains",
             *audit_failed_domain_lines,
+            "",
+            "## Source Master Summary",
+            f"- Active official sources count: {active_official_sources_count}",
+            f"- Suspect review queue count: {suspect_review_queue_count}",
+            f"- Total source master rows: {len(source_master_rows)}",
+            "",
+            "## Overpass Cache Status",
+            f"- Overpass cache used: {'true' if overpass_cache_used else 'false'}",
+            f"- Overpass cache timestamp: {overpass_cache_timestamp or '(none)'}",
+            f"- Overpass source: {overpass_source_label}",
+            "",
+            "## WebsiteResolver Summary",
+            f"- WebsiteResolver resolved count: {website_resolver_resolved_count}",
+            f"- WebsiteResolver unresolved count: {website_resolver_unresolved_count}",
+            f"- Missing website review count: {missing_website_review_count}",
+            "",
+            "## Aggregator Fallback Registry Status",
+            f"- Registry rows: {len(aggregator_registry_rows)}",
+            f"- Disabled adapters count: {aggregator_disabled_count}",
+            *aggregator_registry_lines,
             "",
             "## Coverage By Gemeente",
             *coverage_lines,

@@ -1,0 +1,2241 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-04-21T17:01:53Z",
+    "timestamp_areas_base": "2026-04-21T17:01:53Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+    {
+      "type": "node",
+      "id": 1709324880,
+      "lat": 51.6953269,
+      "lon": 5.2187303,
+      "tags": {
+        "name": "Staete",
+        "shop": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1709324882,
+      "lat": 51.6953696,
+      "lon": 5.2187434,
+      "tags": {
+        "name": "Staete Makelaars",
+        "shop": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1709324884,
+      "lat": 51.6955023,
+      "lon": 5.2187145,
+      "tags": {
+        "name": "Van de Zande Makelaardij",
+        "shop": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2730768798,
+      "lat": 51.6800639,
+      "lon": 5.3173487,
+      "tags": {
+        "addr:city": "'s-Hertogenbosch",
+        "addr:housenumber": "198",
+        "addr:postcode": "5216BW",
+        "addr:street": "Pettelaarseweg",
+        "name": "NL Wonen",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-02-11"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2731132571,
+      "lat": 51.690629,
+      "lon": 5.31619,
+      "tags": {
+        "addr:city": "'s-Hertogenbosch",
+        "addr:housenumber": "88",
+        "addr:postcode": "5211PR",
+        "addr:street": "Hinthamereinde",
+        "name": "Roscam Makelaar",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-02-11"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2731976422,
+      "lat": 51.5660328,
+      "lon": 4.8312291,
+      "tags": {
+        "addr:city": "Bavel",
+        "addr:housenumber": "1B",
+        "addr:postcode": "4854CP",
+        "addr:street": "Pastoor Doensstraat",
+        "name": "Heikens-de Kort makelaardij",
+        "office": "estate_agent",
+        "phone": "+31 161 233 647",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.hdkmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2732453314,
+      "lat": 51.5988741,
+      "lon": 4.7171131,
+      "tags": {
+        "addr:city": "Prinsenbeek",
+        "addr:housenumber": "13",
+        "addr:postcode": "4841BA",
+        "addr:street": "Groenstraat",
+        "name": "Van de Wiel Makelaardij",
+        "office": "estate_agent",
+        "phone": "+31 76 541 2976",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.vandewielmakelaardij.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2735008988,
+      "lat": 51.4503963,
+      "lon": 5.4435164,
+      "tags": {
+        "addr:city": "Eindhoven",
+        "addr:housenumber": "22",
+        "addr:postcode": "5651HC",
+        "addr:street": "Kathodelaan",
+        "email": "info@abmakelaars.nl",
+        "name": "AB Makelaars",
+        "office": "estate_agent",
+        "phone": "+31 40 2309222",
+        "ref:kvk": "17093587",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.abmakelaars.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2735585367,
+      "lat": 51.5758233,
+      "lon": 4.7924242,
+      "tags": {
+        "addr:city": "Breda",
+        "addr:housenumber": "1",
+        "addr:postcode": "4834XT",
+        "addr:street": "Fatimastraat",
+        "name": "Schonck, Schul & Compagnie",
+        "office": "estate_agent",
+        "phone": "+31 76 565 6056",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://schonckschul.com/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2736284126,
+      "lat": 51.6922576,
+      "lon": 5.308716,
+      "tags": {
+        "addr:city": "'s-Hertogenbosch",
+        "addr:housenumber": "84",
+        "addr:postcode": "5211PH",
+        "addr:street": "van Berckelstraat",
+        "name": "De Huyzerij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-02-11"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2736289760,
+      "lat": 51.6921852,
+      "lon": 5.3091553,
+      "tags": {
+        "addr:city": "'s-Hertogenbosch",
+        "addr:housenumber": "67-69",
+        "addr:street": "van Berckelstraat",
+        "contact:facebook": "https://www.facebook.com/StaeteMakelaars.Den.Bosch",
+        "contact:phone": "+31 73 206 0003",
+        "contact:website": "https://www.staete.nl",
+        "name": "Staete",
+        "office": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2736792032,
+      "lat": 51.6870152,
+      "lon": 5.3056563,
+      "tags": {
+        "addr:city": "'s-Hertogenbosch",
+        "addr:housenumber": "9",
+        "addr:postcode": "5211KN",
+        "addr:street": "Lange Putstraat",
+        "name": "Staete",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-02-11"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2738787245,
+      "lat": 51.574945,
+      "lon": 4.7825627,
+      "tags": {
+        "addr:city": "Breda",
+        "addr:housenumber": "135",
+        "addr:postcode": "4818JD",
+        "addr:street": "Ginnekenweg",
+        "email": "info@hormax.nl",
+        "name": "Hormax Horecamakelaars Breda",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-18:00",
+        "phone": "+31 76 523 0060",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.hormax.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2738788102,
+      "lat": 51.5739461,
+      "lon": 4.7835743,
+      "tags": {
+        "addr:city": "Breda",
+        "addr:housenumber": "161",
+        "addr:postcode": "4818JD",
+        "addr:street": "Ginnekenweg",
+        "check_date:opening_hours": "2022-10-01",
+        "name": "Storimans & Partners Makelaar",
+        "office": "estate_agent",
+        "opening_hours:signed": "no",
+        "phone": "+31 76 522 6090",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.storimansenpartners.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2739224386,
+      "lat": 51.5933382,
+      "lon": 4.7798845,
+      "tags": {
+        "addr:city": "Breda",
+        "addr:housenumber": "8",
+        "addr:postcode": "4811AK",
+        "addr:street": "Willemstraat",
+        "name": "Housing Solutions",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-02-11"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2744975932,
+      "lat": 51.7153087,
+      "lon": 5.3632608,
+      "tags": {
+        "addr:city": "Rosmalen",
+        "addr:housenumber": "2",
+        "addr:postcode": "5241TC",
+        "addr:street": "Burgemeester Nieuwenhuijzenstraat",
+        "check_date:opening_hours": "2022-11-22",
+        "email": "info@hetwaarehuis.nl",
+        "name": "Het Waare Huis",
+        "office": "estate_agent",
+        "opening_hours:signed": "no",
+        "phone": "+31 73 523 6465",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.hetwaarehuis.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2744977018,
+      "lat": 51.715841,
+      "lon": 5.3624163,
+      "tags": {
+        "addr:city": "Rosmalen",
+        "addr:housenumber": "69",
+        "addr:postcode": "5241EB",
+        "addr:street": "Dorpsstraat",
+        "check_date:opening_hours": "2022-11-22",
+        "email": "info@penningsoz.nl",
+        "name": "Pennings Onroerende Zaken",
+        "office": "estate_agent",
+        "opening_hours:signed": "no",
+        "phone": "+31 73 522 1193",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://penningsoz.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2744977162,
+      "lat": 51.716689,
+      "lon": 5.3607898,
+      "tags": {
+        "addr:city": "Rosmalen",
+        "addr:housenumber": "8E",
+        "addr:postcode": "5241BL",
+        "addr:street": "Raadhuisstraat",
+        "check_date:opening_hours": "2022-11-22",
+        "email": "rosmalen@viermakelaars.nl",
+        "name": "Viermakelaars",
+        "office": "estate_agent",
+        "opening_hours:signed": "no",
+        "phone": "+31 73 522 4444",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.viermakelaars.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2754642393,
+      "lat": 51.6488898,
+      "lon": 5.9453035,
+      "tags": {
+        "addr:city": "Boxmeer",
+        "addr:housenumber": "117",
+        "addr:postcode": "5831JD",
+        "addr:street": "Steenstraat",
+        "check_date": "2025-12-22",
+        "email": "boxmeer@mvsmakelaardij.nl",
+        "name": "MVS Makelaardij",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 08:45-17:15; Su off; Sa \"op afspraak\"",
+        "phone": "+31 485 521 492",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.mvsmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2754648330,
+      "lat": 51.6480346,
+      "lon": 5.9482395,
+      "tags": {
+        "addr:city": "Boxmeer",
+        "addr:housenumber": "2c",
+        "addr:postcode": "5831DE",
+        "addr:street": "d'n Entrepot",
+        "email": "info@vrijdag-debekker.nl",
+        "name": "Vrijdag & De Bekker",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-17:00",
+        "phone": "+31 485 57 20 90",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.vrijdag-debekker.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2754648331,
+      "lat": 51.6490061,
+      "lon": 5.9504002,
+      "tags": {
+        "addr:city": "Boxmeer",
+        "addr:housenumber": "2c",
+        "addr:postcode": "5831KC",
+        "addr:street": "De Raetsingel",
+        "name": "Nooijen Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2755778018,
+      "lat": 51.7113844,
+      "lon": 5.313083,
+      "tags": {
+        "addr:city": "'s-Hertogenbosch",
+        "addr:housenumber": "64A",
+        "addr:postcode": "5231BR",
+        "addr:street": "Sint Teunislaan",
+        "email": "info@christismakelaardij.nl",
+        "name": "Christis Makelaardij",
+        "phone": "+31 73 511 1114",
+        "shop": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.christismakelaardij.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2756770609,
+      "lat": 51.7229017,
+      "lon": 5.3138655,
+      "tags": {
+        "addr:city": "'s-Hertogenbosch",
+        "addr:housenumber": "3",
+        "addr:postcode": "5235KG",
+        "addr:street": "Maaspoortweg",
+        "name": "Bato makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2759422056,
+      "lat": 51.4330414,
+      "lon": 5.4896001,
+      "tags": {
+        "addr:city": "Eindhoven",
+        "addr:housenumber": "86C",
+        "addr:postcode": "5611SK",
+        "addr:street": "Geldropseweg",
+        "name": "my housing",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.myhousing.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2759644936,
+      "lat": 51.4322686,
+      "lon": 5.4931237,
+      "tags": {
+        "addr:city": "Eindhoven",
+        "addr:housenumber": "159",
+        "addr:postcode": "5611SG",
+        "addr:street": "Geldropseweg",
+        "check_date": "2024-09-24",
+        "name": "Broekx Makelaardij & Hypotheken",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.broekx.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2760250993,
+      "lat": 51.67865,
+      "lon": 5.4005472,
+      "tags": {
+        "addr:city": "Berlicum",
+        "addr:housenumber": "1",
+        "addr:postcode": "5258KA",
+        "addr:street": "Kerkwijk",
+        "name": "BrouwersHonselaarMakelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2760787944,
+      "lat": 51.6420871,
+      "lon": 5.3523966,
+      "tags": {
+        "addr:city": "Sint-Michielsgestel",
+        "addr:housenumber": "41A",
+        "addr:postcode": "5271AC",
+        "addr:street": "Nieuwstraat",
+        "name": "Staete",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.staete.nl/staete-sint-michielsgestel/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2764372522,
+      "lat": 51.4381291,
+      "lon": 5.474266,
+      "tags": {
+        "addr:city": "Eindhoven",
+        "addr:housenumber": "13",
+        "addr:postcode": "5611HA",
+        "addr:street": "Willemstraat",
+        "name": "Huur inc housing",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Th 09:00-17:30, Fr 09:00-17:00",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.huurinc.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2764374260,
+      "lat": 51.4381796,
+      "lon": 5.4737167,
+      "tags": {
+        "addr:city": "Eindhoven",
+        "addr:housenumber": "21A",
+        "addr:postcode": "5611HB",
+        "addr:street": "Willemstraat",
+        "name": "Solutio 365",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2764378823,
+      "lat": 51.4350074,
+      "lon": 5.4724313,
+      "tags": {
+        "addr:city": "Eindhoven",
+        "addr:housenumber": "85",
+        "addr:postcode": "5611GV",
+        "addr:street": "Mauritsstraat",
+        "name": "huis-o-theek",
+        "office": "estate_agent",
+        "phone": "+31 40 213 0213",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://huis-o-theek.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2764499402,
+      "lat": 51.43864,
+      "lon": 5.4716295,
+      "tags": {
+        "addr:city": "Eindhoven",
+        "addr:housenumber": "14",
+        "addr:postcode": "5611HD",
+        "addr:street": "Willemstraat",
+        "name": "Rotsvast",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 08:45-17:30",
+        "phone": "+31 40 244 0244",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.rotsvast.nl/rotsvast-eindhoven/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2772353645,
+      "lat": 51.6447695,
+      "lon": 5.2918915,
+      "tags": {
+        "addr:city": "Vught",
+        "addr:housenumber": "30",
+        "addr:postcode": "5262GJ",
+        "addr:street": "Industrieweg",
+        "name": "Schuurmans Vastgoed",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2772758803,
+      "lat": 51.6591236,
+      "lon": 5.2980922,
+      "tags": {
+        "addr:city": "Vught",
+        "addr:housenumber": "27",
+        "addr:postcode": "5261CJ",
+        "addr:street": "Dorpsstraat",
+        "name": "'t Sas",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2790970226,
+      "lat": 51.5876462,
+      "lon": 5.3282138,
+      "tags": {
+        "addr:city": "Boxtel",
+        "addr:housenumber": "49b",
+        "addr:postcode": "5281BT",
+        "addr:street": "Rechterstraat",
+        "email": "info@nuyensmakelaars.nl",
+        "name": "Nuyens Makelaars",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-18:30",
+        "phone": "+31 411 676 448",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.nuyensmakelaars.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2792206407,
+      "lat": 51.6178432,
+      "lon": 5.4356734,
+      "tags": {
+        "addr:city": "Schijndel",
+        "addr:housenumber": "111A",
+        "addr:postcode": "5481AD",
+        "addr:street": "Hoofdstraat",
+        "check_date": "2025-03-14",
+        "name": "Marc Tummers Makelaardij",
+        "office": "estate_agent",
+        "phone": "+31 6 55783935",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.tummersmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2792511911,
+      "lat": 51.6169509,
+      "lon": 5.4358743,
+      "tags": {
+        "addr:city": "Schijndel",
+        "addr:housenumber": "6",
+        "addr:postcode": "5481BE",
+        "addr:street": "Kloosterstraat",
+        "check_date": "2023-09-30",
+        "name": "Meierijstad Makelaardij",
+        "office": "estate_agent",
+        "phone": "+31 73 544 2100",
+        "source": "BAG",
+        "source:date": "2017-05-23",
+        "website": "https://demakelaarvanhier.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2792747680,
+      "lat": 51.5126551,
+      "lon": 5.4932682,
+      "tags": {
+        "addr:city": "Son en Breugel",
+        "addr:housenumber": "1e",
+        "addr:postcode": "5691CT",
+        "addr:street": "Boslaan",
+        "name": "Sol Makelaardij",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-17:30",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.woon-huis.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2792749783,
+      "lat": 51.5089269,
+      "lon": 5.4925992,
+      "tags": {
+        "addr:city": "Son en Breugel",
+        "addr:housenumber": "39",
+        "addr:postcode": "5691AB",
+        "addr:street": "Nieuwstraat",
+        "check_date": "2023-05-05",
+        "name": "Kruijswijk",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-12:30,13:30-17:30",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "wheelchair": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2794153084,
+      "lat": 51.6215627,
+      "lon": 5.4397496,
+      "tags": {
+        "addr:city": "Schijndel",
+        "addr:housenumber": "55",
+        "addr:postcode": "5482KG",
+        "addr:street": "Kerkendijk",
+        "name": "Woonmeij",
+        "office": "estate_agent",
+        "phone": "+31 73 544 0606",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://woonmeij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2798577451,
+      "lat": 51.5195485,
+      "lon": 5.5123628,
+      "tags": {
+        "addr:city": "Son en Breugel",
+        "addr:housenumber": "14",
+        "addr:postcode": "5694SC",
+        "addr:street": "van Gentlaan",
+        "email": "info@vrmt.nl",
+        "name": "Van Roon Makelaardij & Taxaties B.V",
+        "office": "estate_agent",
+        "phone": "+31 499 490200",
+        "phone2": "+31 40 7420200",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.vrmt.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2817948243,
+      "lat": 51.5343301,
+      "lon": 4.4613322,
+      "tags": {
+        "addr:city": "Roosendaal",
+        "addr:housenumber": "2",
+        "addr:postcode": "4701GZ",
+        "addr:street": "Dunantstraat",
+        "brand": "RE/MAX",
+        "brand:wikidata": "Q965845",
+        "brand:wikipedia": "en:RE/MAX",
+        "email": "woonwens@remax.nl",
+        "name": "RE/MAX WoonWens Makelaars",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-21:00",
+        "phone": "+31 165 520 295",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.remax.nl/kantoor/remax-woonwens-makelaars"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2818007872,
+      "lat": 51.5341343,
+      "lon": 4.4502466,
+      "tags": {
+        "addr:city": "Roosendaal",
+        "addr:housenumber": "37",
+        "addr:postcode": "4703GA",
+        "addr:street": "Kade",
+        "email": "info@bobvandijkmakelaardij.nl",
+        "name": "Bob van Dijk makelaardij",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-17:30",
+        "phone": "+31 165 554 790",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.bobvandijkmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2818008792,
+      "lat": 51.5343469,
+      "lon": 4.4610359,
+      "tags": {
+        "addr:city": "Roosendaal",
+        "addr:housenumber": "38",
+        "addr:postcode": "4701HN",
+        "addr:street": "Burgemeester Prinsensingel",
+        "email": "info@hopmanswonen.nl",
+        "name": "Acser B.V.",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-17:00",
+        "phone": "+31 165 399 209",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.hopmanswonen.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2818028632,
+      "lat": 51.5346442,
+      "lon": 4.4603038,
+      "tags": {
+        "addr:city": "Roosendaal",
+        "addr:housenumber": "44",
+        "addr:postcode": "4701JT",
+        "addr:street": "Molenstraat",
+        "email": "info@vandereijkenmakelaardij.nl",
+        "name": "Van der Eijken Makelaardij",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 08:45-17:00",
+        "phone": "+31 165 556 580",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://vandereijkenmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2818043026,
+      "lat": 51.5317966,
+      "lon": 4.458512,
+      "tags": {
+        "addr:city": "Roosendaal",
+        "addr:housenumber": "57",
+        "addr:postcode": "4701AD",
+        "addr:street": "Nieuwe Markt",
+        "email": "info@vermunt-makelaardij.nl",
+        "name": "Vermunt Makelaardij",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-12:30,13:00-17:30",
+        "phone": "+31 165 560 111",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.vermunt-makelaardij.nl/contact/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2818055332,
+      "lat": 51.5284488,
+      "lon": 4.4594208,
+      "tags": {
+        "addr:city": "Roosendaal",
+        "addr:housenumber": "72",
+        "addr:postcode": "4701CX",
+        "addr:street": "Nispensestraat",
+        "email": "info@cswonen.nl",
+        "name": "CS Wonen",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-17:00",
+        "phone": "+31 165 870 000",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.cswonen.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2818064866,
+      "lat": 51.53111,
+      "lon": 4.45958,
+      "tags": {
+        "addr:city": "Roosendaal",
+        "addr:housenumber": "9",
+        "addr:postcode": "4701CR",
+        "addr:street": "Nispensestraat",
+        "email": "info@lenaers.nl",
+        "name": "Lenaers Makelaardij",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-17:30",
+        "phone": "+31 165 520 304",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.lenaers.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2820336297,
+      "lat": 51.4841141,
+      "lon": 4.2994933,
+      "tags": {
+        "addr:city": "Bergen op Zoom",
+        "addr:housenumber": "40a",
+        "addr:postcode": "4624GM",
+        "addr:street": "Guido Gezellelaan",
+        "contact:facebook": "https://www.facebook.com/BrabantMakelaardij/",
+        "contact:instagram": "https://www.instagram.com/brabant.makelaardij/",
+        "contact:twitter": "https://twitter.com/BrabantMakelaar",
+        "contact:youtube": "https://www.youtube.com/channel/UChpihOXCDIETx1I_8N4nUeg",
+        "email": "info@brabantmakelaardij.nl",
+        "name": "Brabant Makelaardij",
+        "office": "estate_agent",
+        "phone": "+31 164 262 860",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.brabantmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2820945102,
+      "lat": 51.4822844,
+      "lon": 5.1476509,
+      "tags": {
+        "addr:city": "Hilvarenbeek",
+        "addr:housenumber": "12",
+        "addr:postcode": "5081SJ",
+        "addr:street": "Doctor P.C. de Brouwerlaan",
+        "name": "Fynhuys",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.fynhuys.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2820947451,
+      "lat": 51.4844128,
+      "lon": 5.1381379,
+      "tags": {
+        "addr:city": "Hilvarenbeek",
+        "addr:housenumber": "7",
+        "addr:postcode": "5081AE",
+        "addr:street": "Diessenseweg",
+        "name": "Robert Rexwinkel Lommers Makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2820948356,
+      "lat": 51.483512,
+      "lon": 5.1382665,
+      "tags": {
+        "addr:city": "Hilvarenbeek",
+        "addr:housenumber": "89",
+        "addr:postcode": "5081AV",
+        "addr:street": "Hilverstraat",
+        "name": "Clavem",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.clavem.eu/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2824237062,
+      "lat": 51.5805569,
+      "lon": 5.1963007,
+      "tags": {
+        "addr:city": "Oisterwijk",
+        "addr:housenumber": "18",
+        "addr:postcode": "5061HW",
+        "addr:street": "De Lind",
+        "email": "info@hondersalting.nl",
+        "facebook": "https://facebook.com/hondersalting",
+        "name": "Honders/Alting Makelaars",
+        "office": "estate_agent",
+        "phone": "+31 85 330 1060",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://hondersalting.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2824237591,
+      "lat": 51.5778394,
+      "lon": 5.1890701,
+      "tags": {
+        "addr:city": "Oisterwijk",
+        "addr:housenumber": "24",
+        "addr:postcode": "5061GG",
+        "addr:street": "Baerdijk",
+        "email": "info@elzenmaas.nl",
+        "fax": "+31 13 528 5767",
+        "name": "Elzen Maas Makelaars",
+        "office": "estate_agent",
+        "phone": "+31 13 528 5285",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "http://www.elzenmaas.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2833323390,
+      "lat": 51.4249826,
+      "lon": 5.4150752,
+      "tags": {
+        "addr:city": "Veldhoven",
+        "addr:housenumber": "2",
+        "addr:postcode": "5502JV",
+        "addr:street": "Blaarthemseweg",
+        "name": "Van de Schans Makelaardij B.V.",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2833892665,
+      "lat": 51.519821,
+      "lon": 5.0672991,
+      "tags": {
+        "addr:city": "Goirle",
+        "addr:housenumber": "16",
+        "addr:postcode": "5051AH",
+        "addr:street": "Tilburgseweg",
+        "name": "Dassen Garantiemakelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://marcel-dassen-makelaars.business.site/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2833898824,
+      "lat": 51.5225799,
+      "lon": 5.0663111,
+      "tags": {
+        "addr:city": "Goirle",
+        "addr:housenumber": "88",
+        "addr:postcode": "5051AJ",
+        "addr:street": "Tilburgseweg",
+        "name": "Appels Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-03-24",
+        "website": "https://www.appels.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2841727167,
+      "lat": 51.5866481,
+      "lon": 5.1401273,
+      "tags": {
+        "addr:city": "Berkel-Enschot",
+        "addr:housenumber": "44",
+        "addr:postcode": "5056HD",
+        "addr:street": "Raadhuisstraat",
+        "name": "Shirley Kneepkens Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2843546865,
+      "lat": 51.6107183,
+      "lon": 5.1396648,
+      "tags": {
+        "addr:city": "Udenhout",
+        "addr:housenumber": "24b",
+        "addr:postcode": "5071EK",
+        "addr:street": "Slimstraat",
+        "name": "P-B makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2019-05-31",
+        "website": "https://www.p-bmakelaars.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2847042272,
+      "lat": 51.5520816,
+      "lon": 5.0549359,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "33",
+        "addr:postcode": "5037MT",
+        "addr:street": "Zouavenlaan",
+        "name": "Van Heeswijk makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2022-03-22",
+        "website": "https://www.vanheeswijkmakelaars.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2847045041,
+      "lat": 51.5563897,
+      "lon": 5.0592913,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "368",
+        "addr:postcode": "5037LG",
+        "addr:street": "Bredaseweg",
+        "name": "Van de Water",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-01",
+        "website": "https://vandewatergroep.nl/vestigingen/tilburg/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2847046859,
+      "lat": 51.5510389,
+      "lon": 5.0566296,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "55",
+        "addr:postcode": "5037PK",
+        "addr:street": "Burgemeester van de Mortelplein",
+        "name": "Alstede van Mierlo Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-01",
+        "website": "https://www.alstedevanmierlomakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2847327257,
+      "lat": 51.5560989,
+      "lon": 5.0682355,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "211",
+        "addr:postcode": "5038NE",
+        "addr:street": "Bredaseweg",
+        "name": "Brabantstad",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-01",
+        "website": "https://www.brabantstadmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2847327283,
+      "lat": 51.5561966,
+      "lon": 5.0674338,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "219-01",
+        "addr:postcode": "5038NE",
+        "addr:street": "Bredaseweg",
+        "name": "KIN Makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-01",
+        "website": "https://www.kinmakelaars.nl/nl/vestigingen/tilburg"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2848049403,
+      "lat": 51.5761442,
+      "lon": 4.9949832,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "95",
+        "addr:postcode": "5045PH",
+        "addr:street": "Kijkduinlaan",
+        "name": "VMG Makelaars",
+        "office": "estate_agent",
+        "phone": "+31 13 5720 672",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.vmg-makelaars.nl/vestigingen/regio-tilburg"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2848191845,
+      "lat": 51.5649737,
+      "lon": 5.0915853,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "38",
+        "addr:postcode": "5014HP",
+        "addr:street": "Besterdplein",
+        "name": "Hans van Berkel",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-17:30; Sa 09:00-13:00",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.hansvanberkel.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2849382383,
+      "lat": 51.5596447,
+      "lon": 5.0877246,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "350",
+        "addr:postcode": "5038CC",
+        "addr:street": "Spoorlaan",
+        "diet:vegan": "only",
+        "diet:vegetarian": "only",
+        "name": "Kern Makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-01",
+        "website": "https://www.kernmakelaars.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2849383298,
+      "lat": 51.5443847,
+      "lon": 5.0674095,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "305",
+        "addr:postcode": "5025SZ",
+        "addr:street": "Ringbaan-Zuid",
+        "name": "Naber Wonen",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-17:30",
+        "phone": "+31135400700",
+        "source": "BAG",
+        "source:date": "2014-05-01",
+        "website": "https://naber.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2850734733,
+      "lat": 51.5572813,
+      "lon": 5.0931878,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "152",
+        "addr:postcode": "5017HT",
+        "addr:street": "Tivolistraat",
+        "name": "Hormax",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://hormax.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2850735176,
+      "lat": 51.5537217,
+      "lon": 5.0991441,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "2",
+        "addr:postcode": "5017DX",
+        "addr:street": "Kempenaarplaats",
+        "name": "Via Paul",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.viapaulmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2850738223,
+      "lat": 51.5534459,
+      "lon": 5.0902441,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "24a",
+        "addr:postcode": "5038WS",
+        "addr:street": "Piusstraat",
+        "name": "Rotsvast",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2850739139,
+      "lat": 51.557101,
+      "lon": 5.0927898,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "50",
+        "addr:postcode": "5038CS",
+        "addr:street": "Heuvel",
+        "name": "J.H. Oldenkotte & Zn. B.V.",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.oldenkotte.com"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2850741338,
+      "lat": 51.5553146,
+      "lon": 5.090937,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "59",
+        "addr:postcode": "5038WP",
+        "addr:street": "Piusplein",
+        "name": "Becx Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2850742888,
+      "lat": 51.552892,
+      "lon": 5.0987791,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "69",
+        "addr:postcode": "5017AL",
+        "addr:street": "Havendijk",
+        "name": "Jurgens Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://jurgensmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2850939999,
+      "lat": 51.5625018,
+      "lon": 5.0908534,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "223",
+        "addr:postcode": "5014HK",
+        "addr:street": "Besterdring",
+        "name": "Hendriks",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://hendriks.nl/kantoren/hendriks-makelaardij-tilburg"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2850944530,
+      "lat": 51.5655619,
+      "lon": 5.0894537,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "81",
+        "addr:postcode": "5014HH",
+        "addr:street": "Besterdring",
+        "name": "Kempenburg",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2851150487,
+      "lat": 51.5474145,
+      "lon": 5.0661698,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "37a",
+        "addr:postcode": "5025VJ",
+        "addr:street": "Laarstraat",
+        "name": "Huijsmans Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.huijsmansmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2851163886,
+      "lat": 51.5489977,
+      "lon": 5.063182,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "83",
+        "addr:postcode": "5025VD",
+        "addr:street": "Berkdijksestraat",
+        "name": "Kamerbemiddeling Tilburg",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.kamerbemiddelingtilburg.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2851164976,
+      "lat": 51.5552518,
+      "lon": 5.0759291,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "90",
+        "addr:postcode": "5038NH",
+        "addr:street": "Bredaseweg",
+        "name": "Lupker Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.lupkermakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2853141664,
+      "lat": 51.6294286,
+      "lon": 4.8601845,
+      "tags": {
+        "addr:city": "Oosterhout",
+        "addr:housenumber": "11",
+        "addr:postcode": "4904SX",
+        "addr:street": "Europark",
+        "alt_name": "Klijssen Makelaars & Adviseurs",
+        "email": "info@klijssen.nl",
+        "name": "Klijssen",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 08:30-17:00",
+        "phone": "+31 162 426 348",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.klijsen.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2853190825,
+      "lat": 51.6418671,
+      "lon": 4.8540377,
+      "tags": {
+        "addr:city": "Oosterhout",
+        "addr:housenumber": "14",
+        "addr:postcode": "4901KG",
+        "addr:street": "Bouwlingstraat",
+        "name": "Van der Plas & De Vegt Makelaardij BV",
+        "office": "estate_agent",
+        "phone": "+31 162 151 840",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.vdplas.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2853385401,
+      "lat": 51.6429501,
+      "lon": 4.8603277,
+      "tags": {
+        "addr:city": "Oosterhout",
+        "addr:housenumber": "24",
+        "addr:postcode": "4901JA",
+        "addr:street": "Keiweg",
+        "name": "Van de Water",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.vandewatergroep.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2853493220,
+      "lat": 51.6431889,
+      "lon": 4.8567266,
+      "tags": {
+        "addr:city": "Oosterhout",
+        "addr:housenumber": "4",
+        "addr:postcode": "4901KC",
+        "addr:street": "Heuvel",
+        "name": "Biemans Makelaardij en Assurantiën",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2853608638,
+      "lat": 51.6443516,
+      "lon": 4.8644784,
+      "tags": {
+        "addr:city": "Oosterhout",
+        "addr:housenumber": "57",
+        "addr:postcode": "4901HC",
+        "addr:street": "Mathildastraat",
+        "name": "Noud Kops",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.noudkopsmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2853703327,
+      "lat": 51.62535,
+      "lon": 4.8555184,
+      "tags": {
+        "addr:city": "Oosterhout",
+        "addr:housenumber": "77",
+        "addr:postcode": "4904LH",
+        "addr:street": "Lodewijk Napoleonlaan",
+        "name": "Klijsen Makelaars en Taxateurs",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.klijsen.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2853703382,
+      "lat": 51.6419159,
+      "lon": 4.8697005,
+      "tags": {
+        "addr:city": "Oosterhout",
+        "addr:housenumber": "78",
+        "addr:postcode": "4901ZB",
+        "addr:street": "Abdis van Thornstraat",
+        "name": "Bol Makelaars & Taxateurs",
+        "office": "estate_agent",
+        "phone": "+31 162 748 748",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://bolmakelaars.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2857105816,
+      "lat": 51.5891881,
+      "lon": 4.918568,
+      "tags": {
+        "addr:city": "Rijen",
+        "addr:housenumber": "13",
+        "addr:postcode": "5121JA",
+        "addr:street": "Hoofdstraat",
+        "name": "VDP",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2857127074,
+      "lat": 51.5897663,
+      "lon": 4.9182573,
+      "tags": {
+        "addr:city": "Rijen",
+        "addr:housenumber": "23",
+        "addr:postcode": "5121JA",
+        "addr:street": "Hoofdstraat",
+        "name": "Kin Makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2857157742,
+      "lat": 51.5887748,
+      "lon": 4.9188365,
+      "tags": {
+        "addr:city": "Rijen",
+        "addr:housenumber": "5",
+        "addr:postcode": "5121JA",
+        "addr:street": "Hoofdstraat",
+        "name": "VDP",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-07"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2858682974,
+      "lat": 51.728915,
+      "lon": 5.8797585,
+      "tags": {
+        "addr:city": "Cuijk",
+        "addr:housenumber": "13",
+        "addr:postcode": "5431BV",
+        "addr:street": "Louis Jansenplein",
+        "name": "Kolmeijer Land van Cuijk",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-17:00",
+        "phone": "+31 485 240001",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.kolmeijernijmegen.nl/cuijk/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2858682975,
+      "lat": 51.7296723,
+      "lon": 5.8811464,
+      "tags": {
+        "addr:city": "Cuijk",
+        "addr:housenumber": "13",
+        "addr:postcode": "5431BR",
+        "addr:street": "Maasburg",
+        "name": "Makelaardij Martijn Willems",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 10:00-12:30,13:30-17:30; Sa 09:00-12:30",
+        "phone": "+31 485 563177",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://makelaarmartijnwillems.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2858690769,
+      "lat": 51.7297145,
+      "lon": 5.8794197,
+      "tags": {
+        "addr:city": "Cuijk",
+        "addr:housenumber": "33",
+        "addr:postcode": "5431BR",
+        "addr:street": "Maasburg",
+        "name": "Happy Home Makelaars",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:30-18:00; Sa 09:30-17:00",
+        "phone": "+31 6 42498666",
+        "source": "BAG",
+        "source:date": "2014-05-07",
+        "website": "https://www.happyhomemakelaars.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2876516188,
+      "lat": 51.4429473,
+      "lon": 5.6119227,
+      "tags": {
+        "addr:city": "Mierlo",
+        "addr:housenumber": "86",
+        "addr:postcode": "5731JK",
+        "addr:street": "Dorpsstraat",
+        "name": "Wouter Damen",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-20",
+        "website": "http://www.damenmakelaardij.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2890043000,
+      "lat": 51.6295471,
+      "lon": 4.9389554,
+      "tags": {
+        "addr:city": "Dongen",
+        "addr:housenumber": "1A",
+        "addr:postcode": "5103BD",
+        "addr:street": "Monseigneur Poelsstraat",
+        "name": "Van Den Bosch Makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-30",
+        "website": "https://www.vandenboschmakelaars.com/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2892316172,
+      "lat": 51.6911809,
+      "lon": 5.0755497,
+      "tags": {
+        "addr:city": "Waalwijk",
+        "addr:housenumber": "344",
+        "addr:postcode": "5142CD",
+        "addr:street": "Grotestraat",
+        "name": "Van de Zande Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-30"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2929832038,
+      "lat": 51.3947877,
+      "lon": 5.4759413,
+      "tags": {
+        "addr:city": "Waalre",
+        "addr:housenumber": "84a",
+        "addr:postcode": "5582JZ",
+        "addr:street": "Den Hof",
+        "name": "Van Engelen de Wilde Makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-06-23",
+        "website": "https://www.vanengelendewilde.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2930060498,
+      "lat": 51.3873527,
+      "lon": 5.4479823,
+      "tags": {
+        "addr:city": "Waalre",
+        "addr:housenumber": "27",
+        "addr:postcode": "5581GA",
+        "addr:street": "Willibrorduslaan",
+        "name": "Verhagen Makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-06-23",
+        "website": "https://www.verhagenmakelaars.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2931391474,
+      "lat": 51.387893,
+      "lon": 5.4496486,
+      "tags": {
+        "addr:city": "Waalre",
+        "addr:housenumber": "50a",
+        "addr:postcode": "5581GG",
+        "addr:street": "Willibrorduslaan",
+        "name": "Vos Makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-06-24",
+        "website": "https://www.vosmakelaars.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2931709701,
+      "lat": 51.7697725,
+      "lon": 5.5280922,
+      "tags": {
+        "addr:city": "Oss",
+        "addr:housenumber": "241",
+        "addr:postcode": "5341KN",
+        "addr:street": "Oostwal",
+        "name": "Van den Heuvel makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-06-23",
+        "website": "https://www.vandenheuvel.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2994051755,
+      "lat": 51.4729453,
+      "lon": 5.5468126,
+      "tags": {
+        "addr:city": "Nuenen",
+        "addr:housenumber": "15A",
+        "addr:postcode": "5671GD",
+        "addr:street": "Parkstraat",
+        "email": "info@kjbmakelaardij.nl",
+        "name": "KJB Makelaardij",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-18:00",
+        "phone": "+31 6 22567190",
+        "source": "BAG",
+        "source:date": "2014-08-03",
+        "website": "https://www.kjbmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3005538105,
+      "lat": 51.5531824,
+      "lon": 5.6829835,
+      "tags": {
+        "addr:city": "Gemert",
+        "addr:housenumber": "1",
+        "addr:postcode": "5421CG",
+        "addr:street": "Binderseind",
+        "email": "info@geertsvanoijen.nl",
+        "name": "Geerts van Oijen Makelaars Taxateurs",
+        "office": "estate_agent",
+        "phone": "+31 492 392 498",
+        "source": "BAG",
+        "source:date": "2014-08-08",
+        "website": "https://www.geertsvanoijen.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3005553356,
+      "lat": 51.5536016,
+      "lon": 5.6836014,
+      "tags": {
+        "addr:city": "Gemert",
+        "addr:housenumber": "5",
+        "addr:postcode": "5421CV",
+        "addr:street": "Ridderplein",
+        "name": "Van Helvoort Makelaardij",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 09:00-17:30; Sa 09:00-13:00",
+        "phone": "+31 492 371 190",
+        "source": "BAG",
+        "source:date": "2014-08-08",
+        "website": "https://www.vanhelvoortmakelaardij.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3006610708,
+      "lat": 51.6549742,
+      "lon": 5.6298793,
+      "tags": {
+        "addr:city": "Uden",
+        "addr:housenumber": "163",
+        "addr:postcode": "5402KC",
+        "addr:street": "President Kennedylaan",
+        "name": "Aarden Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-08-09",
+        "website": "https://www.aardenmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3006611170,
+      "lat": 51.6548096,
+      "lon": 5.6294242,
+      "tags": {
+        "addr:city": "Uden",
+        "addr:housenumber": "18B",
+        "addr:postcode": "5405NA",
+        "addr:street": "Volkelseweg",
+        "name": "Derks Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-08-09",
+        "website": "https://www.derksmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3006611476,
+      "lat": 51.6547447,
+      "lon": 5.6299893,
+      "tags": {
+        "addr:city": "Uden",
+        "addr:housenumber": "20B",
+        "addr:postcode": "5405NA",
+        "addr:street": "Volkelseweg",
+        "name": "Esser Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-08-09",
+        "website": "https://www.essermakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3006613281,
+      "lat": 51.6586871,
+      "lon": 5.6184336,
+      "tags": {
+        "addr:city": "Uden",
+        "addr:housenumber": "30",
+        "addr:postcode": "5402GE",
+        "addr:street": "Prof. Pulsersstraat",
+        "name": "Petterson Makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-08-09",
+        "website": "https://www.petterson.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3011280923,
+      "lat": 51.6578706,
+      "lon": 5.6178207,
+      "tags": {
+        "addr:city": "Uden",
+        "addr:housenumber": "26",
+        "addr:postcode": "5401GM",
+        "addr:street": "Neringstraat-Oost",
+        "name": "De Support Makelaar",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-08-11",
+        "website": "https://www.desupportmakelaar.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3011322534,
+      "lat": 51.6605669,
+      "lon": 5.6100981,
+      "tags": {
+        "addr:city": "Uden",
+        "addr:housenumber": "6",
+        "addr:postcode": "5401BE",
+        "addr:street": "Kerkstraat",
+        "name": "Makelaardij Ton van Lanen & Partner",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-08-11",
+        "website": "https://www.vanlanen.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3011364901,
+      "lat": 51.6691158,
+      "lon": 5.6089871,
+      "tags": {
+        "addr:city": "Uden",
+        "addr:housenumber": "10",
+        "addr:postcode": "5401JB",
+        "addr:street": "Bitswijk",
+        "name": "Bernheze Makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-08-11",
+        "website": "https://www.bernheze.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3374545355,
+      "lat": 51.705254,
+      "lon": 5.3130934,
+      "tags": {
+        "addr:city": "'s-Hertogenbosch",
+        "addr:housenumber": "2",
+        "addr:postcode": "5231ME",
+        "addr:street": "Walter Breedveldplein",
+        "email": "info@viermakelaars.nl",
+        "name": "Viermakelaars",
+        "phone": "+31 73 621 5656",
+        "shop": "estate_agent",
+        "website": "https://www.viermakelaars.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3425374104,
+      "lat": 51.5862307,
+      "lon": 4.3158813,
+      "tags": {
+        "name": "Koetsenruyter Makelaardij",
+        "shop": "estate_agent",
+        "website": "https://www.koetsenruyter.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3428975244,
+      "lat": 51.5871461,
+      "lon": 4.3189035,
+      "tags": {
+        "name": "Buuron Makelaardij",
+        "shop": "estate_agent",
+        "website": "http://www.buuronmakelaardij.nl/home.html"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3579525469,
+      "lat": 51.427947,
+      "lon": 5.4865195,
+      "tags": {
+        "name": "Debbie Mels Lommers Makelaars",
+        "office": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3579525478,
+      "lat": 51.4274356,
+      "lon": 5.4864557,
+      "tags": {
+        "name": "Samen-wonen Vastgoed Makelaardij",
+        "office": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 4519462797,
+      "lat": 51.6587755,
+      "lon": 5.2980949,
+      "tags": {
+        "addr:city": "Vught",
+        "addr:housenumber": "33",
+        "addr:postcode": "5261CJ",
+        "addr:street": "Dorpsstraat",
+        "name": "Atenzijlstra Makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2016-11-24"
+      }
+    },
+    {
+      "type": "node",
+      "id": 4693957700,
+      "lat": 51.5288955,
+      "lon": 4.453021,
+      "tags": {
+        "addr:city": "Roosendaal",
+        "addr:housenumber": "62",
+        "addr:postcode": "4701BL",
+        "addr:street": "Laan van Brabant",
+        "name": "Charles Suijkerbuijk",
+        "office": "estate_agent",
+        "opening_hours": "Mo-Fr 08:30-17:30",
+        "phone": "+31 165 541 219",
+        "source": "BAG",
+        "source:date": "2017-02-19",
+        "website": "https://www.cs-makelaars.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 4895147267,
+      "lat": 51.6913769,
+      "lon": 5.0744028,
+      "tags": {
+        "name": "Staete Makelaardij",
+        "office": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 5336844662,
+      "lat": 51.5497858,
+      "lon": 5.0688044,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "212",
+        "addr:postcode": "5025JX",
+        "addr:street": "Korvelplein",
+        "name": "Allround Makelaardij",
+        "office": "estate_agent",
+        "website": "https://www.allroundmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 5796023776,
+      "lat": 51.4445767,
+      "lon": 5.6214302,
+      "tags": {
+        "addr:city": "Mierlo",
+        "addr:housenumber": "18",
+        "addr:postcode": "5731HW",
+        "addr:street": "Marktstraat",
+        "name": "Frank Gruintjes makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-05-20",
+        "website": "https://www.frankgruintjes.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6287108383,
+      "lat": 51.4043667,
+      "lon": 5.3991721,
+      "tags": {
+        "addr:city": "Veldhoven",
+        "addr:housenumber": "57",
+        "addr:postcode": "5504HB",
+        "addr:street": "Dorpstraat",
+        "name": "Pit Makerlaars",
+        "office": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6287110986,
+      "lat": 51.40318,
+      "lon": 5.3970564,
+      "tags": {
+        "addr:city": "Veldhoven",
+        "addr:housenumber": "16",
+        "addr:postcode": "5504HH",
+        "addr:street": "Dorpstraat",
+        "name": "Van Kasteren Makelaardij",
+        "office": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6296036163,
+      "lat": 51.4595155,
+      "lon": 5.4894163,
+      "tags": {
+        "name": "Brabant BV",
+        "office": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6481451197,
+      "lat": 51.5527756,
+      "lon": 5.092451,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "1-30",
+        "addr:postcode": "5017BE",
+        "addr:street": "Koopvaardijstraat",
+        "name": "MTB makelaardij",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2019-05-17",
+        "website": "https://www.mtbmakelaardij.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 8594883965,
+      "lat": 51.4262306,
+      "lon": 5.4674381,
+      "tags": {
+        "addr:city": "Eindhoven",
+        "addr:housenumber": "195A",
+        "addr:postcode": "5654AN",
+        "addr:street": "Boutenslaan",
+        "name": "Van Santvoort makelaars",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2014-02-11",
+        "website": "https://www.vansantvoort.nl"
+      }
+    },
+    {
+      "type": "node",
+      "id": 8614638771,
+      "lat": 51.6207744,
+      "lon": 5.4306462,
+      "tags": {
+        "addr:city": "Schijndel",
+        "addr:housenumber": "39",
+        "addr:postcode": "5481AA",
+        "addr:street": "Hoofdstraat",
+        "name": "Wouters Makelaardij",
+        "office": "estate_agent",
+        "phone": "+31 73 543 0683",
+        "website": "https://www.woutersmakelaardij.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11279711696,
+      "lat": 51.5522624,
+      "lon": 5.0995128,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "1",
+        "addr:postcode": "5021AR",
+        "addr:street": "Antoon van Rijenplein",
+        "name": "Hoomz",
+        "office": "estate_agent",
+        "source": "BAG",
+        "source:date": "2023-10-21",
+        "website": "https://www.hoomz.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11691931029,
+      "lat": 51.7303452,
+      "lon": 5.8657412,
+      "tags": {
+        "addr:city": "Cuijk",
+        "addr:housenumber": "5",
+        "addr:postcode": "5431SN",
+        "addr:street": "Spinding",
+        "level": "3",
+        "name": "Vastadis",
+        "office": "estate_agent",
+        "phone": "+31 485 798 008",
+        "ref:room": "3.11",
+        "website": "https://vastadis.nl/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11786769549,
+      "lat": 51.2740686,
+      "lon": 5.5734861,
+      "tags": {
+        "check_date": "2024-04-04",
+        "name": "Casa Nostra",
+        "office": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11955510586,
+      "lat": 51.4243481,
+      "lon": 5.4854966,
+      "tags": {
+        "name": "Adriaan Heuvel",
+        "office": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11955512985,
+      "lat": 51.4244475,
+      "lon": 5.4855513,
+      "tags": {
+        "name": "Hypodomus",
+        "office": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11955530728,
+      "lat": 51.4259964,
+      "lon": 5.4859299,
+      "tags": {
+        "name": "Meneer de Makelaar",
+        "office": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11955722140,
+      "lat": 51.4295026,
+      "lon": 5.4867953,
+      "tags": {
+        "name": "Slippens & Vermeer",
+        "office": "estate_agent"
+      }
+    },
+    {
+      "type": "node",
+      "id": 12850693398,
+      "lat": 51.5526491,
+      "lon": 5.0934962,
+      "tags": {
+        "addr:city": "Tilburg",
+        "addr:housenumber": "27",
+        "addr:postcode": "5017AN",
+        "addr:street": "Piushaven",
+        "name": "Loever Makelaardij",
+        "office": "estate_agent",
+        "website": "https://www.loever.nl/"
+      }
+    }
+  ]
+}

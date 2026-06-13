@@ -182,6 +182,26 @@ def test_reporter_shows_failed_domains_from_live_attempts() -> None:
                 elapsed_ms=15,
             ),
         ],
+        overpass_cache_used=False,
+        overpass_cache_timestamp="",
+        overpass_source_label="primary",
+        source_master_rows=[
+            {
+                "is_active": "true",
+                "aanbod_url_quality": "valid",
+            },
+            {
+                "is_active": "false",
+                "aanbod_url_quality": "suspect",
+            },
+        ],
+        missing_website_review_count=1,
+        website_resolver_resolved_count=1,
+        website_resolver_unresolved_count=1,
+        aggregator_registry_rows=[
+            {"aggregator_name": "Huispedia", "adapter_enabled": "false", "permission_status": "needs_review"},
+            {"aggregator_name": "Funda", "adapter_enabled": "false", "permission_status": "not_allowed_for_scraping"},
+        ],
     )
 
     assert "Top failed domains" in report
@@ -191,3 +211,6 @@ def test_reporter_shows_failed_domains_from_live_attempts() -> None:
     assert "Audit aanbod enabled: true" in report
     assert "Browser audit unique valid domains: 1" in report
     assert "Browser audit duplicate valid rows: 1" in report
+    assert "Overpass Cache Status" in report
+    assert "Source Master Summary" in report
+    assert "WebsiteResolver Summary" in report

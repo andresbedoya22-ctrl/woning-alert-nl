@@ -22,6 +22,7 @@ class SourceCandidate:
     aanbod_validation_reason: str = ""
     confidence: float = 0.0
     needs_review: bool = False
+    website_resolution_status: str = ""
     source_adapter: str = "seed"
     source_origin: str = "seed"
     score: int = 0

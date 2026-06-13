@@ -13,7 +13,7 @@ from .aanbod_finder import (
     detect_live_aanbod_url,
     suggest_common_aanbod_paths,
 )
-from .config import DEFAULT_GEMEENTEN_REFERENCE_PATH, DISCOVERY_BASE_DIR
+from .config import DEFAULT_AGGREGATOR_LEGAL_REGISTRY_PATH, DEFAULT_GEMEENTEN_REFERENCE_PATH, DISCOVERY_BASE_DIR
 from .dedupe import dedupe_candidates
 from .models import AanbodAuditAttempt, DiscoveryResult, GeneratedQuery, LiveAanbodAttempt, SourceCandidate
 from .overpass_adapter import OverpassAdapter, OverpassDiscoveryResponse
@@ -21,6 +21,8 @@ from .query_generator import generate_queries_from_reference
 from .reporter import load_expected_gemeenten, render_discovery_run_report, write_discovery_run_report
 from .scorer import score_candidate
 from .seed_adapter import load_seed_candidates
+from .source_master_builder import build_source_master_rows, write_source_master
+from .website_resolver import resolve_websites
 from .website_analyzer import analyze_candidate_website
 from .website_fetcher import WebsiteFetcher
 
@@ -174,6 +176,31 @@ def _audit_attempt_to_row(attempt) -> dict[str, str]:
     }
 
 
+def _manual_website_review_fieldnames() -> list[str]:
+    return [
+        "office_name",
+        "gemeente",
+        "plaats",
+        "source_origin",
+        "raw_place",
+        "normalized_place",
+        "phone",
+        "email",
+        "lat",
+        "lon",
+        "reason",
+        "suggested_domains",
+        "notes",
+    ]
+
+
+def _load_aggregator_registry_rows(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
 def _write_csv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
@@ -230,6 +257,7 @@ def _mark_missing_website(candidate: SourceCandidate) -> DiscoveryResult:
     candidate.aanbod_url_quality = "missing"
     candidate.aanbod_detection_method = "failed"
     candidate.aanbod_detection_score = 0
+    candidate.website_resolution_status = candidate.website_resolution_status or "needs_manual_review"
     candidate.aanbod_validation_reason = "missing website"
     candidate.rejection_reason = "missing_website"
     candidate.review_reason = "; ".join(
@@ -343,6 +371,7 @@ def run_discovery(
         provincie=normalized_province,
     )[:max_queries]
     expected_gemeenten = load_expected_gemeenten(DEFAULT_GEMEENTEN_REFERENCE_PATH)
+    aggregator_registry_rows = _load_aggregator_registry_rows(DEFAULT_AGGREGATOR_LEGAL_REGISTRY_PATH)
 
     overpass_response = _overpass_response_for_mode(
         mode=mode,
@@ -358,8 +387,14 @@ def run_discovery(
     overpass_response.new_domains_added = overpass_new_domains_added
     overpass_response.duplicates_vs_seed = overpass_duplicates_vs_seed
 
-    direct_rejections = [_mark_missing_website(candidate) for candidate in overpass_candidates if not candidate.website]
-    candidates_with_website = seed_candidates + [candidate for candidate in overpass_candidates if candidate.website]
+    overpass_without_website = [candidate for candidate in overpass_candidates if not candidate.website]
+    resolver_output = resolve_websites(overpass_without_website, seed_candidates=seed_candidates)
+    direct_rejections = [_mark_missing_website(candidate) for candidate in resolver_output.unresolved_candidates]
+    candidates_with_website = (
+        seed_candidates
+        + [candidate for candidate in overpass_candidates if candidate.website]
+        + resolver_output.resolved_candidates
+    )
     limited_candidates = candidates_with_website[:max_sites]
     live_attempts: list[LiveAanbodAttempt] = []
     audit_attempts: list[AanbodAuditAttempt] = []
@@ -459,6 +494,7 @@ def run_discovery(
     query_rows = [_query_to_row(query) for query in generated_queries]
     live_attempt_rows = [_live_attempt_to_row(attempt) for attempt in live_attempts]
     audit_attempt_rows = [_audit_attempt_to_row(attempt) for attempt in audit_attempts]
+    source_master_rows = build_source_master_rows([result.candidate for result in processed_results], run_timestamp=run_timestamp)
 
     live_sites_attempted = sum(1 for attempt in live_attempts if attempt.attempted)
     live_sites_success = sum(1 for attempt in live_attempts if attempt.attempted and attempt.final_status in {"valid", "suspect"})
@@ -580,6 +616,12 @@ def run_discovery(
             "elapsed_ms",
         ],
     )
+    _write_csv(
+        run_dir / "manual_website_review.csv",
+        resolver_output.manual_review_rows,
+        _manual_website_review_fieldnames(),
+    )
+    write_source_master(run_dir / "makelaar_sources_master.csv", source_master_rows)
 
     report_text = render_discovery_run_report(
         province=normalized_province,
@@ -621,6 +663,14 @@ def run_discovery(
         valid_aanbod_after_audit=sum(1 for result in processed_results if result.candidate.aanbod_url_quality == "valid"),
         missing_aanbod_after_audit=sum(1 for result in processed_results if result.candidate.aanbod_url_quality == "missing"),
         audit_attempts=audit_attempts,
+        overpass_cache_used=overpass_response.cache_used,
+        overpass_cache_timestamp=overpass_response.cache_timestamp,
+        overpass_source_label=overpass_response.source_label,
+        source_master_rows=source_master_rows,
+        missing_website_review_count=len(resolver_output.manual_review_rows),
+        website_resolver_resolved_count=len(resolver_output.resolved_candidates),
+        website_resolver_unresolved_count=len(resolver_output.unresolved_candidates),
+        aggregator_registry_rows=aggregator_registry_rows,
     )
     report_path = run_dir / "discovery_run_report.md"
     write_discovery_run_report(report_path, report_text)
@@ -635,6 +685,8 @@ def run_discovery(
             "generated_queries.csv",
             "live_aanbod_attempts.csv",
             "aanbod_audit_results.csv",
+            "manual_website_review.csv",
+            "makelaar_sources_master.csv",
             "discovery_run_report.md",
         ],
     )

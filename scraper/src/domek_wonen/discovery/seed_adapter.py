@@ -54,6 +54,7 @@ def row_to_candidate(row: dict[str, str]) -> SourceCandidate:
         aanbod_url_quality=quality,
         confidence=float(confidence_raw or 0),
         needs_review=(row.get("needs_review") or "").strip().lower() == "true",
+        website_resolution_status=(row.get("website_resolution_status") or "").strip(),
         source_adapter="seed",
         source_origin="seed",
         review_reason=(row.get("review_reason") or "").strip(),

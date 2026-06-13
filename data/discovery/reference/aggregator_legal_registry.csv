@@ -1,0 +1,4 @@
+aggregator_name,base_url,adapter_name,robots_status,tos_status,permission_status,allowed_use,adapter_enabled,notes
+Huispedia,https://www.huispedia.nl,huispedia_adapter,needs_review,needs_review,needs_review,disabled_pending_review,false,Disabled by default until legal review is complete.
+Huislijn,https://www.huislijn.nl,huislijn_adapter,needs_review,needs_review,needs_review,disabled_pending_review,false,Disabled by default until legal review is complete.
+Funda,https://www.funda.nl,disabled,not_allowed,not_allowed,not_allowed_for_scraping,not_allowed,false,Do not scrape Funda.
