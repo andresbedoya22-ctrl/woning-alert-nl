@@ -145,6 +145,7 @@ def _write_missing_sources_report(
             "- Sources succeeded: 0",
             "- Sources failed: 0",
             "- Sources timeout: 0",
+            "- Sources skipped invalid aanbod_url: 0",
             "- Properties found: 0",
             "- Properties matching ready: 0",
             "- Rejected candidates: 0",
@@ -315,6 +316,7 @@ def _write_checkpoint(
     candidates: list[PropertyCandidate],
     inventory: list[PropertyInventoryRecord],
     rejected: list[PropertyRejectedRecord],
+    sources_skipped_invalid_aanbod_url: int = 0,
 ) -> None:
     candidate_rows = [candidate_to_row(candidate) for candidate in candidates]
     inventory_rows = [inventory_to_row(record) for record in inventory]
@@ -342,6 +344,7 @@ def _write_checkpoint(
         candidates=candidates,
         inventory=inventory,
         rejected=rejected,
+        sources_skipped_invalid_aanbod_url=sources_skipped_invalid_aanbod_url,
     )
     report_path.write_text(report_text, encoding="utf-8")
 
@@ -570,6 +573,7 @@ def run_property_discovery(
     max_detail_pages: int = 3,
     detail_timeout_seconds: int = 10,
     disable_detail_extraction: bool = False,
+    include_invalid_sources: bool = False,
     verbose: bool = True,
 ) -> PropertyDiscoveryRunOutput:
     started_at = _utc_now()
@@ -594,7 +598,11 @@ def run_property_discovery(
     restore_latest_discovery_if_missing(source_csv_path)
 
     try:
-        sources = [] if max_sources <= 0 else loader.load(province=province, max_sources=max_sources)
+        sources = [] if max_sources <= 0 else loader.load(
+            province=province,
+            max_sources=max_sources,
+            include_invalid_sources=include_invalid_sources,
+        )
     except MissingSourceFileError as exc:
         finished_at = _utc_now()
         missing_path = Path(exc.csv_path)
@@ -623,12 +631,14 @@ def run_property_discovery(
             sources_succeeded=0,
             sources_failed=0,
             sources_timeout=0,
+            sources_skipped_invalid_aanbod_url=0,
             total_property_candidates=0,
             deduped_properties=0,
             rejected_candidates=0,
         )
     if verbose:
         _log(f"sources loaded count={len(sources)}")
+        _log(f"sources skipped invalid aanbod_url={loader.last_skipped_invalid_aanbod_url_count}")
 
     crawl_results: list[CrawlResult] = []
     candidates: list[PropertyCandidate] = []
@@ -651,6 +661,7 @@ def run_property_discovery(
         candidates=candidates,
         inventory=inventory,
         rejected=rejected_records,
+        sources_skipped_invalid_aanbod_url=loader.last_skipped_invalid_aanbod_url_count,
     )
 
     try:
@@ -716,6 +727,7 @@ def run_property_discovery(
                 candidates=candidates,
                 inventory=inventory,
                 rejected=rejected_records,
+                sources_skipped_invalid_aanbod_url=loader.last_skipped_invalid_aanbod_url_count,
             )
 
             if verbose:
@@ -752,6 +764,7 @@ def run_property_discovery(
             candidates=candidates,
             inventory=inventory,
             rejected=rejected_records,
+            sources_skipped_invalid_aanbod_url=loader.last_skipped_invalid_aanbod_url_count,
         )
         if run_status != "interrupted":
             copy_latest(
@@ -787,6 +800,7 @@ def run_property_discovery(
         sources_succeeded=sum(1 for result in crawl_results if result.ok),
         sources_failed=sum(1 for result in crawl_results if not result.ok),
         sources_timeout=sum(1 for result in crawl_results if result.timed_out),
+        sources_skipped_invalid_aanbod_url=loader.last_skipped_invalid_aanbod_url_count,
         total_property_candidates=len(candidates),
         deduped_properties=len(inventory),
         rejected_candidates=len(rejected_records),

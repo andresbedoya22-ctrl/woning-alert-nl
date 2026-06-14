@@ -189,12 +189,18 @@ def test_reporter_shows_failed_domains_from_live_attempts() -> None:
             {
                 "is_active": "true",
                 "aanbod_url_quality": "valid",
+                "aanbod_url_type": "listing_index",
                 "legal_status": "allowed_official_source",
+                "source_quality_status": "valid",
+                "needs_review": "false",
             },
             {
                 "is_active": "false",
                 "aanbod_url_quality": "suspect",
+                "aanbod_url_type": "missing",
                 "legal_status": "needs_manual_review",
+                "source_quality_status": "invalid",
+                "needs_review": "true",
             },
         ],
         missing_website_review_count=1,
@@ -216,5 +222,7 @@ def test_reporter_shows_failed_domains_from_live_attempts() -> None:
     assert "Overpass Cache Status" in report
     assert "Source Master Summary" in report
     assert "Total master sources: 2" in report
+    assert "Invalid sources count: 1" in report
+    assert "Needs review count: 1" in report
     assert "Inactive/missing count: 1" in report
     assert "WebsiteResolver Summary" in report

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 from time import perf_counter
 from urllib.parse import urljoin, urlsplit
 
@@ -20,6 +21,7 @@ class AanbodClassification:
     status: str
     reason: str
     url: str = ""
+    url_type: str = "missing"
     score: int = 0
     detection_method: str = "failed"
     matched_signals: list[str] = field(default_factory=list)
@@ -62,6 +64,94 @@ def _match_tokens(haystack: str, tokens: tuple[str, ...]) -> list[str]:
     return [token for token in tokens if token in haystack]
 
 
+_LISTING_INDEX_SEGMENTS = {
+    "aanbod",
+    "woningaanbod",
+    "koopwoningen",
+    "woningen",
+    "huizen",
+    "objecten",
+}
+_COMMERCIAL_SEGMENTS = {
+    "contact",
+    "privacy",
+    "about",
+    "verkoopadvies",
+    "gratis-verkoopadvies",
+    "diensten",
+    "taxatie",
+    "hypotheek",
+    "aankoopmakelaar",
+}
+_PROPERTY_DETAIL_PATTERNS = (
+    re.compile(r"/huis-\d+", re.IGNORECASE),
+    re.compile(r"/koop/huis-\d+", re.IGNORECASE),
+    re.compile(r"/woning/", re.IGNORECASE),
+)
+_ADDRESS_SLUG_RE = re.compile(r"^[a-z0-9'._-]{10,}$", re.IGNORECASE)
+_ADDRESS_SLUG_WITH_NUMBER_RE = re.compile(r"[a-z].*-\d+[a-z0-9-]*$", re.IGNORECASE)
+
+
+def _path_segments(url: str) -> list[str]:
+    parsed = urlsplit(url)
+    return [segment for segment in parsed.path.split("/") if segment]
+
+
+def _looks_like_property_detail_segment(segment: str) -> bool:
+    normalized = segment.strip().lower()
+    if not normalized:
+        return False
+    if normalized.startswith(("huis-", "woning-", "object-")) and any(char.isdigit() for char in normalized):
+        return True
+    if _ADDRESS_SLUG_RE.match(normalized) and _ADDRESS_SLUG_WITH_NUMBER_RE.search(normalized):
+        return True
+    return False
+
+
+def classify_aanbod_url_type(url: str | None) -> str:
+    normalized = _normalize_url(url)
+    if not normalized:
+        return "missing"
+
+    haystack = _haystack(normalized)
+    segments = [segment.lower() for segment in _path_segments(normalized)]
+    if any(pattern.search(haystack) for pattern in _PROPERTY_DETAIL_PATTERNS):
+        return "property_detail"
+    if any(segment in _COMMERCIAL_SEGMENTS for segment in segments):
+        return "commercial_page"
+    if segments:
+        last_segment = segments[-1]
+        if _looks_like_property_detail_segment(last_segment):
+            if len(segments) >= 2 and segments[0] in _LISTING_INDEX_SEGMENTS:
+                return "property_detail"
+            if "woningen" in segments:
+                return "property_detail"
+    if any(segment in _LISTING_INDEX_SEGMENTS for segment in segments):
+        return "listing_index"
+    if _match_tokens(haystack, EXCLUDED_AANBOD_TOKENS):
+        return "commercial_page"
+    return "invalid"
+
+
+def derive_listing_index_url(url: str | None) -> str:
+    normalized = _normalize_url(url)
+    if classify_aanbod_url_type(normalized) != "property_detail":
+        return ""
+    parsed = urlsplit(normalized)
+    segments = [segment for segment in parsed.path.split("/") if segment]
+    if not segments:
+        return ""
+    leading_listing_segments: list[str] = []
+    for segment in segments:
+        if segment.lower() in _LISTING_INDEX_SEGMENTS:
+            leading_listing_segments.append(segment)
+            continue
+        break
+    if not leading_listing_segments:
+        return ""
+    return urljoin(f"{parsed.scheme}://{parsed.netloc}/", "/".join(leading_listing_segments))
+
+
 def _url_priority(url: str) -> int:
     haystack = _haystack(url)
     score = 0
@@ -77,11 +167,36 @@ def _score_listing_page(url: str, response: FetchResponse) -> AanbodClassificati
             status="rejected",
             reason=f"status_code={response.status_code or 0}",
             url=normalized or _normalize_url(url),
+            url_type=classify_aanbod_url_type(normalized or url),
             score=0,
         )
     text = _text_haystack(response.text)
     if not text:
-        return AanbodClassification(status="rejected", reason="empty page", url=normalized, score=0)
+        return AanbodClassification(
+            status="rejected",
+            reason="empty page",
+            url=normalized,
+            url_type=classify_aanbod_url_type(normalized),
+            score=0,
+        )
+
+    url_type = classify_aanbod_url_type(normalized)
+    if url_type == "property_detail":
+        return AanbodClassification(
+            status="suspect",
+            reason="url points to property detail page",
+            url=normalized,
+            url_type=url_type,
+            score=20,
+        )
+    if url_type == "commercial_page":
+        return AanbodClassification(
+            status="rejected",
+            reason="url points to commercial page",
+            url=normalized,
+            url_type=url_type,
+            score=0,
+        )
 
     url_excluded = _match_tokens(_haystack(normalized), EXCLUDED_AANBOD_TOKENS)
     text_excluded = _match_tokens(text, EXCLUDED_AANBOD_TOKENS)
@@ -91,6 +206,7 @@ def _score_listing_page(url: str, response: FetchResponse) -> AanbodClassificati
             status="rejected",
             reason=f"contains excluded token '{token}'",
             url=normalized,
+            url_type="commercial_page",
             score=0,
         )
 
@@ -105,6 +221,7 @@ def _score_listing_page(url: str, response: FetchResponse) -> AanbodClassificati
             status="valid",
             reason=f"listing signals={','.join(unique_signals[:5])}",
             url=normalized,
+            url_type="listing_index",
             score=score,
             matched_signals=unique_signals,
         )
@@ -113,6 +230,7 @@ def _score_listing_page(url: str, response: FetchResponse) -> AanbodClassificati
             status="suspect",
             reason="possible aanbod page but insufficient listing signals",
             url=normalized,
+            url_type="listing_index",
             score=min(score, 59),
             matched_signals=unique_signals,
         )
@@ -120,6 +238,7 @@ def _score_listing_page(url: str, response: FetchResponse) -> AanbodClassificati
         status="missing",
         reason="missing listing signals",
         url=normalized,
+        url_type="invalid",
         score=min(score, 30),
         matched_signals=unique_signals,
     )
@@ -128,9 +247,38 @@ def _score_listing_page(url: str, response: FetchResponse) -> AanbodClassificati
 def classify_aanbod_url(url: str | None) -> AanbodClassification:
     normalized = _normalize_url(url)
     if not normalized:
-        return AanbodClassification(status="missing", reason="missing aanbod_url")
+        return AanbodClassification(status="missing", reason="missing aanbod_url", url_type="missing")
 
+    url_type = classify_aanbod_url_type(normalized)
     haystack = _haystack(normalized)
+    if url_type == "property_detail":
+        return AanbodClassification(
+            status="suspect",
+            reason="url points to property detail page",
+            url=normalized,
+            url_type=url_type,
+            score=10,
+            detection_method="existing_seed_url",
+        )
+    if url_type == "commercial_page":
+        return AanbodClassification(
+            status="rejected",
+            reason="url points to commercial page",
+            url=normalized,
+            url_type=url_type,
+            score=0,
+            detection_method="existing_seed_url",
+        )
+    if url_type == "invalid":
+        return AanbodClassification(
+            status="missing",
+            reason="missing listing signal",
+            url=normalized,
+            url_type=url_type,
+            score=20,
+            detection_method="existing_seed_url",
+        )
+
     matched_excluded = _match_tokens(haystack, EXCLUDED_AANBOD_TOKENS)
     if matched_excluded:
         status = "rejected" if matched_excluded[0] in {"contact", "privacy", "about"} else "suspect"
@@ -138,6 +286,7 @@ def classify_aanbod_url(url: str | None) -> AanbodClassification:
             status=status,
             reason=f"contains excluded token '{matched_excluded[0]}'",
             url=normalized,
+            url_type="commercial_page" if status == "rejected" else "invalid",
             score=0 if status == "rejected" else 25,
             detection_method="existing_seed_url",
         )
@@ -148,6 +297,7 @@ def classify_aanbod_url(url: str | None) -> AanbodClassification:
             status="valid",
             reason=f"url contains listing signal '{matched_valid[0]}'",
             url=normalized,
+            url_type="listing_index",
             score=75,
             detection_method="existing_seed_url",
         )
@@ -156,6 +306,7 @@ def classify_aanbod_url(url: str | None) -> AanbodClassification:
         status="suspect",
         reason="missing listing signal",
         url=normalized,
+        url_type="invalid",
         score=30,
         detection_method="existing_seed_url",
     )
@@ -236,6 +387,7 @@ def _pick_best(classifications: list[AanbodClassification]) -> AanbodClassificat
         return AanbodClassification(
             status="missing",
             reason="no aanbod candidate matched",
+            url_type="missing",
             detection_method="failed",
             score=0,
         )
@@ -259,6 +411,7 @@ def detect_live_aanbod_url(
             classification=AanbodClassification(
                 status="missing",
                 reason="missing website",
+                url_type="missing",
                 detection_method="failed",
                 score=0,
             ),
@@ -277,6 +430,7 @@ def detect_live_aanbod_url(
                 status="rejected",
                 reason=f"homepage fetch failed: status_code={homepage.status_code or 0}",
                 url=website,
+                url_type="invalid",
                 detection_method="failed",
                 score=0,
             ),
@@ -367,6 +521,7 @@ def dedupe_classifications(classifications: list[AanbodClassification]) -> list[
 def apply_aanbod_classification(candidate: SourceCandidate, classification: AanbodClassification) -> None:
     if classification.status in {"valid", "suspect"} and classification.url:
         candidate.aanbod_url = classification.url
+    candidate.aanbod_url_type = classification.url_type
     candidate.aanbod_url_quality = classification.status if classification.status != "rejected" else "missing"
     candidate.aanbod_detection_method = classification.detection_method
     candidate.aanbod_detection_score = classification.score

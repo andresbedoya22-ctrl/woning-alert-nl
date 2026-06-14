@@ -799,3 +799,35 @@ def test_property_discovery_rejected_candidates_skips_empty_rows(tmp_path: Path,
         rejected_rows = list(csv.DictReader(handle))
 
     assert rejected_rows == []
+
+
+def test_property_discovery_skips_invalid_and_property_detail_sources_by_default(tmp_path: Path) -> None:
+    latest_dir = tmp_path / "latest"
+    latest_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = latest_dir / "makelaar_sources_master.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,aanbod_url_type,confidence_score,source_quality_status,source_quality_reason,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,listing_index,80,valid,,false,,allowed_official_source,20260613T000000Z,,true",
+                "bad-1,Detail One,detail.nl,https://detail.nl,Breda,Noord-Brabant,seed,https://detail.nl/aanbod/woningaanbod/koop/huis-123-Markt-1,valid,property_detail,80,valid,,false,,allowed_official_source,20260613T000000Z,,true",
+                "bad-2,Invalid One,invalid.nl,https://invalid.nl,Breda,Noord-Brabant,seed,https://invalid.nl/contact,valid,listing_index,80,invalid,aanbod_url_type=commercial_page,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=10,
+        max_properties_per_source=1,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=latest_dir,
+        verbose=False,
+    )
+
+    assert output.sources_loaded == 1
+    assert output.sources_skipped_invalid_aanbod_url == 2
+    report_text = output.report_path.read_text(encoding="utf-8")
+    assert "- Sources skipped invalid aanbod_url: 2" in report_text

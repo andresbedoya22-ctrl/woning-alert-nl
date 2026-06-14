@@ -230,6 +230,9 @@ def render_discovery_run_report(
     valid_aanbod_count = sum(1 for result in analyzed_results if result.candidate.aanbod_url_quality == "valid")
     suspect_count = sum(1 for result in analyzed_results if result.candidate.aanbod_url_quality == "suspect")
     missing_count = sum(1 for result in analyzed_results if result.candidate.aanbod_url_quality == "missing")
+    property_detail_aanbod_urls_count = sum(
+        1 for result in analyzed_results if result.candidate.aanbod_url_type == "property_detail"
+    )
     rejected_count = sum(1 for result in analyzed_results if result.status == "rejected")
     still_missing_aanbod = sum(1 for result in analyzed_results if result.candidate.aanbod_url_quality == "missing")
 
@@ -324,6 +327,8 @@ def render_discovery_run_report(
     ] or ["- None"]
     active_official_sources_count = sum(1 for row in source_master_rows if row["is_active"] == "true")
     suspect_review_queue_count = sum(1 for row in source_master_rows if row["aanbod_url_quality"] == "suspect")
+    invalid_sources_count = sum(1 for row in source_master_rows if row.get("source_quality_status") == "invalid")
+    needs_review_count = sum(1 for row in source_master_rows if (row.get("needs_review") or "").lower() == "true")
     inactive_missing_count = sum(
         1
         for row in source_master_rows
@@ -400,6 +405,7 @@ def render_discovery_run_report(
             f"- Valid aanbod_url after Overpass: {valid_aanbod_count}",
             f"- Suspect after Overpass: {suspect_count}",
             f"- Missing aanbod_url after Overpass: {missing_count}",
+            f"- Property detail aanbod_url count: {property_detail_aanbod_urls_count}",
             f"- Live sites attempted: {live_sites_attempted}",
             f"- Live sites success: {live_sites_success}",
             f"- Live sites failed: {live_sites_failed}",
@@ -416,6 +422,8 @@ def render_discovery_run_report(
             f"- Valid aanbod_url after audit: {valid_aanbod_after_audit}",
             f"- Missing aanbod_url after audit: {missing_aanbod_after_audit}",
             f"- Active official sources count: {active_official_sources_count}",
+            f"- Invalid sources count: {invalid_sources_count}",
+            f"- Needs review count: {needs_review_count}",
             f"- Suspect review queue count: {suspect_review_queue_count}",
             f"- Missing website review count: {missing_website_review_count}",
             f"- Still missing aanbod_url: {still_missing_aanbod}",
@@ -484,6 +492,8 @@ def render_discovery_run_report(
             "## Source Master Summary",
             f"- Total master sources: {len(source_master_rows)}",
             f"- Active official sources count: {active_official_sources_count}",
+            f"- Invalid sources count: {invalid_sources_count}",
+            f"- Needs review count: {needs_review_count}",
             f"- Suspect review queue count: {suspect_review_queue_count}",
             f"- Inactive/missing count: {inactive_missing_count}",
             "",

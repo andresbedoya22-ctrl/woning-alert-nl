@@ -139,6 +139,7 @@ def render_report(
     candidates: list[PropertyCandidate],
     inventory: list[PropertyInventoryRecord],
     rejected: list[PropertyRejectedRecord],
+    sources_skipped_invalid_aanbod_url: int = 0,
 ) -> str:
     succeeded = [result for result in crawl_results if result.ok]
     failed = [result for result in crawl_results if not result.ok]
@@ -179,6 +180,7 @@ def render_report(
             f"- Sources succeeded: {len(succeeded)}",
             f"- Sources failed: {len(failed)}",
             f"- Sources timeout: {len(timed_out)}",
+            f"- Sources skipped invalid aanbod_url: {sources_skipped_invalid_aanbod_url}",
             f"- Properties found: {len(candidates)}",
             f"- Properties matching ready: {len(inventory)}",
             f"- Rejected candidates: {len(rejected)}",

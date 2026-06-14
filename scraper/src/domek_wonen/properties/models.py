@@ -16,6 +16,9 @@ class PropertySource:
     legal_status: str
     aanbod_url_quality: str
     is_active: bool
+    aanbod_url_type: str = "missing"
+    source_quality_status: str = ""
+    source_quality_reason: str = ""
     source_origin: str = ""
 
 
@@ -139,6 +142,7 @@ class PropertyDiscoveryRunOutput:
     sources_succeeded: int
     sources_failed: int
     sources_timeout: int
+    sources_skipped_invalid_aanbod_url: int
     total_property_candidates: int
     deduped_properties: int
     rejected_candidates: int

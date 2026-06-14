@@ -42,6 +42,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Hard timeout per detail page navigation and load operations",
     )
     parser.add_argument("--disable-detail-extraction", action="store_true", help="Disable optional detail page enrichment")
+    parser.add_argument(
+        "--include-invalid-sources",
+        action="store_true",
+        help="Include sources flagged with invalid aanbod_url quality gates",
+    )
     parser.add_argument("--smoke", action="store_true", help="Run a fast single-source smoke test")
     return parser.parse_args(argv)
 
@@ -71,6 +76,7 @@ def _effective_options(args: argparse.Namespace) -> dict[str, int | bool | str]:
         "max_detail_pages": max_detail_pages,
         "detail_timeout_seconds": detail_timeout_seconds,
         "disable_detail_extraction": args.disable_detail_extraction,
+        "include_invalid_sources": args.include_invalid_sources,
         "verbose": True,
     }
 

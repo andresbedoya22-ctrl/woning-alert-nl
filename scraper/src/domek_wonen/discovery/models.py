@@ -17,6 +17,7 @@ class SourceCandidate:
     provincie: str = ""
     aanbod_url: str = ""
     aanbod_url_quality: str = "missing"
+    aanbod_url_type: str = "missing"
     aanbod_detection_method: str = "failed"
     aanbod_detection_score: int = 0
     aanbod_validation_reason: str = ""

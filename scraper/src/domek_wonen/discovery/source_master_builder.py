@@ -4,6 +4,7 @@ import csv
 from pathlib import Path
 from typing import Iterable
 
+from .aanbod_finder import classify_aanbod_url_type, derive_listing_index_url
 from .models import SourceCandidate
 
 
@@ -17,8 +18,11 @@ SOURCE_MASTER_FIELDNAMES = [
     "source_origin",
     "aanbod_url",
     "aanbod_url_quality",
+    "aanbod_url_type",
     "confidence_score",
     "score",
+    "source_quality_status",
+    "source_quality_reason",
     "needs_review",
     "review_reason",
     "legal_status",
@@ -44,7 +48,7 @@ def _legal_status(candidate: SourceCandidate) -> str:
         return "disabled_legal_review"
     if candidate.rejection_reason == "missing_website" or candidate.website_resolution_status == "needs_manual_review":
         return "missing_website"
-    if candidate.aanbod_url_quality == "valid":
+    if candidate.aanbod_url_quality == "valid" and candidate.aanbod_url_type == "listing_index":
         return "allowed_official_source"
     if candidate.aanbod_url_quality == "suspect":
         return "needs_manual_review"
@@ -94,7 +98,7 @@ def _legal_status_from_row(row: dict[str, str], *, aanbod_url_quality: str, sour
         return existing
     if source_origin == "aggregator_fallback":
         return "disabled_legal_review"
-    if aanbod_url_quality == "valid":
+    if aanbod_url_quality == "valid" and _read_first(row, "aanbod_url_type", default="missing") == "listing_index":
         return "allowed_official_source"
     if aanbod_url_quality == "suspect":
         return "needs_manual_review"
@@ -120,8 +124,11 @@ def _build_master_row(
     source_origin: str,
     aanbod_url: str,
     aanbod_url_quality: str,
+    aanbod_url_type: str,
     confidence_score: int,
     score: int,
+    source_quality_status: str,
+    source_quality_reason: str,
     needs_review: bool,
     review_reason: str,
     legal_status: str,
@@ -140,8 +147,11 @@ def _build_master_row(
         "source_origin": source_origin,
         "aanbod_url": aanbod_url,
         "aanbod_url_quality": aanbod_url_quality,
+        "aanbod_url_type": aanbod_url_type,
         "confidence_score": str(confidence_score),
         "score": str(score),
+        "source_quality_status": source_quality_status,
+        "source_quality_reason": source_quality_reason,
         "needs_review": _bool_str(needs_review),
         "review_reason": review_reason,
         "legal_status": legal_status,
@@ -155,8 +165,45 @@ def _build_master_row(
 def build_source_master_rows(candidates: list[SourceCandidate], *, run_timestamp: str) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for candidate in candidates:
+        aanbod_url = candidate.aanbod_url
+        aanbod_url_quality = candidate.aanbod_url_quality
+        aanbod_url_type = (
+            candidate.aanbod_url_type
+            if candidate.aanbod_url_type not in {"", "missing"}
+            else classify_aanbod_url_type(aanbod_url)
+        )
+        source_quality_status = "valid"
+        source_quality_reason = ""
+        review_reason = candidate.review_reason or candidate.aanbod_validation_reason
+        needs_review = candidate.needs_review or aanbod_url_quality == "suspect"
+        if aanbod_url_type == "property_detail":
+            derived_url = derive_listing_index_url(aanbod_url)
+            if derived_url:
+                aanbod_url = derived_url
+                aanbod_url_quality = "valid"
+                aanbod_url_type = "listing_index"
+                source_quality_reason = "derived_from_property_detail"
+            else:
+                aanbod_url = ""
+                aanbod_url_quality = "missing"
+                aanbod_url_type = "missing"
+                source_quality_status = "invalid"
+                source_quality_reason = "aanbod_url_was_property_detail"
+                needs_review = True
+                review_reason = "; ".join(
+                    part for part in (review_reason, "aanbod_url_was_property_detail") if part
+                )
+        elif aanbod_url_type in {"commercial_page", "invalid"}:
+            source_quality_status = "invalid"
+            source_quality_reason = f"aanbod_url_type={aanbod_url_type}"
+            needs_review = True
+        elif aanbod_url_type == "missing":
+            source_quality_status = "missing"
+        candidate.aanbod_url_type = aanbod_url_type
         legal_status = _legal_status(candidate)
-        needs_review = candidate.needs_review or candidate.aanbod_url_quality == "suspect" or legal_status in {
+        if source_quality_status == "invalid":
+            legal_status = "rejected"
+        needs_review = needs_review or legal_status in {
             "needs_manual_review",
             "missing_website",
         }
@@ -172,12 +219,15 @@ def build_source_master_rows(candidates: list[SourceCandidate], *, run_timestamp
                 gemeente=candidate.gemeente,
                 province=candidate.provincie,
                 source_origin=candidate.source_origin,
-                aanbod_url=candidate.aanbod_url,
-                aanbod_url_quality=candidate.aanbod_url_quality,
+                aanbod_url=aanbod_url,
+                aanbod_url_quality=aanbod_url_quality,
+                aanbod_url_type=aanbod_url_type,
                 confidence_score=confidence_score,
                 score=score,
+                source_quality_status=source_quality_status,
+                source_quality_reason=source_quality_reason,
                 needs_review=needs_review,
-                review_reason=candidate.review_reason or candidate.aanbod_validation_reason,
+                review_reason=review_reason,
                 legal_status=legal_status,
                 last_seen_at=run_timestamp,
                 last_audited_at=last_audited_at,
@@ -196,14 +246,52 @@ def build_source_master_rows_from_discovered_rows(
     master_rows: list[dict[str, str]] = []
     fallback_run_id = default_run_id or run_timestamp or "latest"
     for row in rows:
+        aanbod_url = _read_first(row, "aanbod_url")
         aanbod_url_quality = _read_first(row, "aanbod_url_quality", default="missing")
+        aanbod_url_type = _read_first(row, "aanbod_url_type", default=classify_aanbod_url_type(aanbod_url))
         source_origin = _read_first(row, "source_origin", default="source_discovery")
         score = _parse_int(row.get("score"), default=_parse_int(row.get("candidate_score"), default=0))
         confidence_score = _parse_int(row.get("confidence_score"), default=_parse_int(row.get("aanbod_detection_score"), default=score))
-        legal_status = _legal_status_from_row(row, aanbod_url_quality=aanbod_url_quality, source_origin=source_origin)
+        source_quality_status = _read_first(row, "source_quality_status", default="")
+        source_quality_reason = _read_first(row, "source_quality_reason")
+        review_reason = _read_first(row, "review_reason", "aanbod_validation_reason")
+        if aanbod_url_type == "property_detail":
+            derived_url = derive_listing_index_url(aanbod_url)
+            if derived_url:
+                aanbod_url = derived_url
+                aanbod_url_quality = "valid"
+                aanbod_url_type = "listing_index"
+                source_quality_status = "valid"
+                source_quality_reason = "derived_from_property_detail"
+            else:
+                aanbod_url = ""
+                aanbod_url_quality = "missing"
+                aanbod_url_type = "missing"
+                source_quality_status = "invalid"
+                source_quality_reason = "aanbod_url_was_property_detail"
+                review_reason = "; ".join(
+                    part for part in (review_reason, "aanbod_url_was_property_detail") if part
+                )
+        elif not source_quality_status:
+            if aanbod_url_type in {"commercial_page", "invalid"}:
+                source_quality_status = "invalid"
+                source_quality_reason = f"aanbod_url_type={aanbod_url_type}"
+            elif aanbod_url_type == "missing":
+                source_quality_status = "missing"
+            else:
+                source_quality_status = "valid"
+        legal_status = _legal_status_from_row(
+            {**row, "aanbod_url_type": aanbod_url_type},
+            aanbod_url_quality=aanbod_url_quality,
+            source_origin=source_origin,
+        )
+        if source_quality_status == "invalid":
+            legal_status = "rejected"
         last_seen_at = _read_first(row, "last_seen_at", default=run_timestamp)
         run_id = _read_first(row, "run_id", default=fallback_run_id)
         needs_review = _needs_review_from_row(row, aanbod_url_quality=aanbod_url_quality, score=score, legal_status=legal_status)
+        if source_quality_status == "invalid":
+            needs_review = True
         last_audited_at = _read_first(row, "last_audited_at")
         if not last_audited_at and _read_first(row, "aanbod_detection_method") == "browser_audit":
             last_audited_at = run_timestamp
@@ -216,12 +304,15 @@ def build_source_master_rows_from_discovered_rows(
                 gemeente=_read_first(row, "gemeente"),
                 province=_read_first(row, "province", "provincie"),
                 source_origin=source_origin,
-                aanbod_url=_read_first(row, "aanbod_url"),
+                aanbod_url=aanbod_url,
                 aanbod_url_quality=aanbod_url_quality,
+                aanbod_url_type=aanbod_url_type,
                 confidence_score=confidence_score,
                 score=score,
+                source_quality_status=source_quality_status,
+                source_quality_reason=source_quality_reason,
                 needs_review=needs_review,
-                review_reason=_read_first(row, "review_reason", "aanbod_validation_reason"),
+                review_reason=review_reason,
                 legal_status=legal_status,
                 last_seen_at=last_seen_at,
                 last_audited_at=last_audited_at,

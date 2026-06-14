@@ -33,6 +33,8 @@ def test_valid_source_is_active_true(tmp_path) -> None:
 
     assert rows[0]["legal_status"] == "allowed_official_source"
     assert rows[0]["is_active"] == "true"
+    assert rows[0]["aanbod_url_type"] == "listing_index"
+    assert rows[0]["source_quality_status"] == "valid"
 
 
 def test_suspect_source_is_inactive_and_needs_review(tmp_path) -> None:
@@ -106,6 +108,55 @@ def test_build_source_master_from_discovered_sources_csv(tmp_path) -> None:
     assert rows[1]["score"] == "0"
     assert rows[1]["needs_review"] == "true"
     assert rows[1]["last_seen_at"] == "20260614T120000Z"
+
+
+def test_builder_replaces_property_detail_with_parent_listing_url() -> None:
+    rows = build_source_master_rows(
+        [
+            SourceCandidate(
+                office_name="Detail Seed",
+                root_domain="detail.nl",
+                website="https://detail.nl",
+                gemeente="Den Bosch",
+                provincie="Noord-Brabant",
+                source_origin="seed",
+                aanbod_url="https://detail.nl/aanbod/woningaanbod/s-hertogenbosch/koop/huis-10187874-Uilenburg-32",
+                aanbod_url_quality="suspect",
+                aanbod_url_type="property_detail",
+            )
+        ],
+        run_timestamp="20260613T000000Z",
+    )
+
+    assert rows[0]["aanbod_url"] == "https://detail.nl/aanbod/woningaanbod"
+    assert rows[0]["aanbod_url_type"] == "listing_index"
+    assert rows[0]["source_quality_status"] == "valid"
+    assert rows[0]["source_quality_reason"] == "derived_from_property_detail"
+
+
+def test_builder_marks_underivable_property_detail_as_missing_and_review() -> None:
+    rows = build_source_master_rows(
+        [
+            SourceCandidate(
+                office_name="Broken Detail",
+                root_domain="broken.nl",
+                website="https://broken.nl",
+                gemeente="Breda",
+                provincie="Noord-Brabant",
+                source_origin="seed",
+                aanbod_url="https://broken.nl/huis-10187874-Uilenburg-32",
+                aanbod_url_quality="suspect",
+                aanbod_url_type="property_detail",
+            )
+        ],
+        run_timestamp="20260613T000000Z",
+    )
+
+    assert rows[0]["aanbod_url"] == ""
+    assert rows[0]["aanbod_url_quality"] == "missing"
+    assert rows[0]["source_quality_status"] == "invalid"
+    assert rows[0]["source_quality_reason"] == "aanbod_url_was_property_detail"
+    assert rows[0]["needs_review"] == "true"
 
 
 def test_build_source_master_script_writes_output(tmp_path) -> None:
