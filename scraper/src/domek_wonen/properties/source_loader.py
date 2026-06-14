@@ -4,6 +4,7 @@ import csv
 from pathlib import Path
 
 from .models import PropertySource
+from .platform_parser_registry import detect_platform_for_row, load_platform_assignments
 
 
 class MissingSourceFileError(FileNotFoundError):
@@ -31,15 +32,26 @@ class SourceLoader:
         max_sources: int | None = None,
         *,
         include_invalid_sources: bool = False,
+        platform_filter: str = "",
+        platform_fingerprint_path: Path | None = None,
     ) -> list[PropertySource]:
         target_province = normalize_province(province)
         loaded: list[PropertySource] = []
+        platform_assignments = load_platform_assignments(platform_fingerprint_path) if platform_fingerprint_path else {}
+        normalized_platform_filter = (platform_filter or "").strip().lower()
         self.last_skipped_invalid_aanbod_url_count = 0
         if not self.csv_path.exists():
             raise MissingSourceFileError(self.csv_path)
         with self.csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
             for row in csv.DictReader(handle):
-                source = self._build_source(row, include_invalid_sources=include_invalid_sources)
+                detected_platform = detect_platform_for_row(row, platform_assignments)
+                if normalized_platform_filter and detected_platform != normalized_platform_filter:
+                    continue
+                source = self._build_source(
+                    row,
+                    include_invalid_sources=include_invalid_sources,
+                    detected_platform=detected_platform,
+                )
                 if source is None:
                     continue
                 if target_province and source.province != target_province:
@@ -49,7 +61,13 @@ class SourceLoader:
                     break
         return loaded
 
-    def _build_source(self, row: dict[str, str], *, include_invalid_sources: bool) -> PropertySource | None:
+    def _build_source(
+        self,
+        row: dict[str, str],
+        *,
+        include_invalid_sources: bool,
+        detected_platform: str,
+    ) -> PropertySource | None:
         if (row.get("is_active") or "").strip().lower() != "true":
             return None
         if (row.get("legal_status") or "").strip() != "allowed_official_source":
@@ -88,4 +106,5 @@ class SourceLoader:
             source_quality_reason=(row.get("source_quality_reason") or "").strip(),
             is_active=True,
             source_origin=(row.get("source_origin") or "").strip(),
+            detected_platform=detected_platform,
         )

@@ -15,6 +15,7 @@ from domek_wonen.properties.listing_page_crawler import ListingPageCrawler
 from domek_wonen.properties.address_quality import derive_address_from_slug
 from domek_wonen.properties.detail_page_extractor import DetailPageExtractor
 from domek_wonen.properties.models import PropertyCandidate, PropertySource
+from domek_wonen.properties.platform_parser_registry import get_platform_parser
 from domek_wonen.properties.property_card_extractor import PropertyCardExtractor
 from domek_wonen.properties.property_discovery_engine import _annotate_candidate, _normalize_candidate
 from domek_wonen.properties.property_url_classifier import PropertyUrlClassifier
@@ -44,6 +45,7 @@ def _build_source(payload: dict[str, object]) -> PropertySource:
         aanbod_url_quality="valid",
         is_active=True,
         source_origin=str(payload.get("source_origin") or ""),
+        detected_platform=str(payload.get("detected_platform") or ""),
     )
 
 
@@ -267,6 +269,8 @@ def run_worker(input_path: Path, output_path: Path) -> int:
     max_detail_pages = int(payload.get("max_detail_pages") or 3)
     detail_timeout_seconds = int(payload.get("detail_timeout_seconds") or 10)
     disable_detail_extraction = bool(payload.get("disable_detail_extraction") or False)
+    disable_platform_parsers = bool(payload.get("disable_platform_parsers") or False)
+    detected_platform = (source.detected_platform or "").strip().lower()
 
     output: dict[str, object] = {
         "status": "failed",
@@ -274,9 +278,54 @@ def run_worker(input_path: Path, output_path: Path) -> int:
         "rejected": [],
         "errors": [],
         "duration_seconds": 0.0,
+        "parser_info": {
+            "parser_used": "",
+            "realworks_parser_success": False,
+            "realworks_parser_failed": False,
+            "parser_fallback_used": False,
+            "generic_parser_success": False,
+        },
     }
 
     try:
+        if not disable_platform_parsers and detected_platform:
+            platform_parser = get_platform_parser(detected_platform)
+            if platform_parser is not None:
+                try:
+                    parsed_candidates = platform_parser.parse(
+                        source,
+                        max_properties_per_source=max_properties_per_source,
+                        page_timeout_seconds=page_timeout_seconds,
+                    )
+                    parsed_candidates = [
+                        _finalize_candidate(_annotate_candidate(_normalize_candidate(candidate), url_classifier))
+                        for candidate in parsed_candidates
+                    ]
+                    if parsed_candidates:
+                        output["status"] = "succeeded"
+                        output["properties"] = _serialize_candidates(parsed_candidates, accepted=True)
+                        output["rejected"] = _serialize_candidates(parsed_candidates, accepted=False)
+                        output["errors"] = []
+                        output["parser_info"] = {
+                            "parser_used": f"{detected_platform}_parser",
+                            "realworks_parser_success": detected_platform == "realworks",
+                            "realworks_parser_failed": False,
+                            "parser_fallback_used": False,
+                            "generic_parser_success": False,
+                        }
+                        return_code = 0
+                        return return_code
+                    raise RuntimeError(f"{detected_platform} parser returned no candidates")
+                except Exception as exc:
+                    output["errors"] = [str(exc)]
+                    output["parser_info"] = {
+                        "parser_used": "",
+                        "realworks_parser_success": False,
+                        "realworks_parser_failed": detected_platform == "realworks",
+                        "parser_fallback_used": True,
+                        "generic_parser_success": False,
+                    }
+
         with ListingPageCrawler(timeout_ms=effective_timeout_ms) as crawler:
             result = crawler.crawl(source)
             if not result.ok:
@@ -308,6 +357,13 @@ def run_worker(input_path: Path, output_path: Path) -> int:
                 output["status"] = "succeeded"
                 output["properties"] = _serialize_candidates(annotated, accepted=True)
                 output["rejected"] = _serialize_candidates(annotated, accepted=False)
+                output["parser_info"] = {
+                    "parser_used": "generic",
+                    "realworks_parser_success": False,
+                    "realworks_parser_failed": bool(output["parser_info"].get("realworks_parser_failed")),
+                    "parser_fallback_used": bool(output["parser_info"].get("parser_fallback_used")),
+                    "generic_parser_success": True,
+                }
                 return_code = 0
     except Exception as exc:
         if output["properties"] or output["rejected"]:

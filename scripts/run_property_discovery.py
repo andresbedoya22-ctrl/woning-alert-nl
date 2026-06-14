@@ -9,6 +9,7 @@ sys.path.insert(0, str(BASE_DIR))
 sys.path.insert(0, str(BASE_DIR / "scraper" / "src"))
 
 from domek_wonen.properties.property_discovery_engine import run_property_discovery
+from domek_wonen.properties.property_discovery_engine import DEFAULT_PLATFORM_FINGERPRINT_INPUT
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -42,6 +43,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Hard timeout per detail page navigation and load operations",
     )
     parser.add_argument("--disable-detail-extraction", action="store_true", help="Disable optional detail page enrichment")
+    parser.add_argument("--platform", default="", help="Only process sources detected for a specific platform, e.g. realworks")
+    parser.add_argument(
+        "--platform-fingerprint-input",
+        type=Path,
+        default=DEFAULT_PLATFORM_FINGERPRINT_INPUT,
+        help="Path to platform_fingerprint_results.csv",
+    )
+    parser.add_argument(
+        "--disable-platform-parsers",
+        action="store_true",
+        help="Disable platform-specific parsers and use the generic flow only",
+    )
     parser.add_argument(
         "--include-invalid-sources",
         action="store_true",
@@ -76,6 +89,9 @@ def _effective_options(args: argparse.Namespace) -> dict[str, int | bool | str]:
         "max_detail_pages": max_detail_pages,
         "detail_timeout_seconds": detail_timeout_seconds,
         "disable_detail_extraction": args.disable_detail_extraction,
+        "platform": args.platform,
+        "platform_fingerprint_input": args.platform_fingerprint_input,
+        "disable_platform_parsers": args.disable_platform_parsers,
         "include_invalid_sources": args.include_invalid_sources,
         "verbose": True,
     }

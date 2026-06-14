@@ -886,6 +886,149 @@ def test_property_discovery_invalid_address_raw_is_excluded_from_matching_ready_
     assert "- Clean available properties: 0" in report_text
 
 
+def test_property_discovery_engine_platform_realworks_filters_only_realworks_sources(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    fingerprint_path = tmp_path / "platform_fingerprint_results.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "rw-1,Realworks Office,realworks-office.nl,https://realworks-office.nl,Breda,Noord-Brabant,seed,https://realworks-office.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+                "custom-1,Custom Office,custom-office.nl,https://custom-office.nl,Breda,Noord-Brabant,seed,https://custom-office.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    fingerprint_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website_url,aanbod_url,detected_platform,confidence,evidence,parser_priority,recommended_next_action,fetch_status,error",
+                "rw-1,Realworks Office,realworks-office.nl,https://realworks-office.nl,https://realworks-office.nl/aanbod,realworks,0.95,signal,p1,bundle,homepage_ok,",
+                "custom-1,Custom Office,custom-office.nl,https://custom-office.nl,https://custom-office.nl/aanbod,custom,0.55,signal,p3,defer,homepage_ok,",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    seen_sources: list[str] = []
+
+    def fake_worker(**kwargs):
+        source = kwargs["source"]
+        seen_sources.append(source.source_id)
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "properties": [asdict(_candidate(property_url="https://realworks-office.nl/woningen/test-1-breda", classification="property_detail_candidate"))],
+                    "rejected": [],
+                    "errors": [],
+                    "duration_seconds": 0.01,
+                    "parser_info": {"parser_used": "realworks_parser", "realworks_parser_success": True},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return _completed()
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=5,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+        platform="realworks",
+        platform_fingerprint_input=fingerprint_path,
+    )
+
+    assert output.sources_loaded == 1
+    assert seen_sources == ["rw-1"]
+
+
+def test_property_discovery_worker_falls_back_to_generic_when_realworks_parser_fails(tmp_path: Path, monkeypatch) -> None:
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "output.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "office_name": "Realworks Office",
+                "website": "https://example.nl",
+                "root_domain": "example.nl",
+                "gemeente": "Breda",
+                "province": "Noord-Brabant",
+                "aanbod_url": "https://example.nl/aanbod/woningaanbod",
+                "detected_platform": "realworks",
+                "max_properties_per_source": 5,
+                "timeout_ms": 1000,
+                "page_timeout_seconds": 1,
+                "max_detail_pages": 1,
+                "detail_timeout_seconds": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FailingParser:
+        def parse(self, source, *, max_properties_per_source: int, page_timeout_seconds: int):
+            raise RuntimeError("realworks boom")
+
+    class FakeCrawler:
+        def __init__(self, timeout_ms: int = 1000) -> None:
+            self.timeout_ms = timeout_ms
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def crawl(self, source):
+            return type(
+                "Result",
+                (),
+                {
+                    "ok": True,
+                    "html": "<html></html>",
+                    "final_url": source.aanbod_url,
+                    "error": "",
+                },
+            )()
+
+        def fetch(self, url, source, timeout_ms=None):
+            raise AssertionError("detail fetch should not run")
+
+    base_candidate = PropertyCandidate(
+        source_id="example.nl",
+        source_url="https://example.nl/aanbod/woningaanbod",
+        root_domain="example.nl",
+        gemeente="Breda",
+        property_url="https://example.nl/woningen/vier-heultjes-99-sprang-capelle",
+        property_url_classification="property_detail_candidate",
+        title="Example",
+        address_raw="Vier Heultjes 99",
+        city_raw="Sprang-Capelle",
+        price_raw="EUR 425.000 k.k.",
+    )
+
+    monkeypatch.setattr("scripts.property_discovery_worker.get_platform_parser", lambda platform_name: FailingParser())
+    monkeypatch.setattr("scripts.property_discovery_worker.ListingPageCrawler", FakeCrawler)
+    monkeypatch.setattr("scripts.property_discovery_worker.PropertyCardExtractor.extract", lambda self, html, source, source_url=None: [base_candidate])
+    monkeypatch.setattr("scripts.property_discovery_worker._annotate_candidate", lambda candidate, url_classifier: candidate)
+    monkeypatch.setattr("scripts.property_discovery_worker._normalize_candidate", lambda candidate: candidate)
+
+    exit_code = run_worker(input_path, output_path)
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["status"] == "succeeded"
+    assert payload["parser_info"]["realworks_parser_failed"] is True
+    assert payload["parser_info"]["parser_fallback_used"] is True
+    assert payload["parser_info"]["generic_parser_success"] is True
+    assert payload["parser_info"]["parser_used"] == "generic"
+
+
 def test_property_discovery_rejected_candidates_skips_empty_rows(tmp_path: Path, monkeypatch) -> None:
     csv_path = tmp_path / "sources.csv"
     csv_path.write_text(

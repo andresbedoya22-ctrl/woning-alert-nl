@@ -38,6 +38,9 @@ from .source_loader import MissingSourceFileError, SourceLoader, normalize_provi
 
 BASE_DIR = Path(__file__).resolve().parents[4]
 DEFAULT_SOURCE_CSV_PATH = BASE_DIR / "data" / "discovery" / "latest" / "makelaar_sources_master.csv"
+DEFAULT_PLATFORM_FINGERPRINT_INPUT = (
+    BASE_DIR / "data" / "discovery" / "platform_fingerprint" / "platform_fingerprint_results.csv"
+)
 DEFAULT_RUNS_BASE_DIR = BASE_DIR / "data" / "property_discovery" / "runs"
 DEFAULT_LATEST_DIR = BASE_DIR / "data" / "property_discovery" / "latest"
 LEGACY_INVENTORY_FILENAME = "property_inventory.csv"
@@ -417,6 +420,19 @@ def _deserialize_candidate(payload: dict[str, object]) -> PropertyCandidate:
     return PropertyCandidate(**normalized)
 
 
+def _parser_info_from_payload(payload: dict[str, object]) -> dict[str, bool | str]:
+    parser_info = payload.get("parser_info")
+    if not isinstance(parser_info, dict):
+        parser_info = {}
+    return {
+        "parser_used": str(parser_info.get("parser_used") or ""),
+        "realworks_parser_success": bool(parser_info.get("realworks_parser_success") or False),
+        "realworks_parser_failed": bool(parser_info.get("realworks_parser_failed") or False),
+        "parser_fallback_used": bool(parser_info.get("parser_fallback_used") or False),
+        "generic_parser_success": bool(parser_info.get("generic_parser_success") or False),
+    }
+
+
 def _source_payload(
     *,
     source: PropertySource,
@@ -426,6 +442,7 @@ def _source_payload(
     max_detail_pages: int,
     detail_timeout_seconds: int,
     disable_detail_extraction: bool,
+    disable_platform_parsers: bool,
 ) -> dict[str, object]:
     return {
         "source_id": source.source_id,
@@ -435,12 +452,14 @@ def _source_payload(
         "gemeente": source.gemeente,
         "province": source.province,
         "aanbod_url": source.aanbod_url,
+        "detected_platform": source.detected_platform,
         "max_properties_per_source": max_properties_per_source,
         "timeout_ms": timeout_ms,
         "page_timeout_seconds": page_timeout_seconds,
         "max_detail_pages": max_detail_pages,
         "detail_timeout_seconds": detail_timeout_seconds,
         "disable_detail_extraction": disable_detail_extraction,
+        "disable_platform_parsers": disable_platform_parsers,
     }
 
 
@@ -454,6 +473,7 @@ def _run_source_worker_subprocess(
     max_detail_pages: int,
     detail_timeout_seconds: int,
     disable_detail_extraction: bool,
+    disable_platform_parsers: bool,
     source_timeout_seconds: int,
     output_path: Path,
 ) -> subprocess.CompletedProcess[str]:
@@ -468,6 +488,7 @@ def _run_source_worker_subprocess(
                 max_detail_pages=max_detail_pages,
                 detail_timeout_seconds=detail_timeout_seconds,
                 disable_detail_extraction=disable_detail_extraction,
+                disable_platform_parsers=disable_platform_parsers,
             ),
             input_handle,
             ensure_ascii=True,
@@ -496,6 +517,7 @@ def _crawl_source_in_subprocess(
     max_detail_pages: int,
     detail_timeout_seconds: int,
     disable_detail_extraction: bool,
+    disable_platform_parsers: bool,
     source_timeout_seconds: int,
 ) -> tuple[CrawlResult, list[PropertyCandidate]]:
     started = time.perf_counter()
@@ -513,6 +535,7 @@ def _crawl_source_in_subprocess(
                 max_detail_pages=max_detail_pages,
                 detail_timeout_seconds=detail_timeout_seconds,
                 disable_detail_extraction=disable_detail_extraction,
+                disable_platform_parsers=disable_platform_parsers,
                 source_timeout_seconds=source_timeout_seconds,
                 output_path=output_path,
             )
@@ -524,6 +547,7 @@ def _crawl_source_in_subprocess(
                     accepted = [_deserialize_candidate(item) for item in payload.get("properties", [])]
                     rejected = [_deserialize_candidate(item) for item in payload.get("rejected", [])]
                     candidates = accepted + rejected
+                    parser_info = _parser_info_from_payload(payload)
                     if candidates:
                         return (
                             CrawlResult(
@@ -533,6 +557,11 @@ def _crawl_source_in_subprocess(
                                 error=f"source timeout after {source_timeout_seconds}s; partial results preserved",
                                 elapsed_ms=elapsed_ms,
                                 timed_out=True,
+                                parser_used=str(parser_info["parser_used"]),
+                                realworks_parser_success=bool(parser_info["realworks_parser_success"]),
+                                realworks_parser_failed=bool(parser_info["realworks_parser_failed"]),
+                                parser_fallback_used=bool(parser_info["parser_fallback_used"]),
+                                generic_parser_success=bool(parser_info["generic_parser_success"]),
                             ),
                             candidates,
                         )
@@ -588,6 +617,7 @@ def _crawl_source_in_subprocess(
         rejected = [_deserialize_candidate(item) for item in payload.get("rejected", [])]
         candidates = accepted + rejected
         errors = [str(item).strip() for item in payload.get("errors", []) if str(item).strip()]
+        parser_info = _parser_info_from_payload(payload)
         if payload.get("status") == "succeeded":
             return (
                 CrawlResult(
@@ -596,6 +626,11 @@ def _crawl_source_in_subprocess(
                     final_url=source.aanbod_url,
                     error="",
                     elapsed_ms=elapsed_ms,
+                    parser_used=str(parser_info["parser_used"]),
+                    realworks_parser_success=bool(parser_info["realworks_parser_success"]),
+                    realworks_parser_failed=bool(parser_info["realworks_parser_failed"]),
+                    parser_fallback_used=bool(parser_info["parser_fallback_used"]),
+                    generic_parser_success=bool(parser_info["generic_parser_success"]),
                 ),
                 candidates,
             )
@@ -614,6 +649,11 @@ def _crawl_source_in_subprocess(
                 final_url=source.aanbod_url,
                 error="; ".join(dict.fromkeys(detail_parts)) or "source worker failed",
                 elapsed_ms=elapsed_ms,
+                parser_used=str(parser_info["parser_used"]),
+                realworks_parser_success=bool(parser_info["realworks_parser_success"]),
+                realworks_parser_failed=bool(parser_info["realworks_parser_failed"]),
+                parser_fallback_used=bool(parser_info["parser_fallback_used"]),
+                generic_parser_success=bool(parser_info["generic_parser_success"]),
             ),
             candidates,
         )
@@ -636,6 +676,9 @@ def run_property_discovery(
     max_detail_pages: int = 3,
     detail_timeout_seconds: int = 10,
     disable_detail_extraction: bool = False,
+    platform: str = "",
+    platform_fingerprint_input: Path = DEFAULT_PLATFORM_FINGERPRINT_INPUT,
+    disable_platform_parsers: bool = False,
     include_invalid_sources: bool = False,
     verbose: bool = True,
 ) -> PropertyDiscoveryRunOutput:
@@ -655,7 +698,8 @@ def run_property_discovery(
             f"province={province} max_sources={max_sources} max_properties_per_source={max_properties_per_source} "
             f"timeout_ms={timeout_ms} source_timeout_seconds={source_timeout_seconds} "
             f"page_timeout_seconds={page_timeout_seconds} max_detail_pages={max_detail_pages} "
-            f"detail_timeout_seconds={detail_timeout_seconds} disable_detail_extraction={disable_detail_extraction} output_dir={run_dir}"
+            f"detail_timeout_seconds={detail_timeout_seconds} disable_detail_extraction={disable_detail_extraction} "
+            f"platform={platform or 'all'} disable_platform_parsers={disable_platform_parsers} output_dir={run_dir}"
         )
 
     restore_latest_discovery_if_missing(source_csv_path)
@@ -665,6 +709,8 @@ def run_property_discovery(
             province=province,
             max_sources=max_sources,
             include_invalid_sources=include_invalid_sources,
+            platform_filter=platform,
+            platform_fingerprint_path=platform_fingerprint_input,
         )
     except MissingSourceFileError as exc:
         finished_at = _utc_now()
@@ -745,6 +791,7 @@ def run_property_discovery(
                 max_detail_pages=max_detail_pages,
                 detail_timeout_seconds=detail_timeout_seconds,
                 disable_detail_extraction=disable_detail_extraction,
+                disable_platform_parsers=disable_platform_parsers,
                 source_timeout_seconds=source_timeout_seconds,
             )
             crawl_results.append(result)

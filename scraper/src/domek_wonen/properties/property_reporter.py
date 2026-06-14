@@ -171,6 +171,10 @@ def render_report(
         f"- {result.source.source_id}: {'timeout' if result.timed_out else 'error'} | {result.error}"
         for result in failed
     ] or ["- None"]
+    realworks_parser_success_count = sum(1 for result in crawl_results if result.realworks_parser_success)
+    realworks_parser_failed_count = sum(1 for result in crawl_results if result.realworks_parser_failed)
+    parser_fallback_count = sum(1 for result in crawl_results if result.parser_fallback_used)
+    generic_parser_success_count = sum(1 for result in crawl_results if result.generic_parser_success)
     actions = [
         "Review `unknown` status records and expand card heuristics where needed.",
         "Add detail-page extraction for sources with sparse cards or missing address data.",
@@ -194,6 +198,10 @@ def render_report(
             f"- Sources failed: {len(failed)}",
             f"- Sources timeout: {len(timed_out)}",
             f"- Sources skipped invalid aanbod_url: {sources_skipped_invalid_aanbod_url}",
+            f"- Realworks parser success: {realworks_parser_success_count}",
+            f"- Realworks parser failed: {realworks_parser_failed_count}",
+            f"- Parser fallback count: {parser_fallback_count}",
+            f"- Generic parser success: {generic_parser_success_count}",
             f"- Properties found: {len(candidates)}",
             f"- Properties matching ready: {len(inventory)}",
             f"- Rejected candidates: {len(rejected)}",

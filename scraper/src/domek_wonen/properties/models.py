@@ -20,6 +20,7 @@ class PropertySource:
     source_quality_status: str = ""
     source_quality_reason: str = ""
     source_origin: str = ""
+    detected_platform: str = ""
 
 
 @dataclass(slots=True)
@@ -31,6 +32,11 @@ class CrawlResult:
     error: str = ""
     elapsed_ms: int = 0
     timed_out: bool = False
+    parser_used: str = ""
+    realworks_parser_success: bool = False
+    realworks_parser_failed: bool = False
+    parser_fallback_used: bool = False
+    generic_parser_success: bool = False
 
 
 @dataclass(slots=True)

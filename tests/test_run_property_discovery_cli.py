@@ -5,7 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scraper" / "src"))
 
 from domek_wonen.properties.models import PropertyDiscoveryRunOutput
-from scripts.run_property_discovery import _effective_options, main, parse_args
+from scripts.run_property_discovery import DEFAULT_PLATFORM_FINGERPRINT_INPUT, _effective_options, main, parse_args
 
 
 def _output(tmp_path: Path, run_status: str = "completed") -> PropertyDiscoveryRunOutput:
@@ -51,6 +51,11 @@ def test_property_cli_parse_args(monkeypatch) -> None:
             "--detail-timeout-seconds",
             "10",
             "--disable-detail-extraction",
+            "--platform",
+            "realworks",
+            "--platform-fingerprint-input",
+            "custom-platforms.csv",
+            "--disable-platform-parsers",
             "--include-invalid-sources",
             "--smoke",
         ],
@@ -66,6 +71,9 @@ def test_property_cli_parse_args(monkeypatch) -> None:
     assert args.max_detail_pages == 3
     assert args.detail_timeout_seconds == 10
     assert args.disable_detail_extraction is True
+    assert args.platform == "realworks"
+    assert args.platform_fingerprint_input == Path("custom-platforms.csv")
+    assert args.disable_platform_parsers is True
     assert args.include_invalid_sources is True
     assert args.smoke is True
 
@@ -107,6 +115,9 @@ def test_property_cli_main_supports_zero_max_sources(monkeypatch, tmp_path: Path
             "max_detail_pages": 3,
             "detail_timeout_seconds": 10,
             "disable_detail_extraction": False,
+            "platform": "",
+            "platform_fingerprint_input": DEFAULT_PLATFORM_FINGERPRINT_INPUT,
+            "disable_platform_parsers": False,
             "include_invalid_sources": False,
             "verbose": True,
         }
@@ -123,6 +134,9 @@ def test_property_cli_smoke_defaults() -> None:
     assert options["page_timeout_seconds"] == 15
     assert options["max_detail_pages"] == 1
     assert options["detail_timeout_seconds"] == 5
+    assert options["platform"] == ""
+    assert options["platform_fingerprint_input"] == DEFAULT_PLATFORM_FINGERPRINT_INPUT
+    assert options["disable_platform_parsers"] is False
     assert options["include_invalid_sources"] is False
 
 
