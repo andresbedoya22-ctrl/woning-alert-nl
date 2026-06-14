@@ -28,8 +28,11 @@ Thumbs.db
 
 # Secrets
 *.key
-*.pemdata/discovery/latest/
+*.pem
+data/discovery/latest/
 data/discovery/runs/
+data/discovery/platform_fingerprint/
 data/discovery/cache/
+data/property_discovery/
 data/properties/latest/
 data/properties/runs/
