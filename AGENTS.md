@@ -26,6 +26,7 @@ No commitear outputs generados por ejecuciones del pipeline, especialmente:
 - `data/property_discovery/runs/`
 - `data/discovery/latest/`
 - `data/discovery/platform_fingerprint/`
+- `data/matching/`
 
 Si un cambio necesita ejemplos o evidencia, referenciar los archivos generados localmente sin agregarlos al commit.
 
