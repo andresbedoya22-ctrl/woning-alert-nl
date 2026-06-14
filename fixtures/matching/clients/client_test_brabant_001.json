@@ -1,0 +1,28 @@
+{
+  "client_id": "cliente_test_brabant_001",
+  "max_budget_eur": 500000,
+  "target_cities": [
+    "Breda",
+    "Bergen op Zoom",
+    "Oosterhout",
+    "'s-Hertogenbosch"
+  ],
+  "compatible_cities": [
+    "Halsteren"
+  ],
+  "preferred_cities": [
+    "Breda",
+    "Bergen op Zoom",
+    "Oosterhout",
+    "'s-Hertogenbosch"
+  ],
+  "min_bedrooms": 3,
+  "min_m2": 80,
+  "preferred_energy_labels": [
+    "A",
+    "B",
+    "C"
+  ],
+  "wants_garden_or_balcony": true,
+  "language": "es"
+}

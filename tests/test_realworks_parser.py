@@ -123,7 +123,12 @@ def test_realworks_parser_extracts_address_price_and_status_from_detail_fixture(
     assert candidates[0].city_raw == "Breda"
     assert candidates[0].living_area_raw == "123 m2 woonoppervlakte"
     assert candidates[0].rooms_raw == "5 kamers"
+    assert candidates[0].rooms_count == "5"
+    assert candidates[0].bedrooms_count == "3"
+    assert candidates[0].living_area_m2 == "123"
     assert candidates[0].energy_label == "A"
+    assert candidates[0].has_garden == "true"
+    assert candidates[0].has_balcony == "true"
     assert candidates[0].extraction_source == "realworks_parser"
     assert candidates[0].detail_extraction_status == "succeeded"
 

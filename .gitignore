@@ -33,6 +33,7 @@ data/discovery/latest/
 data/discovery/runs/
 data/discovery/platform_fingerprint/
 data/discovery/cache/
+data/email_previews/
 data/matching/
 data/property_discovery/
 data/properties/latest/

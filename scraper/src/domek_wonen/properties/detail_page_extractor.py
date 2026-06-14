@@ -22,6 +22,30 @@ LIVING_AREA_PATTERN = r"\d+\s?m[²2]\s*(?:woonoppervlakte|wonen|living)?"
 PLOT_AREA_PATTERN = r"\d+\s?m[²2]\s*(?:perceel|plot|kavel)"
 ROOMS_PATTERN = r"\d+\s*(?:kamers?|rooms?)"
 ENERGY_LABEL_PATTERN = r"(?:energielabel|energy label)\s*[:\-]?\s*([a-g]\+{0,3})"
+BEDROOMS_PATTERNS = (
+    re.compile(r"\b(\d+)\s*(?:slaapkamers?|bedrooms?)\b", flags=re.IGNORECASE),
+    re.compile(r"\b(?:aantal\s+)?(?:slaapkamers?|bedrooms?)\s*[:\-]?\s*(\d+)\b", flags=re.IGNORECASE),
+)
+ROOMS_COUNT_PATTERNS = (
+    re.compile(r"\b(\d+)\s*(?:kamers?|rooms?)\b", flags=re.IGNORECASE),
+    re.compile(r"\b(?:aantal\s+)?(?:kamers?|rooms?)\s*[:\-]?\s*(\d+)\b", flags=re.IGNORECASE),
+)
+LIVING_AREA_M2_PATTERNS = (
+    re.compile(r"\b(\d+)\s*m[²2]\s*(?:woonoppervlakte|wonen|living)?\b", flags=re.IGNORECASE),
+    re.compile(r"\b(?:woonoppervlakte|living area)\s*[:\-]?\s*(\d+)\s*m[²2]\b", flags=re.IGNORECASE),
+)
+GARDEN_TRUE_PATTERNS = (
+    re.compile(r"\b(?:tuin|garden)\b", flags=re.IGNORECASE),
+)
+GARDEN_FALSE_PATTERNS = (
+    re.compile(r"\b(?:geen|zonder|no)\s+(?:tuin|garden)\b", flags=re.IGNORECASE),
+)
+BALCONY_TRUE_PATTERNS = (
+    re.compile(r"\b(?:balkon|balcony)\b", flags=re.IGNORECASE),
+)
+BALCONY_FALSE_PATTERNS = (
+    re.compile(r"\b(?:geen|zonder|no)\s+(?:balkon|balcony)\b", flags=re.IGNORECASE),
+)
 ADDRESS_PATTERN = re.compile(
     r"([A-ZÀ-ÿ][A-Za-zÀ-ÿ'()./\- ]+\d+[A-Za-z0-9/\-]*)(?:,\s*|\s+)([A-ZÀ-ÿ][A-Za-zÀ-ÿ'().\- ]+)",
     flags=re.IGNORECASE,
@@ -99,6 +123,29 @@ def _extract_energy_label(text: str) -> str:
     return match.group(1).upper() if match else ""
 
 
+def _extract_first_count(text: str, patterns: tuple[re.Pattern[str], ...]) -> str:
+    for pattern in patterns:
+        match = pattern.search(text or "")
+        if match:
+            return match.group(1)
+    return ""
+
+
+def _extract_boolean_signal(
+    text: str,
+    *,
+    true_patterns: tuple[re.Pattern[str], ...],
+    false_patterns: tuple[re.Pattern[str], ...],
+) -> str:
+    for pattern in false_patterns:
+        if pattern.search(text or ""):
+            return "false"
+    for pattern in true_patterns:
+        if pattern.search(text or ""):
+            return "true"
+    return ""
+
+
 def _iter_json_ld_records(html: str) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for match in JSON_LD_PATTERN.finditer(html or ""):
@@ -168,7 +215,12 @@ class DetailPageExtractor:
         living_area_raw = candidate.living_area_raw
         plot_area_raw = candidate.plot_area_raw
         rooms_raw = candidate.rooms_raw
+        rooms_count = candidate.rooms_count
+        bedrooms_count = candidate.bedrooms_count
+        living_area_m2 = candidate.living_area_m2
         energy_label = candidate.energy_label
+        has_garden = candidate.has_garden
+        has_balcony = candidate.has_balcony
 
         detail_texts = [h1_text, title_text, *meta_values, visible_text]
         for text in detail_texts:
@@ -182,8 +234,26 @@ class DetailPageExtractor:
                 plot_area_raw = _find_line(text, PLOT_AREA_PATTERN)
             if not rooms_raw:
                 rooms_raw = _find_line(text, ROOMS_PATTERN)
+            if not rooms_count:
+                rooms_count = _extract_first_count(text, ROOMS_COUNT_PATTERNS)
+            if not bedrooms_count:
+                bedrooms_count = _extract_first_count(text, BEDROOMS_PATTERNS)
+            if not living_area_m2:
+                living_area_m2 = _extract_first_count(text, LIVING_AREA_M2_PATTERNS)
             if not energy_label:
                 energy_label = _extract_energy_label(text)
+            if not has_garden:
+                has_garden = _extract_boolean_signal(
+                    text,
+                    true_patterns=GARDEN_TRUE_PATTERNS,
+                    false_patterns=GARDEN_FALSE_PATTERNS,
+                )
+            if not has_balcony:
+                has_balcony = _extract_boolean_signal(
+                    text,
+                    true_patterns=BALCONY_TRUE_PATTERNS,
+                    false_patterns=BALCONY_FALSE_PATTERNS,
+                )
 
         detail_succeeded = any(
             [
@@ -192,7 +262,12 @@ class DetailPageExtractor:
                 status_raw != candidate.status_raw and bool(status_raw),
                 living_area_raw != candidate.living_area_raw and bool(living_area_raw),
                 rooms_raw != candidate.rooms_raw and bool(rooms_raw),
+                rooms_count != candidate.rooms_count and bool(rooms_count),
+                bedrooms_count != candidate.bedrooms_count and bool(bedrooms_count),
+                living_area_m2 != candidate.living_area_m2 and bool(living_area_m2),
                 energy_label != candidate.energy_label and bool(energy_label),
+                has_garden != candidate.has_garden and bool(has_garden),
+                has_balcony != candidate.has_balcony and bool(has_balcony),
             ]
         )
 
@@ -206,7 +281,12 @@ class DetailPageExtractor:
             living_area_raw=living_area_raw,
             plot_area_raw=plot_area_raw,
             rooms_raw=rooms_raw,
+            rooms_count=rooms_count,
+            bedrooms_count=bedrooms_count,
+            living_area_m2=living_area_m2,
             energy_label=energy_label,
+            has_garden=has_garden,
+            has_balcony=has_balcony,
             extraction_source=extraction_source,
             detail_extraction_status="succeeded" if detail_succeeded else "failed",
             detail_error="" if detail_succeeded else "detail page missing usable signals",

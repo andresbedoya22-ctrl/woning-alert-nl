@@ -35,9 +35,36 @@ def test_detail_page_extractor_extracts_address_from_h1() -> None:
     assert enriched.price_raw
     assert enriched.status_raw.lower() == "beschikbaar"
     assert enriched.rooms_raw == "5 kamers"
+    assert enriched.bedrooms_count == ""
     assert enriched.energy_label == "A"
     assert enriched.extraction_source == "detail_page"
     assert enriched.detail_extraction_status == "succeeded"
+
+
+def test_detail_page_extractor_extracts_bedrooms_without_promoting_ambiguous_kamers() -> None:
+    html = """
+    <html>
+      <body>
+        <h1>Voorbeeldstraat 12 Breda</h1>
+        <div>Beschikbaar</div>
+        <div>Woonoppervlakte 101 m2</div>
+        <div>5 kamers</div>
+        <div>3 slaapkamers</div>
+        <div>Geen balkon</div>
+      </body>
+    </html>
+    """
+
+    enriched = DetailPageExtractor().enrich(
+        _candidate("https://example.nl/woningen/voorbeeldstraat-12-breda"),
+        html,
+        "https://example.nl/woningen/voorbeeldstraat-12-breda",
+    )
+
+    assert enriched.rooms_count == "5"
+    assert enriched.bedrooms_count == "3"
+    assert enriched.living_area_m2 == "101"
+    assert enriched.has_balcony == "false"
 
 
 def test_detail_page_extractor_fallback_from_url_slug_is_legible() -> None:

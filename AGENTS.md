@@ -26,6 +26,7 @@ No commitear outputs generados por ejecuciones del pipeline, especialmente:
 - `data/property_discovery/runs/`
 - `data/discovery/latest/`
 - `data/discovery/platform_fingerprint/`
+- `data/email_previews/`
 - `data/matching/`
 
 Si un cambio necesita ejemplos o evidencia, referenciar los archivos generados localmente sin agregarlos al commit.
@@ -51,8 +52,12 @@ No declarar una tarea como terminada si hubo cambios de codigo y esa validacion 
 
 - Matching v1 debe usar solo `clean_available`.
 - No descartar una propiedad solo porque falten campos opcionales.
-- `rooms`, `m2` y `energy_label` son opcionales para Matching v1.
-- La ausencia de `rooms`, `m2` o `energy_label` no convierte una propiedad en no apta para matching.
+- `bedrooms_count` puede ser filtro duro cuando el cliente define `min_bedrooms`.
+- `rooms_count` no sustituye `bedrooms_count` salvo señal clara.
+- ubicacion/zona debe poder ser filtro duro.
+- `m2` y `energy_label` siguen siendo scoring/warnings salvo que el cliente los marque como obligatorios.
+- `rooms`, `m2` y `energy_label` son opcionales para Matching v1 salvo configuracion explicita del cliente.
+- La ausencia de `rooms`, `m2` o `energy_label` no convierte una propiedad en no apta para matching por si sola.
 - Los descartes deben basarse en problemas reales de elegibilidad o integridad minima, no en metadata opcional incompleta.
 
 ## Disciplina operativa

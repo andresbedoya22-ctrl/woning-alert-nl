@@ -60,7 +60,12 @@ class PropertyCandidate:
     living_area_raw: str = ""
     plot_area_raw: str = ""
     rooms_raw: str = ""
+    rooms_count: str = ""
+    bedrooms_count: str = ""
+    living_area_m2: str = ""
     energy_label: str = ""
+    has_garden: str = ""
+    has_balcony: str = ""
     image_url: str = ""
     extraction_source: str = "card"
     detail_extraction_status: str = "skipped"
@@ -90,7 +95,12 @@ class PropertyInventoryRecord:
     living_area_raw: str
     plot_area_raw: str
     rooms_raw: str
+    rooms_count: str
+    bedrooms_count: str
+    living_area_m2: str
     energy_label: str
+    has_garden: str
+    has_balcony: str
     image_url: str
     extraction_source: str
     detail_extraction_status: str
@@ -120,7 +130,12 @@ class PropertyRejectedRecord:
     living_area_raw: str
     plot_area_raw: str
     rooms_raw: str
+    rooms_count: str
+    bedrooms_count: str
+    living_area_m2: str
     energy_label: str
+    has_garden: str
+    has_balcony: str
     image_url: str
     rejection_reason: str
     extraction_source: str
