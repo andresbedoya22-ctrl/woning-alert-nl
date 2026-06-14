@@ -6,6 +6,12 @@ from pathlib import Path
 from .models import PropertySource
 
 
+class MissingSourceFileError(FileNotFoundError):
+    def __init__(self, csv_path: Path) -> None:
+        self.csv_path = csv_path
+        super().__init__(str(csv_path))
+
+
 def normalize_province(value: str) -> str:
     normalized = (value or "").strip().lower().replace("_", "-").replace(" ", "-")
     aliases = {
@@ -21,6 +27,8 @@ class SourceLoader:
     def load(self, province: str, max_sources: int | None = None) -> list[PropertySource]:
         target_province = normalize_province(province)
         loaded: list[PropertySource] = []
+        if not self.csv_path.exists():
+            raise MissingSourceFileError(self.csv_path)
         with self.csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
             for row in csv.DictReader(handle):
                 source = self._build_source(row)

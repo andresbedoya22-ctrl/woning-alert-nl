@@ -44,6 +44,10 @@ STATUS_PATTERNS = (
     "beschikbaar",
     "te koop",
 )
+PRICE_PATTERN = r"€\s?[\d\.\,]+(?:\s*[a-z.]+)?"
+LIVING_AREA_PATTERN = r"\d+\s?m²\s*(?:woonoppervlakte|wonen|living)?"
+PLOT_AREA_PATTERN = r"\d+\s?m²\s*(?:perceel|plot|kavel)"
+ROOMS_PATTERN = r"\d+\s*(?:kamers?|rooms?)"
 
 
 @dataclass(slots=True)
@@ -116,49 +120,6 @@ def _container_score(node: HtmlNode) -> int:
     return score
 
 
-def _best_container(anchor: HtmlNode) -> HtmlNode:
-    best = anchor
-    depth = 0
-    current = anchor
-    while current.parent is not None and depth < 5:
-        current = current.parent
-        depth += 1
-        if _container_score(current) > _container_score(best):
-            best = current
-    return best
-
-
-def _same_domain(candidate_url: str, root_domain: str) -> bool:
-    if not root_domain:
-        return True
-    hostname = (urlparse(candidate_url).hostname or "").lower()
-    return hostname == root_domain or hostname.endswith("." + root_domain)
-
-
-def _looks_like_property_link(url: str, text: str) -> bool:
-    lowered_url = url.lower()
-    lowered_text = text.lower()
-    if any(token in lowered_url for token in EXCLUDED_HINTS):
-        return False
-    score = 0
-    if any(token in lowered_url for token in LISTING_HINTS):
-        score += 2
-    if any(token in lowered_text for token in ("€", "m²", "kamer", "slaapkamer", "te koop", "onder bod", "verkocht")):
-        score += 2
-    if re.search(r"\b\d{4}\s?[a-z]{2}\b", lowered_text, flags=re.IGNORECASE):
-        score += 1
-    return score >= 2
-
-
-def _extract_title(container: HtmlNode, anchor: HtmlNode) -> str:
-    for node in container.iter_descendants():
-        if node.tag in {"h1", "h2", "h3", "h4"}:
-            text = node.text_content()
-            if text:
-                return text
-    return anchor.text_content()
-
-
 def _find_line(text: str, pattern: str) -> str:
     match = re.search(pattern, text, flags=re.IGNORECASE)
     return _collapse_whitespace(match.group(0)) if match else ""
@@ -195,6 +156,87 @@ def _extract_image_url(container: HtmlNode, base_url: str) -> str:
     return ""
 
 
+def _container_signal_score(node: HtmlNode) -> int:
+    text = node.text_content()
+    score = _container_score(node)
+    address_raw, city_raw = _extract_address(text)
+    if _find_line(text, PRICE_PATTERN):
+        score += 4
+    if _extract_status(text):
+        score += 2
+    if _find_line(text, LIVING_AREA_PATTERN):
+        score += 2
+    if _find_line(text, ROOMS_PATTERN):
+        score += 2
+    if address_raw or city_raw:
+        score += 3
+    if any(desc.tag == "img" for desc in node.iter_descendants()):
+        score += 1
+    return score
+
+
+def _best_container(anchor: HtmlNode) -> HtmlNode:
+    best = anchor
+    depth = 0
+    current = anchor
+    while current.parent is not None and depth < 5:
+        current = current.parent
+        depth += 1
+        if _container_signal_score(current) > _container_signal_score(best):
+            best = current
+    return best
+
+
+def _same_domain(candidate_url: str, root_domain: str) -> bool:
+    if not root_domain:
+        return True
+    hostname = (urlparse(candidate_url).hostname or "").lower()
+    return hostname == root_domain or hostname.endswith("." + root_domain)
+
+
+def _looks_like_property_link(url: str, text: str) -> bool:
+    lowered_url = url.lower()
+    lowered_text = text.lower()
+    if any(token in lowered_url for token in EXCLUDED_HINTS):
+        return False
+    score = 0
+    if any(token in lowered_url for token in LISTING_HINTS):
+        score += 2
+    if any(token in lowered_text for token in ("€", "m²", "kamer", "slaapkamer", "te koop", "onder bod", "verkocht")):
+        score += 2
+    if re.search(r"\b\d{4}\s?[a-z]{2}\b", lowered_text, flags=re.IGNORECASE):
+        score += 1
+    return score >= 2
+
+
+def _anchor_score(anchor: HtmlNode, container: HtmlNode, resolved_url: str) -> int:
+    score = 0
+    href = (anchor.attrs.get("href") or "").strip().lower()
+    anchor_text = anchor.text_content().lower()
+    container_text = container.text_content()
+    if _looks_like_property_link(resolved_url, container_text):
+        score += 3
+    if any(token in href for token in LISTING_HINTS):
+        score += 2
+    if anchor_text and anchor_text not in {"bekijk", "lees meer", "meer info", "details"}:
+        score += 1
+    address_raw, city_raw = _extract_address(container_text)
+    if address_raw or city_raw:
+        score += 2
+    if _find_line(container_text, PRICE_PATTERN):
+        score += 2
+    return score
+
+
+def _extract_title(container: HtmlNode, anchor: HtmlNode) -> str:
+    for node in container.iter_descendants():
+        if node.tag in {"h1", "h2", "h3", "h4"}:
+            text = node.text_content()
+            if text:
+                return text
+    return anchor.text_content()
+
+
 def _confidence_from_fields(candidate: PropertyCandidate) -> float:
     score = 0.25
     if candidate.title:
@@ -221,20 +263,41 @@ class PropertyCardExtractor:
         base_url = source_url or source.aanbod_url or source.website
         extracted: list[PropertyCandidate] = []
         seen_urls: set[str] = set()
+        seen_containers: set[int] = set()
 
         for node in builder.root.iter_descendants():
             if node.tag != "a":
                 continue
-            href = (node.attrs.get("href") or "").strip()
-            if not href:
+            container = _best_container(node)
+            container_key = id(container)
+            if container_key in seen_containers:
                 continue
-            resolved_url = urljoin(base_url, href)
-            if urlparse(resolved_url).scheme not in {"http", "https"}:
+            seen_containers.add(container_key)
+
+            if _container_signal_score(container) < 6:
                 continue
 
-            container = _best_container(node)
+            anchor_candidates: list[tuple[int, HtmlNode, str]] = []
+            for anchor in container.iter_descendants():
+                if anchor.tag != "a":
+                    continue
+                href = (anchor.attrs.get("href") or "").strip()
+                if not href:
+                    continue
+                resolved_url = urljoin(base_url, href)
+                if urlparse(resolved_url).scheme not in {"http", "https"}:
+                    continue
+                if not _same_domain(resolved_url, source.root_domain):
+                    continue
+                anchor_candidates.append((_anchor_score(anchor, container, resolved_url), anchor, resolved_url))
+
+            if not anchor_candidates:
+                continue
+
+            anchor_candidates.sort(key=lambda item: item[0], reverse=True)
+            best_score, best_anchor, resolved_url = anchor_candidates[0]
             container_text = container.text_content()
-            if not _same_domain(resolved_url, source.root_domain):
+            if best_score < 5:
                 continue
             if not _looks_like_property_link(resolved_url, container_text):
                 continue
@@ -244,13 +307,13 @@ class PropertyCardExtractor:
                 continue
             seen_urls.add(normalized_url)
 
-            title = _extract_title(container, node)
+            title = _extract_title(container, best_anchor)
             address_raw, city_raw = _extract_address(container_text)
-            price_raw = _find_line(container_text, r"€\s?[\d\.\,]+(?:\s*[a-z.]+)?")
+            price_raw = _find_line(container_text, PRICE_PATTERN)
             status_raw = _extract_status(container_text)
-            living_area_raw = _find_line(container_text, r"\d+\s?m²\s*(?:woonoppervlakte|wonen|living)?")
-            plot_area_raw = _find_line(container_text, r"\d+\s?m²\s*(?:perceel|plot|kavel)")
-            rooms_raw = _find_line(container_text, r"\d+\s*(?:kamers?|rooms?)")
+            living_area_raw = _find_line(container_text, LIVING_AREA_PATTERN)
+            plot_area_raw = _find_line(container_text, PLOT_AREA_PATTERN)
+            rooms_raw = _find_line(container_text, ROOMS_PATTERN)
             image_url = _extract_image_url(container, base_url)
 
             candidate = PropertyCandidate(
@@ -259,6 +322,10 @@ class PropertyCardExtractor:
                 root_domain=source.root_domain,
                 gemeente=source.gemeente,
                 property_url=resolved_url,
+                candidate_type="property_card_anchor",
+                link_text=best_anchor.text_content(),
+                extraction_method="container_card_best_anchor",
+                is_property_like=True,
                 title=title,
                 address_raw=address_raw,
                 city_raw=city_raw,

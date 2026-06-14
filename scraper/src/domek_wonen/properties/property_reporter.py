@@ -5,7 +5,7 @@ import shutil
 from collections import Counter
 from pathlib import Path
 
-from .models import CrawlResult, PropertyCandidate, PropertyInventoryRecord, PropertySource
+from .models import CrawlResult, PropertyCandidate, PropertyInventoryRecord, PropertyRejectedRecord, PropertySource
 
 INVENTORY_FIELDNAMES = [
     "property_id",
@@ -38,6 +38,12 @@ CANDIDATE_FIELDNAMES = [
     "root_domain",
     "source_url",
     "property_url",
+    "candidate_type",
+    "link_text",
+    "extraction_method",
+    "excluded_reason",
+    "is_property_like",
+    "property_url_classification",
     "title",
     "address_raw",
     "city_raw",
@@ -52,6 +58,8 @@ CANDIDATE_FIELDNAMES = [
     "needs_review",
     "review_reason",
 ]
+
+REJECTED_FIELDNAMES = CANDIDATE_FIELDNAMES
 
 
 def write_csv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
@@ -74,6 +82,12 @@ def candidate_to_row(candidate: PropertyCandidate) -> dict[str, str]:
         "root_domain": candidate.root_domain,
         "source_url": candidate.source_url,
         "property_url": candidate.property_url,
+        "candidate_type": candidate.candidate_type,
+        "link_text": candidate.link_text,
+        "extraction_method": candidate.extraction_method,
+        "excluded_reason": candidate.excluded_reason,
+        "is_property_like": "true" if candidate.is_property_like else "false",
+        "property_url_classification": candidate.property_url_classification,
         "title": candidate.title,
         "address_raw": candidate.address_raw,
         "city_raw": candidate.city_raw,
@@ -96,17 +110,27 @@ def inventory_to_row(record: PropertyInventoryRecord) -> dict[str, str]:
     }
 
 
+def rejected_to_row(record: PropertyRejectedRecord) -> dict[str, str]:
+    return {field: getattr(record, field) for field in REJECTED_FIELDNAMES}
+
+
 def render_report(
     *,
     run_timestamp: str,
     province: str,
+    run_status: str,
+    started_at: str,
+    finished_at: str,
+    duration_seconds: float,
     sources_loaded: list[PropertySource],
     crawl_results: list[CrawlResult],
     candidates: list[PropertyCandidate],
     inventory: list[PropertyInventoryRecord],
+    rejected: list[PropertyRejectedRecord],
 ) -> str:
     succeeded = [result for result in crawl_results if result.ok]
     failed = [result for result in crawl_results if not result.ok]
+    timed_out = [result for result in failed if result.timed_out]
     by_status = Counter(record.status for record in inventory)
     by_source = Counter(record.source_id for record in inventory)
     top_source_lines = [
@@ -115,6 +139,10 @@ def render_report(
     ] or ["- None"]
     failed_lines = [
         f"- {result.source.source_id}: {result.error}"
+        for result in failed
+    ] or ["- None"]
+    error_lines = [
+        f"- {result.source.source_id}: {'timeout' if result.timed_out else 'error'} | {result.error}"
         for result in failed
     ] or ["- None"]
     actions = [
@@ -129,13 +157,19 @@ def render_report(
             "# Property Discovery Report",
             "",
             f"- Run timestamp: {run_timestamp}",
+            f"- Run status: {run_status}",
+            f"- Started at: {started_at}",
+            f"- Finished at: {finished_at}",
+            f"- Duration seconds: {duration_seconds:.1f}",
             f"- Province: {province}",
-            f"- Sources loaded: {len(sources_loaded)}",
-            f"- Sources attempted: {len(crawl_results)}",
+            f"- Sources total: {len(sources_loaded)}",
+            f"- Sources processed: {len(crawl_results)}",
             f"- Sources succeeded: {len(succeeded)}",
             f"- Sources failed: {len(failed)}",
-            f"- Total property candidates: {len(candidates)}",
-            f"- Deduped properties: {len(inventory)}",
+            f"- Sources timeout: {len(timed_out)}",
+            f"- Properties found: {len(candidates)}",
+            f"- Properties matching ready: {len(inventory)}",
+            f"- Rejected candidates: {len(rejected)}",
             f"- Available properties: {by_status.get('beschikbaar', 0)}",
             f"- Under offer: {by_status.get('onder_bod', 0)}",
             f"- Sold: {by_status.get('verkocht', 0) + by_status.get('verkocht_ov', 0)}",
@@ -146,6 +180,9 @@ def render_report(
             "",
             "## Failed Sources",
             *failed_lines,
+            "",
+            "## Errors By Source",
+            *error_lines,
             "",
             "## Next Recommended Actions",
             *action_lines,

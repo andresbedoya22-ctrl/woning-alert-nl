@@ -29,3 +29,5 @@ def test_property_card_extractor_extracts_three_properties_from_fixture() -> Non
     assert len(properties) == 3
     assert properties[0].property_url == "https://example.nl/woning/breda/kerkstraat-1"
     assert properties[1].status_raw.lower() == "onder bod"
+    assert properties[0].candidate_type == "property_card_anchor"
+    assert properties[0].extraction_method == "container_card_best_anchor"

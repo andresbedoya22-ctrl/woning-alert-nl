@@ -14,25 +14,57 @@ from domek_wonen.properties.property_discovery_engine import run_property_discov
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run PropertyDiscovery v1.")
     parser.add_argument("--province", required=True, help="Canonical province or alias, e.g. noord-brabant")
-    parser.add_argument("--max-sources", type=int, default=20, help="Maximum number of official sources to crawl")
+    parser.add_argument("--max-sources", type=int, default=None, help="Maximum number of official sources to crawl")
     parser.add_argument(
         "--max-properties-per-source",
         type=int,
-        default=50,
+        default=None,
         help="Maximum number of property cards to keep per source",
     )
+    parser.add_argument("--timeout-ms", type=int, default=30000, help="General timeout budget in milliseconds")
+    parser.add_argument(
+        "--source-timeout-seconds",
+        type=int,
+        default=90,
+        help="Hard timeout per source before continuing to the next one",
+    )
+    parser.add_argument(
+        "--page-timeout-seconds",
+        type=int,
+        default=30,
+        help="Hard timeout per page navigation and load operations",
+    )
+    parser.add_argument("--smoke", action="store_true", help="Run a fast single-source smoke test")
     return parser.parse_args(argv)
+
+
+def _effective_options(args: argparse.Namespace) -> dict[str, int | bool | str]:
+    if args.smoke:
+        max_sources = 1 if args.max_sources is None else args.max_sources
+        max_properties_per_source = 1 if args.max_properties_per_source is None else args.max_properties_per_source
+        source_timeout_seconds = min(args.source_timeout_seconds, 30)
+        page_timeout_seconds = min(args.page_timeout_seconds, 15)
+    else:
+        max_sources = 20 if args.max_sources is None else args.max_sources
+        max_properties_per_source = 50 if args.max_properties_per_source is None else args.max_properties_per_source
+        source_timeout_seconds = args.source_timeout_seconds
+        page_timeout_seconds = args.page_timeout_seconds
+    return {
+        "province": args.province,
+        "max_sources": max_sources,
+        "max_properties_per_source": max_properties_per_source,
+        "timeout_ms": args.timeout_ms,
+        "source_timeout_seconds": source_timeout_seconds,
+        "page_timeout_seconds": page_timeout_seconds,
+        "verbose": True,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    output = run_property_discovery(
-        province=args.province,
-        max_sources=args.max_sources,
-        max_properties_per_source=args.max_properties_per_source,
-    )
-    print(output.report_path)
-    return 0
+    output = run_property_discovery(**_effective_options(args))
+    print(output.report_path, flush=True)
+    return 0 if output.run_status in {"completed", "completed_with_errors"} else 1
 
 
 if __name__ == "__main__":

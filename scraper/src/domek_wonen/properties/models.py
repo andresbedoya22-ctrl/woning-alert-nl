@@ -27,6 +27,7 @@ class CrawlResult:
     html: str = ""
     error: str = ""
     elapsed_ms: int = 0
+    timed_out: bool = False
 
 
 @dataclass(slots=True)
@@ -36,6 +37,12 @@ class PropertyCandidate:
     root_domain: str
     gemeente: str
     property_url: str
+    candidate_type: str = ""
+    link_text: str = ""
+    extraction_method: str = ""
+    excluded_reason: str = ""
+    is_property_like: bool = False
+    property_url_classification: str = ""
     title: str = ""
     address_raw: str = ""
     city_raw: str = ""
@@ -78,14 +85,47 @@ class PropertyInventoryRecord:
 
 
 @dataclass(slots=True)
+class PropertyRejectedRecord:
+    source_id: str
+    root_domain: str
+    source_url: str
+    property_url: str
+    title: str
+    address_raw: str
+    city_raw: str
+    gemeente: str
+    price_raw: str
+    status_raw: str
+    living_area_raw: str
+    plot_area_raw: str
+    rooms_raw: str
+    image_url: str
+    extraction_confidence: str
+    needs_review: str
+    review_reason: str
+    candidate_type: str
+    link_text: str
+    extraction_method: str
+    excluded_reason: str
+    is_property_like: str
+    property_url_classification: str
+
+
+@dataclass(slots=True)
 class PropertyDiscoveryRunOutput:
     run_id: str
     run_dir: Path
     latest_dir: Path
     report_path: Path
+    run_status: str
+    started_at: str
+    finished_at: str
+    duration_seconds: float
     sources_loaded: int
     sources_attempted: int
     sources_succeeded: int
     sources_failed: int
+    sources_timeout: int
     total_property_candidates: int
     deduped_properties: int
+    rejected_candidates: int

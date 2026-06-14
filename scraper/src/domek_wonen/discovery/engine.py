@@ -215,6 +215,18 @@ def _copy_to_latest(run_dir: Path, latest_dir: Path, filenames: list[str]) -> No
         shutil.copy2(run_dir / filename, latest_dir / filename)
 
 
+def _create_run_dir(base_dir: Path, run_timestamp: str) -> tuple[str, Path]:
+    run_id = run_timestamp
+    run_dir = base_dir / run_id
+    suffix = 1
+    while run_dir.exists():
+        run_id = f"{run_timestamp}-{suffix:02d}"
+        run_dir = base_dir / run_id
+        suffix += 1
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_id, run_dir
+
+
 def _enrich_candidate(candidate: SourceCandidate) -> DiscoveryResult:
     website_analysis = analyze_candidate_website(candidate)
     aanbod_classification = classify_aanbod_url(candidate.aanbod_url)
@@ -357,8 +369,7 @@ def run_discovery(
 ) -> DiscoveryEngineOutput:
     normalized_province = normalize_province_name(province)
     run_timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    run_dir = RUNS_DIR / run_timestamp
-    run_dir.mkdir(parents=True, exist_ok=True)
+    run_timestamp, run_dir = _create_run_dir(RUNS_DIR, run_timestamp)
 
     seed_candidates = [
         candidate

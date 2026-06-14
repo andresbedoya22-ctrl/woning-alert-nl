@@ -8,8 +8,12 @@ from playwright.sync_api import Error, TimeoutError, sync_playwright
 from .models import CrawlResult, PropertySource
 
 
+def _warn(message: str) -> None:
+    print(f"[property-discovery] warning {message}", flush=True)
+
+
 class ListingPageCrawler(AbstractContextManager["ListingPageCrawler"]):
-    def __init__(self, timeout_ms: int = 15000) -> None:
+    def __init__(self, timeout_ms: int = 30000) -> None:
         self.timeout_ms = timeout_ms
         self._playwright = None
         self._browser = None
@@ -23,13 +27,22 @@ class ListingPageCrawler(AbstractContextManager["ListingPageCrawler"]):
         self.close()
         return None
 
+    def _safe_cleanup(self, label: str, action) -> None:
+        try:
+            action()
+        except BaseException as exc:  # pragma: no cover - defensive cleanup path
+            _warn(f"{label} failed during cleanup: {exc}")
+
     def close(self) -> None:
-        if self._browser is not None:
-            self._browser.close()
-            self._browser = None
-        if self._playwright is not None:
-            self._playwright.stop()
-            self._playwright = None
+        browser = self._browser
+        playwright = self._playwright
+        self._browser = None
+        self._playwright = None
+
+        if browser is not None:
+            self._safe_cleanup("browser.close", browser.close)
+        if playwright is not None:
+            self._safe_cleanup("playwright.stop", playwright.stop)
 
     def crawl(self, source: PropertySource) -> CrawlResult:
         if self._browser is None:
@@ -59,6 +72,13 @@ class ListingPageCrawler(AbstractContextManager["ListingPageCrawler"]):
             )
         except (TimeoutError, Error, RuntimeError) as exc:
             elapsed_ms = int((time.perf_counter() - started) * 1000)
-            return CrawlResult(source=source, ok=False, final_url=source.aanbod_url, error=str(exc), elapsed_ms=elapsed_ms)
+            return CrawlResult(
+                source=source,
+                ok=False,
+                final_url=source.aanbod_url,
+                error=str(exc),
+                elapsed_ms=elapsed_ms,
+                timed_out=isinstance(exc, TimeoutError),
+            )
         finally:
-            page.close()
+            self._safe_cleanup("page.close", page.close)

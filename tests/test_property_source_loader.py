@@ -4,7 +4,9 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scraper" / "src"))
 
-from domek_wonen.properties.source_loader import SourceLoader
+import pytest
+
+from domek_wonen.properties.source_loader import MissingSourceFileError, SourceLoader
 
 
 def test_source_loader_keeps_only_active_official_valid_sources(tmp_path: Path) -> None:
@@ -25,3 +27,12 @@ def test_source_loader_keeps_only_active_official_valid_sources(tmp_path: Path) 
     sources = SourceLoader(csv_path).load(province="noord-brabant")
 
     assert [source.source_id for source in sources] == ["ok-1"]
+
+
+def test_source_loader_raises_clear_error_when_csv_is_missing(tmp_path: Path) -> None:
+    missing_path = tmp_path / "makelaar_sources_master.csv"
+
+    with pytest.raises(MissingSourceFileError) as excinfo:
+        SourceLoader(missing_path).load(province="noord-brabant")
+
+    assert excinfo.value.csv_path == missing_path

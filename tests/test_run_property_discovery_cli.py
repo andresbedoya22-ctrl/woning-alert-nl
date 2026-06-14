@@ -5,7 +5,28 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scraper" / "src"))
 
 from domek_wonen.properties.models import PropertyDiscoveryRunOutput
-from scripts.run_property_discovery import main, parse_args
+from scripts.run_property_discovery import _effective_options, main, parse_args
+
+
+def _output(tmp_path: Path, run_status: str = "completed") -> PropertyDiscoveryRunOutput:
+    return PropertyDiscoveryRunOutput(
+        run_id="20260613T000000Z",
+        run_dir=tmp_path,
+        latest_dir=tmp_path,
+        report_path=tmp_path / "property_discovery_run_report.md",
+        run_status=run_status,
+        started_at="2026-06-13T00:00:00+00:00",
+        finished_at="2026-06-13T00:00:01+00:00",
+        duration_seconds=1.0,
+        sources_loaded=0,
+        sources_attempted=0,
+        sources_succeeded=0,
+        sources_failed=0,
+        sources_timeout=0,
+        total_property_candidates=0,
+        deduped_properties=0,
+        rejected_candidates=0,
+    )
 
 
 def test_property_cli_parse_args(monkeypatch) -> None:
@@ -20,6 +41,11 @@ def test_property_cli_parse_args(monkeypatch) -> None:
             "20",
             "--max-properties-per-source",
             "50",
+            "--source-timeout-seconds",
+            "90",
+            "--page-timeout-seconds",
+            "30",
+            "--smoke",
         ],
     )
 
@@ -28,6 +54,9 @@ def test_property_cli_parse_args(monkeypatch) -> None:
     assert args.province == "noord-brabant"
     assert args.max_sources == 20
     assert args.max_properties_per_source == 50
+    assert args.source_timeout_seconds == 90
+    assert args.page_timeout_seconds == 30
+    assert args.smoke is True
 
 
 def test_property_cli_main_supports_zero_max_sources(monkeypatch, tmp_path: Path) -> None:
@@ -45,26 +74,56 @@ def test_property_cli_main_supports_zero_max_sources(monkeypatch, tmp_path: Path
         ],
     )
 
-    calls: list[tuple[str, int, int]] = []
+    calls: list[dict[str, int | bool | str]] = []
 
-    def fake_runner(*, province: str, max_sources: int, max_properties_per_source: int):
-        calls.append((province, max_sources, max_properties_per_source))
-        return PropertyDiscoveryRunOutput(
-            run_id="20260613T000000Z",
-            run_dir=tmp_path,
-            latest_dir=tmp_path,
-            report_path=tmp_path / "property_discovery_report.md",
-            sources_loaded=0,
-            sources_attempted=0,
-            sources_succeeded=0,
-            sources_failed=0,
-            total_property_candidates=0,
-            deduped_properties=0,
-        )
+    def fake_runner(**kwargs):
+        calls.append(kwargs)
+        return _output(tmp_path)
 
     monkeypatch.setattr("scripts.run_property_discovery.run_property_discovery", fake_runner)
 
     exit_code = main()
 
     assert exit_code == 0
-    assert calls == [("noord-brabant", 0, 50)]
+    assert calls == [
+        {
+            "province": "noord-brabant",
+            "max_sources": 0,
+            "max_properties_per_source": 50,
+            "timeout_ms": 30000,
+            "source_timeout_seconds": 90,
+            "page_timeout_seconds": 30,
+            "verbose": True,
+        }
+    ]
+
+
+def test_property_cli_smoke_defaults() -> None:
+    args = parse_args(["--province", "noord-brabant", "--smoke"])
+    options = _effective_options(args)
+
+    assert options["max_sources"] == 1
+    assert options["max_properties_per_source"] == 1
+    assert options["source_timeout_seconds"] == 30
+    assert options["page_timeout_seconds"] == 15
+
+
+def test_property_cli_returns_error_for_missing_sources(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_property_discovery.py",
+            "--province",
+            "noord-brabant",
+        ],
+    )
+
+    def fake_runner(**kwargs):
+        return _output(tmp_path, run_status="failed_missing_sources")
+
+    monkeypatch.setattr("scripts.run_property_discovery.run_property_discovery", fake_runner)
+
+    exit_code = main()
+
+    assert exit_code == 1
