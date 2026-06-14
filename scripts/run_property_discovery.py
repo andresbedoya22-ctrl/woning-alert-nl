@@ -34,6 +34,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=30,
         help="Hard timeout per page navigation and load operations",
     )
+    parser.add_argument("--max-detail-pages", type=int, default=3, help="Maximum detail pages to enrich per source")
+    parser.add_argument(
+        "--detail-timeout-seconds",
+        type=int,
+        default=10,
+        help="Hard timeout per detail page navigation and load operations",
+    )
+    parser.add_argument("--disable-detail-extraction", action="store_true", help="Disable optional detail page enrichment")
     parser.add_argument("--smoke", action="store_true", help="Run a fast single-source smoke test")
     return parser.parse_args(argv)
 
@@ -44,11 +52,15 @@ def _effective_options(args: argparse.Namespace) -> dict[str, int | bool | str]:
         max_properties_per_source = 1 if args.max_properties_per_source is None else args.max_properties_per_source
         source_timeout_seconds = min(args.source_timeout_seconds, 30)
         page_timeout_seconds = min(args.page_timeout_seconds, 15)
+        max_detail_pages = min(args.max_detail_pages, 1)
+        detail_timeout_seconds = min(args.detail_timeout_seconds, 5)
     else:
         max_sources = 20 if args.max_sources is None else args.max_sources
         max_properties_per_source = 50 if args.max_properties_per_source is None else args.max_properties_per_source
         source_timeout_seconds = args.source_timeout_seconds
         page_timeout_seconds = args.page_timeout_seconds
+        max_detail_pages = args.max_detail_pages
+        detail_timeout_seconds = args.detail_timeout_seconds
     return {
         "province": args.province,
         "max_sources": max_sources,
@@ -56,6 +68,9 @@ def _effective_options(args: argparse.Namespace) -> dict[str, int | bool | str]:
         "timeout_ms": args.timeout_ms,
         "source_timeout_seconds": source_timeout_seconds,
         "page_timeout_seconds": page_timeout_seconds,
+        "max_detail_pages": max_detail_pages,
+        "detail_timeout_seconds": detail_timeout_seconds,
+        "disable_detail_extraction": args.disable_detail_extraction,
         "verbose": True,
     }
 

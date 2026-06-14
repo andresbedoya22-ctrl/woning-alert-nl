@@ -45,6 +45,11 @@ def test_property_cli_parse_args(monkeypatch) -> None:
             "90",
             "--page-timeout-seconds",
             "30",
+            "--max-detail-pages",
+            "3",
+            "--detail-timeout-seconds",
+            "10",
+            "--disable-detail-extraction",
             "--smoke",
         ],
     )
@@ -56,6 +61,9 @@ def test_property_cli_parse_args(monkeypatch) -> None:
     assert args.max_properties_per_source == 50
     assert args.source_timeout_seconds == 90
     assert args.page_timeout_seconds == 30
+    assert args.max_detail_pages == 3
+    assert args.detail_timeout_seconds == 10
+    assert args.disable_detail_extraction is True
     assert args.smoke is True
 
 
@@ -93,6 +101,9 @@ def test_property_cli_main_supports_zero_max_sources(monkeypatch, tmp_path: Path
             "timeout_ms": 30000,
             "source_timeout_seconds": 90,
             "page_timeout_seconds": 30,
+            "max_detail_pages": 3,
+            "detail_timeout_seconds": 10,
+            "disable_detail_extraction": False,
             "verbose": True,
         }
     ]
@@ -106,6 +117,8 @@ def test_property_cli_smoke_defaults() -> None:
     assert options["max_properties_per_source"] == 1
     assert options["source_timeout_seconds"] == 30
     assert options["page_timeout_seconds"] == 15
+    assert options["max_detail_pages"] == 1
+    assert options["detail_timeout_seconds"] == 5
 
 
 def test_property_cli_returns_error_for_missing_sources(monkeypatch, tmp_path: Path) -> None:

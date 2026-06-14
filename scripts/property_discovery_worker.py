@@ -12,6 +12,7 @@ sys.path.insert(0, str(BASE_DIR))
 sys.path.insert(0, str(BASE_DIR / "scraper" / "src"))
 
 from domek_wonen.properties.listing_page_crawler import ListingPageCrawler
+from domek_wonen.properties.detail_page_extractor import DetailPageExtractor, derive_address_from_slug
 from domek_wonen.properties.models import PropertyCandidate, PropertySource
 from domek_wonen.properties.property_card_extractor import PropertyCardExtractor
 from domek_wonen.properties.property_discovery_engine import _annotate_candidate, _normalize_candidate
@@ -23,6 +24,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--input", required=True, help="Path to the input source JSON file")
     parser.add_argument("--output", required=True, help="Path to the output result JSON file")
     return parser.parse_args(argv)
+
+
+def _write_output(output_path: Path, payload: dict[str, object]) -> None:
+    output_path.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
 
 
 def _build_source(payload: dict[str, object]) -> PropertySource:
@@ -50,6 +55,196 @@ def _serialize_candidates(candidates: list[PropertyCandidate], *, accepted: bool
     return serialized
 
 
+def _with_detail_status(candidate: PropertyCandidate, *, status: str) -> PropertyCandidate:
+    return PropertyCandidate(
+        source_id=candidate.source_id,
+        source_url=candidate.source_url,
+        root_domain=candidate.root_domain,
+        gemeente=candidate.gemeente,
+        property_url=candidate.property_url,
+        candidate_type=candidate.candidate_type,
+        link_text=candidate.link_text,
+        extraction_method=candidate.extraction_method,
+        excluded_reason=candidate.excluded_reason,
+        is_property_like=candidate.is_property_like,
+        property_url_classification=candidate.property_url_classification,
+        title=candidate.title,
+        address_raw=candidate.address_raw,
+        city_raw=candidate.city_raw,
+        price_raw=candidate.price_raw,
+        status_raw=candidate.status_raw,
+        living_area_raw=candidate.living_area_raw,
+        plot_area_raw=candidate.plot_area_raw,
+        rooms_raw=candidate.rooms_raw,
+        energy_label=candidate.energy_label,
+        image_url=candidate.image_url,
+        extraction_source=candidate.extraction_source,
+        detail_extraction_status=status,
+        detail_error="",
+        extraction_confidence=candidate.extraction_confidence,
+        needs_review=candidate.needs_review,
+        review_reason=candidate.review_reason,
+    )
+
+
+def _prepare_base_candidates(
+    candidates: list[PropertyCandidate],
+    *,
+    max_detail_pages: int,
+    disable_detail_extraction: bool,
+) -> list[PropertyCandidate]:
+    prepared: list[PropertyCandidate] = []
+    pending_budget = 0
+    for candidate in candidates:
+        if disable_detail_extraction or not _needs_detail_enrichment(candidate):
+            status = "skipped"
+        elif pending_budget < max_detail_pages:
+            status = "pending"
+            pending_budget += 1
+        else:
+            status = "skipped"
+        prepared.append(_with_detail_status(candidate, status=status))
+    return prepared
+
+
+def _needs_detail_enrichment(candidate: PropertyCandidate) -> bool:
+    if not candidate.property_url:
+        return False
+    if not (candidate.address_raw or "").strip():
+        return True
+    if not (candidate.price_raw or "").strip():
+        return True
+    return False
+
+
+def _finalize_candidate(candidate: PropertyCandidate) -> PropertyCandidate:
+    review_reasons: list[str] = []
+    if candidate.needs_review and candidate.review_reason:
+        review_reasons.append(candidate.review_reason)
+    if not (candidate.address_raw or "").strip() and not (candidate.city_raw or "").strip():
+        review_reasons.append("missing address after detail extraction")
+    return PropertyCandidate(
+        source_id=candidate.source_id,
+        source_url=candidate.source_url,
+        root_domain=candidate.root_domain,
+        gemeente=candidate.gemeente,
+        property_url=candidate.property_url,
+        candidate_type=candidate.candidate_type,
+        link_text=candidate.link_text,
+        extraction_method=candidate.extraction_method,
+        excluded_reason=candidate.excluded_reason,
+        is_property_like=candidate.is_property_like,
+        property_url_classification=candidate.property_url_classification,
+        title=candidate.title,
+        address_raw=candidate.address_raw,
+        city_raw=candidate.city_raw,
+        price_raw=candidate.price_raw,
+        status_raw=candidate.status_raw,
+        living_area_raw=candidate.living_area_raw,
+        plot_area_raw=candidate.plot_area_raw,
+        rooms_raw=candidate.rooms_raw,
+        energy_label=candidate.energy_label,
+        image_url=candidate.image_url,
+        extraction_source=candidate.extraction_source,
+        detail_extraction_status=candidate.detail_extraction_status,
+        detail_error=candidate.detail_error,
+        extraction_confidence=candidate.extraction_confidence,
+        needs_review=bool(review_reasons),
+        review_reason="; ".join(dict.fromkeys(review_reasons)),
+    )
+
+
+def _enrich_candidates(
+    crawler: ListingPageCrawler,
+    candidates: list[PropertyCandidate],
+    source: PropertySource,
+    *,
+    max_detail_pages: int,
+    detail_timeout_seconds: int,
+    disable_detail_extraction: bool,
+) -> list[PropertyCandidate]:
+    extractor = DetailPageExtractor()
+    enriched: list[PropertyCandidate] = []
+    detail_budget = 0
+    for candidate in candidates:
+        should_enrich = not disable_detail_extraction and _needs_detail_enrichment(candidate) and detail_budget < max_detail_pages
+        current = _with_detail_status(candidate, status="pending" if should_enrich else "skipped")
+        if should_enrich:
+            detail_budget += 1
+            try:
+                detail_result = crawler.fetch(
+                    candidate.property_url,
+                    source,
+                    timeout_ms=max(1, detail_timeout_seconds) * 1000,
+                )
+                if detail_result.ok:
+                    current = extractor.enrich(current, detail_result.html, detail_result.final_url)
+                else:
+                    slug_address, slug_city = derive_address_from_slug(candidate.property_url)
+                    current = PropertyCandidate(
+                        source_id=candidate.source_id,
+                        source_url=candidate.source_url,
+                        root_domain=candidate.root_domain,
+                        gemeente=candidate.gemeente,
+                        property_url=candidate.property_url,
+                        candidate_type=candidate.candidate_type,
+                        link_text=candidate.link_text,
+                        extraction_method=candidate.extraction_method,
+                        excluded_reason=candidate.excluded_reason,
+                        is_property_like=candidate.is_property_like,
+                        property_url_classification=candidate.property_url_classification,
+                        title=candidate.title,
+                        address_raw=slug_address or candidate.address_raw,
+                        city_raw=slug_city or candidate.city_raw,
+                        price_raw=candidate.price_raw,
+                        status_raw=candidate.status_raw,
+                        living_area_raw=candidate.living_area_raw,
+                        plot_area_raw=candidate.plot_area_raw,
+                        rooms_raw=candidate.rooms_raw,
+                        energy_label=candidate.energy_label,
+                        image_url=candidate.image_url,
+                        extraction_source="url_slug" if slug_address else current.extraction_source,
+                        detail_extraction_status="failed",
+                        detail_error=detail_result.error or "detail page fetch failed",
+                        extraction_confidence=candidate.extraction_confidence,
+                        needs_review=candidate.needs_review,
+                        review_reason=candidate.review_reason,
+                    )
+            except Exception as exc:
+                slug_address, slug_city = derive_address_from_slug(candidate.property_url)
+                current = PropertyCandidate(
+                    source_id=candidate.source_id,
+                    source_url=candidate.source_url,
+                    root_domain=candidate.root_domain,
+                    gemeente=candidate.gemeente,
+                    property_url=candidate.property_url,
+                    candidate_type=candidate.candidate_type,
+                    link_text=candidate.link_text,
+                    extraction_method=candidate.extraction_method,
+                    excluded_reason=candidate.excluded_reason,
+                    is_property_like=candidate.is_property_like,
+                    property_url_classification=candidate.property_url_classification,
+                    title=candidate.title,
+                    address_raw=slug_address or candidate.address_raw,
+                    city_raw=slug_city or candidate.city_raw,
+                    price_raw=candidate.price_raw,
+                    status_raw=candidate.status_raw,
+                    living_area_raw=candidate.living_area_raw,
+                    plot_area_raw=candidate.plot_area_raw,
+                    rooms_raw=candidate.rooms_raw,
+                    energy_label=candidate.energy_label,
+                    image_url=candidate.image_url,
+                    extraction_source="url_slug" if slug_address else current.extraction_source,
+                    detail_extraction_status="failed",
+                    detail_error=str(exc),
+                    extraction_confidence=candidate.extraction_confidence,
+                    needs_review=candidate.needs_review,
+                    review_reason=candidate.review_reason,
+                )
+        enriched.append(_finalize_candidate(current))
+    return enriched
+
+
 def run_worker(input_path: Path, output_path: Path) -> int:
     started = time.perf_counter()
     payload = json.loads(input_path.read_text(encoding="utf-8"))
@@ -60,6 +255,9 @@ def run_worker(input_path: Path, output_path: Path) -> int:
     page_timeout_seconds = int(payload.get("page_timeout_seconds") or 30)
     effective_timeout_ms = min(timeout_ms, page_timeout_seconds * 1000)
     max_properties_per_source = int(payload.get("max_properties_per_source") or 50)
+    max_detail_pages = int(payload.get("max_detail_pages") or 3)
+    detail_timeout_seconds = int(payload.get("detail_timeout_seconds") or 10)
+    disable_detail_extraction = bool(payload.get("disable_detail_extraction") or False)
 
     output: dict[str, object] = {
         "status": "failed",
@@ -78,16 +276,40 @@ def run_worker(input_path: Path, output_path: Path) -> int:
             else:
                 raw_candidates = extractor.extract(result.html, source, result.final_url)[:max_properties_per_source]
                 annotated = [_annotate_candidate(_normalize_candidate(candidate), url_classifier) for candidate in raw_candidates]
+                base_candidates = _prepare_base_candidates(
+                    annotated,
+                    max_detail_pages=max_detail_pages,
+                    disable_detail_extraction=disable_detail_extraction,
+                )
+                output["status"] = "partial"
+                output["properties"] = _serialize_candidates(base_candidates, accepted=True)
+                output["rejected"] = _serialize_candidates(base_candidates, accepted=False)
+                output["errors"] = []
+                output["duration_seconds"] = round(time.perf_counter() - started, 3)
+                _write_output(output_path, output)
+
+                annotated = _enrich_candidates(
+                    crawler,
+                    annotated,
+                    source,
+                    max_detail_pages=max_detail_pages,
+                    detail_timeout_seconds=detail_timeout_seconds,
+                    disable_detail_extraction=disable_detail_extraction,
+                )
                 output["status"] = "succeeded"
                 output["properties"] = _serialize_candidates(annotated, accepted=True)
                 output["rejected"] = _serialize_candidates(annotated, accepted=False)
                 return_code = 0
     except Exception as exc:
+        if output["properties"] or output["rejected"]:
+            output["status"] = "partial"
+        else:
+            output["status"] = "failed"
         output["errors"] = [str(exc)]
         return_code = 1
     finally:
         output["duration_seconds"] = round(time.perf_counter() - started, 3)
-        output_path.write_text(json.dumps(output, ensure_ascii=True, indent=2), encoding="utf-8")
+        _write_output(output_path, output)
 
     return return_code
 

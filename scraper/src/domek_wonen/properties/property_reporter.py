@@ -24,7 +24,11 @@ INVENTORY_FIELDNAMES = [
     "living_area_raw",
     "plot_area_raw",
     "rooms_raw",
+    "energy_label",
     "image_url",
+    "extraction_source",
+    "detail_extraction_status",
+    "detail_error",
     "first_seen_at",
     "last_seen_at",
     "discovery_run_id",
@@ -53,13 +57,17 @@ CANDIDATE_FIELDNAMES = [
     "living_area_raw",
     "plot_area_raw",
     "rooms_raw",
+    "energy_label",
     "image_url",
+    "extraction_source",
+    "detail_extraction_status",
+    "detail_error",
     "extraction_confidence",
     "needs_review",
     "review_reason",
 ]
 
-REJECTED_FIELDNAMES = CANDIDATE_FIELDNAMES
+REJECTED_FIELDNAMES = CANDIDATE_FIELDNAMES + ["rejection_reason"]
 
 
 def write_csv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
@@ -97,7 +105,11 @@ def candidate_to_row(candidate: PropertyCandidate) -> dict[str, str]:
         "living_area_raw": candidate.living_area_raw,
         "plot_area_raw": candidate.plot_area_raw,
         "rooms_raw": candidate.rooms_raw,
+        "energy_label": candidate.energy_label,
         "image_url": candidate.image_url,
+        "extraction_source": candidate.extraction_source,
+        "detail_extraction_status": candidate.detail_extraction_status,
+        "detail_error": candidate.detail_error,
         "extraction_confidence": f"{candidate.extraction_confidence:.2f}",
         "needs_review": "true" if candidate.needs_review else "false",
         "review_reason": candidate.review_reason,

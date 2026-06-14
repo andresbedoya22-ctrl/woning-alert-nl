@@ -45,19 +45,23 @@ class ListingPageCrawler(AbstractContextManager["ListingPageCrawler"]):
             self._safe_cleanup("playwright.stop", playwright.stop)
 
     def crawl(self, source: PropertySource) -> CrawlResult:
+        return self.fetch(source.aanbod_url, source)
+
+    def fetch(self, url: str, source: PropertySource, timeout_ms: int | None = None) -> CrawlResult:
         if self._browser is None:
             raise RuntimeError("ListingPageCrawler must be opened before crawling")
 
         started = time.perf_counter()
         page = self._browser.new_page()
-        page.set_default_timeout(self.timeout_ms)
+        effective_timeout_ms = timeout_ms if timeout_ms is not None else self.timeout_ms
+        page.set_default_timeout(effective_timeout_ms)
         try:
-            response = page.goto(source.aanbod_url, wait_until="domcontentloaded", timeout=self.timeout_ms)
+            response = page.goto(url, wait_until="domcontentloaded", timeout=effective_timeout_ms)
             try:
-                page.wait_for_load_state("networkidle", timeout=min(self.timeout_ms, 5000))
+                page.wait_for_load_state("networkidle", timeout=min(effective_timeout_ms, 5000))
             except TimeoutError:
                 pass
-            final_url = page.url or source.aanbod_url
+            final_url = page.url or url or source.aanbod_url
             html = page.content()
             if not html.strip():
                 raise RuntimeError("empty page content")
@@ -75,7 +79,7 @@ class ListingPageCrawler(AbstractContextManager["ListingPageCrawler"]):
             return CrawlResult(
                 source=source,
                 ok=False,
-                final_url=source.aanbod_url,
+                final_url=url or source.aanbod_url,
                 error=str(exc),
                 elapsed_ms=elapsed_ms,
                 timed_out=isinstance(exc, TimeoutError),

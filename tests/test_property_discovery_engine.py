@@ -429,6 +429,131 @@ def test_property_discovery_worker_writes_output_json_on_failure(tmp_path: Path,
     assert payload["errors"] == ["worker boom"]
 
 
+def test_property_discovery_worker_preserves_partial_candidates_when_detail_fails(tmp_path: Path, monkeypatch) -> None:
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "output.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "office_name": "Detail Office",
+                "website": "https://example.nl",
+                "root_domain": "example.nl",
+                "gemeente": "Breda",
+                "province": "Noord-Brabant",
+                "aanbod_url": "https://example.nl/aanbod",
+                "max_properties_per_source": 5,
+                "timeout_ms": 1000,
+                "page_timeout_seconds": 1,
+                "max_detail_pages": 3,
+                "detail_timeout_seconds": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeCrawler:
+        def __init__(self, timeout_ms: int = 1000) -> None:
+            self.timeout_ms = timeout_ms
+
+        def __enter__(self) -> "FakeCrawler":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def crawl(self, source):
+            from domek_wonen.properties.models import CrawlResult
+
+            return CrawlResult(source=source, ok=True, final_url=source.aanbod_url, html="<html></html>", error="", elapsed_ms=1)
+
+    base_candidate = PropertyCandidate(
+        source_id="example.nl",
+        source_url="https://example.nl/aanbod",
+        root_domain="example.nl",
+        gemeente="Breda",
+        property_url="https://example.nl/woningen/vier-heultjes-99-sprang-capelle",
+        property_url_classification="property_detail_candidate",
+        title="Example",
+    )
+
+    monkeypatch.setattr("scripts.property_discovery_worker.ListingPageCrawler", FakeCrawler)
+    monkeypatch.setattr("scripts.property_discovery_worker.PropertyCardExtractor.extract", lambda self, html, source, source_url=None: [base_candidate])
+    monkeypatch.setattr("scripts.property_discovery_worker._annotate_candidate", lambda candidate, url_classifier: candidate)
+    monkeypatch.setattr("scripts.property_discovery_worker._normalize_candidate", lambda candidate: candidate)
+    monkeypatch.setattr("scripts.property_discovery_worker._enrich_candidates", lambda *args, **kwargs: (_ for _ in ()).throw(TimeoutError("detail hung")))
+
+    exit_code = run_worker(input_path, output_path)
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert payload["properties"]
+    assert payload["status"] == "partial"
+    assert payload["properties"][0]["property_url"] == "https://example.nl/woningen/vier-heultjes-99-sprang-capelle"
+    assert payload["properties"][0]["detail_extraction_status"] == "pending"
+
+
+def test_property_discovery_worker_disable_detail_extraction_keeps_cards_only(tmp_path: Path, monkeypatch) -> None:
+    input_path = tmp_path / "input.json"
+    output_path = tmp_path / "output.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "office_name": "Detail Office",
+                "website": "https://example.nl",
+                "root_domain": "example.nl",
+                "gemeente": "Breda",
+                "province": "Noord-Brabant",
+                "aanbod_url": "https://example.nl/aanbod",
+                "max_properties_per_source": 5,
+                "timeout_ms": 1000,
+                "page_timeout_seconds": 1,
+                "disable_detail_extraction": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeCrawler:
+        def __init__(self, timeout_ms: int = 1000) -> None:
+            self.timeout_ms = timeout_ms
+
+        def __enter__(self) -> "FakeCrawler":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def crawl(self, source):
+            from domek_wonen.properties.models import CrawlResult
+
+            return CrawlResult(source=source, ok=True, final_url=source.aanbod_url, html="<html></html>", error="", elapsed_ms=1)
+
+        def fetch(self, url, source, timeout_ms=None):
+            raise AssertionError("detail fetch should not run when disabled")
+
+    base_candidate = PropertyCandidate(
+        source_id="example.nl",
+        source_url="https://example.nl/aanbod",
+        root_domain="example.nl",
+        gemeente="Breda",
+        property_url="https://example.nl/woningen/vier-heultjes-99-sprang-capelle",
+        property_url_classification="property_detail_candidate",
+        title="Example",
+    )
+
+    monkeypatch.setattr("scripts.property_discovery_worker.ListingPageCrawler", FakeCrawler)
+    monkeypatch.setattr("scripts.property_discovery_worker.PropertyCardExtractor.extract", lambda self, html, source, source_url=None: [base_candidate])
+    monkeypatch.setattr("scripts.property_discovery_worker._annotate_candidate", lambda candidate, url_classifier: candidate)
+    monkeypatch.setattr("scripts.property_discovery_worker._normalize_candidate", lambda candidate: candidate)
+
+    exit_code = run_worker(input_path, output_path)
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["status"] == "succeeded"
+    assert payload["properties"][0]["detail_extraction_status"] == "skipped"
+
+
 def test_property_discovery_engine_marks_timeout_and_continues(tmp_path: Path, monkeypatch) -> None:
     csv_path = tmp_path / "sources.csv"
     csv_path.write_text(
@@ -483,3 +608,194 @@ def test_property_discovery_engine_marks_timeout_and_continues(tmp_path: Path, m
     assert output.sources_succeeded == 1
     assert output.run_status == "completed_with_errors"
     assert "source timeout after 1s" in report_text
+
+
+def test_property_discovery_engine_preserves_partial_results_after_worker_timeout(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "slow-1,Slow One,slow-one.nl,https://slow-one.nl,Breda,Noord-Brabant,seed,https://slow-one.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    partial_payload = {
+        "status": "partial",
+        "properties": [asdict(_candidate(property_url="https://example.nl/aanbod/1", classification="property_detail_candidate"))],
+        "rejected": [asdict(_candidate(property_url="https://example.nl/diensten/aankoopmakelaar", classification="other"))],
+        "errors": [],
+        "duration_seconds": 0.01,
+    }
+
+    def fake_worker(**kwargs):
+        kwargs["output_path"].write_text(json.dumps(partial_payload), encoding="utf-8")
+        raise subprocess.TimeoutExpired(cmd=["worker"], timeout=kwargs["source_timeout_seconds"])
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+        source_timeout_seconds=1,
+    )
+
+    assert output.sources_attempted == 1
+    assert output.sources_timeout == 1
+    assert output.total_property_candidates == 2
+    assert output.deduped_properties == 1
+
+
+def test_property_discovery_engine_carredewit_like_partial_timeout_does_not_drop_to_zero(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Carre de Wit,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    fixture_path = BASE_DIR / "tests" / "fixtures" / "properties" / "listing_page_with_noise.html"
+    fixture_html = fixture_path.read_text(encoding="utf-8")
+
+    def fake_worker(**kwargs):
+        source = kwargs["source"]
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    **_payload_from_fixture_html(source, fixture_html),
+                    "status": "partial",
+                }
+            ),
+            encoding="utf-8",
+        )
+        raise subprocess.TimeoutExpired(cmd=["worker"], timeout=kwargs["source_timeout_seconds"])
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=3,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+        source_timeout_seconds=1,
+    )
+
+    assert output.total_property_candidates > 0
+    assert output.deduped_properties > 0
+
+
+def test_property_discovery_inventory_marks_empty_address_for_review(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_worker(**kwargs):
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "properties": [
+                        {
+                            **asdict(_candidate(property_url="https://example.nl/woningen/onbekend", classification="property_detail_candidate")),
+                            "address_raw": "",
+                            "city_raw": "",
+                            "detail_extraction_status": "failed",
+                            "detail_error": "detail page missing usable signals",
+                        }
+                    ],
+                    "rejected": [],
+                    "errors": [],
+                    "duration_seconds": 0.01,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return _completed()
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+    )
+
+    with (output.run_dir / "property_inventory.csv").open("r", encoding="utf-8", newline="") as handle:
+        inventory_rows = list(csv.DictReader(handle))
+
+    assert len(inventory_rows) == 1
+    assert inventory_rows[0]["address_raw"] == ""
+    assert inventory_rows[0]["needs_review"] == "true"
+    assert "missing address after detail extraction" in inventory_rows[0]["review_reason"]
+
+
+def test_property_discovery_rejected_candidates_skips_empty_rows(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_worker(**kwargs):
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "properties": [],
+                    "rejected": [
+                        {
+                            **asdict(_candidate(property_url="", classification="other")),
+                            "review_reason": "",
+                            "excluded_reason": "",
+                            "property_url": "",
+                        }
+                    ],
+                    "errors": [],
+                    "duration_seconds": 0.01,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return _completed()
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+    )
+
+    with (output.run_dir / "rejected_property_candidates.csv").open("r", encoding="utf-8", newline="") as handle:
+        rejected_rows = list(csv.DictReader(handle))
+
+    assert rejected_rows == []

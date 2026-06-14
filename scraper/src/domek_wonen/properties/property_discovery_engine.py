@@ -180,6 +180,9 @@ def _normalize_candidate(candidate: PropertyCandidate) -> PropertyCandidate:
 
 
 def _to_rejected_record(candidate: PropertyCandidate) -> PropertyRejectedRecord:
+    rejection_reason = candidate.excluded_reason or candidate.review_reason
+    if not rejection_reason and candidate.property_url_classification not in {"", "other"}:
+        rejection_reason = candidate.property_url_classification
     return PropertyRejectedRecord(
         source_id=candidate.source_id,
         root_domain=candidate.root_domain,
@@ -194,7 +197,12 @@ def _to_rejected_record(candidate: PropertyCandidate) -> PropertyRejectedRecord:
         living_area_raw=candidate.living_area_raw,
         plot_area_raw=candidate.plot_area_raw,
         rooms_raw=candidate.rooms_raw,
+        energy_label=candidate.energy_label,
         image_url=candidate.image_url,
+        rejection_reason=rejection_reason,
+        extraction_source=candidate.extraction_source,
+        detail_extraction_status=candidate.detail_extraction_status,
+        detail_error=candidate.detail_error,
         extraction_confidence=f"{candidate.extraction_confidence:.2f}",
         needs_review="true" if candidate.needs_review else "false",
         review_reason=candidate.review_reason,
@@ -235,7 +243,10 @@ def _to_inventory_record(
     if status == "unknown":
         review_reasons.append("unknown status")
     if not candidate.address_raw and not candidate.city_raw:
-        review_reasons.append("missing address")
+        if candidate.detail_extraction_status == "failed":
+            review_reasons.append("missing address after detail extraction")
+        else:
+            review_reasons.append("missing address")
 
     return PropertyInventoryRecord(
         property_id=_property_id(candidate),
@@ -254,7 +265,11 @@ def _to_inventory_record(
         living_area_raw=candidate.living_area_raw,
         plot_area_raw=candidate.plot_area_raw,
         rooms_raw=candidate.rooms_raw,
+        energy_label=candidate.energy_label,
         image_url=candidate.image_url,
+        extraction_source=candidate.extraction_source,
+        detail_extraction_status=candidate.detail_extraction_status,
+        detail_error=candidate.detail_error,
         first_seen_at=run_id,
         last_seen_at=run_id,
         discovery_run_id=run_id,
@@ -303,7 +318,11 @@ def _write_checkpoint(
 ) -> None:
     candidate_rows = [candidate_to_row(candidate) for candidate in candidates]
     inventory_rows = [inventory_to_row(record) for record in inventory]
-    rejected_rows = [rejected_to_row(record) for record in rejected]
+    rejected_rows = [
+        rejected_to_row(record)
+        for record in rejected
+        if (record.property_url or "").strip() or (record.rejection_reason or "").strip()
+    ]
 
     write_csv(run_dir / "property_candidates.csv", candidate_rows, CANDIDATE_FIELDNAMES)
     write_csv(run_dir / INVENTORY_FILENAME, inventory_rows, INVENTORY_FIELDNAMES)
@@ -338,6 +357,9 @@ def _source_payload(
     max_properties_per_source: int,
     timeout_ms: int,
     page_timeout_seconds: int,
+    max_detail_pages: int,
+    detail_timeout_seconds: int,
+    disable_detail_extraction: bool,
 ) -> dict[str, object]:
     return {
         "source_id": source.source_id,
@@ -350,6 +372,9 @@ def _source_payload(
         "max_properties_per_source": max_properties_per_source,
         "timeout_ms": timeout_ms,
         "page_timeout_seconds": page_timeout_seconds,
+        "max_detail_pages": max_detail_pages,
+        "detail_timeout_seconds": detail_timeout_seconds,
+        "disable_detail_extraction": disable_detail_extraction,
     }
 
 
@@ -360,6 +385,9 @@ def _run_source_worker_subprocess(
     max_properties_per_source: int,
     timeout_ms: int,
     page_timeout_seconds: int,
+    max_detail_pages: int,
+    detail_timeout_seconds: int,
+    disable_detail_extraction: bool,
     source_timeout_seconds: int,
     output_path: Path,
 ) -> subprocess.CompletedProcess[str]:
@@ -371,6 +399,9 @@ def _run_source_worker_subprocess(
                 max_properties_per_source=max_properties_per_source,
                 timeout_ms=timeout_ms,
                 page_timeout_seconds=page_timeout_seconds,
+                max_detail_pages=max_detail_pages,
+                detail_timeout_seconds=detail_timeout_seconds,
+                disable_detail_extraction=disable_detail_extraction,
             ),
             input_handle,
             ensure_ascii=True,
@@ -396,6 +427,9 @@ def _crawl_source_in_subprocess(
     max_properties_per_source: int,
     timeout_ms: int,
     page_timeout_seconds: int,
+    max_detail_pages: int,
+    detail_timeout_seconds: int,
+    disable_detail_extraction: bool,
     source_timeout_seconds: int,
 ) -> tuple[CrawlResult, list[PropertyCandidate]]:
     started = time.perf_counter()
@@ -410,11 +444,34 @@ def _crawl_source_in_subprocess(
                 max_properties_per_source=max_properties_per_source,
                 timeout_ms=timeout_ms,
                 page_timeout_seconds=page_timeout_seconds,
+                max_detail_pages=max_detail_pages,
+                detail_timeout_seconds=detail_timeout_seconds,
+                disable_detail_extraction=disable_detail_extraction,
                 source_timeout_seconds=source_timeout_seconds,
                 output_path=output_path,
             )
         except subprocess.TimeoutExpired:
             elapsed_ms = int((time.perf_counter() - started) * 1000)
+            if output_path.exists():
+                try:
+                    payload = json.loads(output_path.read_text(encoding="utf-8"))
+                    accepted = [_deserialize_candidate(item) for item in payload.get("properties", [])]
+                    rejected = [_deserialize_candidate(item) for item in payload.get("rejected", [])]
+                    candidates = accepted + rejected
+                    if candidates:
+                        return (
+                            CrawlResult(
+                                source=source,
+                                ok=False,
+                                final_url=source.aanbod_url,
+                                error=f"source timeout after {source_timeout_seconds}s; partial results preserved",
+                                elapsed_ms=elapsed_ms,
+                                timed_out=True,
+                            ),
+                            candidates,
+                        )
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
             return (
                 CrawlResult(
                     source=source,
@@ -510,6 +567,9 @@ def run_property_discovery(
     timeout_ms: int = 30000,
     source_timeout_seconds: int = 90,
     page_timeout_seconds: int = 30,
+    max_detail_pages: int = 3,
+    detail_timeout_seconds: int = 10,
+    disable_detail_extraction: bool = False,
     verbose: bool = True,
 ) -> PropertyDiscoveryRunOutput:
     started_at = _utc_now()
@@ -527,7 +587,8 @@ def run_property_discovery(
             "run started "
             f"province={province} max_sources={max_sources} max_properties_per_source={max_properties_per_source} "
             f"timeout_ms={timeout_ms} source_timeout_seconds={source_timeout_seconds} "
-            f"page_timeout_seconds={page_timeout_seconds} output_dir={run_dir}"
+            f"page_timeout_seconds={page_timeout_seconds} max_detail_pages={max_detail_pages} "
+            f"detail_timeout_seconds={detail_timeout_seconds} disable_detail_extraction={disable_detail_extraction} output_dir={run_dir}"
         )
 
     restore_latest_discovery_if_missing(source_csv_path)
@@ -607,6 +668,9 @@ def run_property_discovery(
                 max_properties_per_source=max_properties_per_source,
                 timeout_ms=effective_timeout_ms,
                 page_timeout_seconds=page_timeout_seconds,
+                max_detail_pages=max_detail_pages,
+                detail_timeout_seconds=detail_timeout_seconds,
+                disable_detail_extraction=disable_detail_extraction,
                 source_timeout_seconds=source_timeout_seconds,
             )
             crawl_results.append(result)
@@ -623,6 +687,8 @@ def run_property_discovery(
                         f"accepted={source_accepted} rejected={source_rejected}"
                     )
             elif result.timed_out:
+                if source_candidates:
+                    candidates.extend(source_candidates)
                 if verbose:
                     _log(f"source {index}/{len(sources)} TIMEOUT error={result.error}")
             else:

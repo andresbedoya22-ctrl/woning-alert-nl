@@ -51,7 +51,11 @@ class PropertyCandidate:
     living_area_raw: str = ""
     plot_area_raw: str = ""
     rooms_raw: str = ""
+    energy_label: str = ""
     image_url: str = ""
+    extraction_source: str = "card"
+    detail_extraction_status: str = "skipped"
+    detail_error: str = ""
     extraction_confidence: float = 0.0
     needs_review: bool = False
     review_reason: str = ""
@@ -75,7 +79,11 @@ class PropertyInventoryRecord:
     living_area_raw: str
     plot_area_raw: str
     rooms_raw: str
+    energy_label: str
     image_url: str
+    extraction_source: str
+    detail_extraction_status: str
+    detail_error: str
     first_seen_at: str
     last_seen_at: str
     discovery_run_id: str
@@ -99,7 +107,12 @@ class PropertyRejectedRecord:
     living_area_raw: str
     plot_area_raw: str
     rooms_raw: str
+    energy_label: str
     image_url: str
+    rejection_reason: str
+    extraction_source: str
+    detail_extraction_status: str
+    detail_error: str
     extraction_confidence: str
     needs_review: str
     review_reason: str
