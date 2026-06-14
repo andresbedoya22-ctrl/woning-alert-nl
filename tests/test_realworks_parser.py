@@ -8,7 +8,7 @@ sys.path.insert(0, str(BASE_DIR / "scraper" / "src"))
 
 from domek_wonen.discovery.website_fetcher import FetchResponse
 from domek_wonen.properties.models import PropertySource
-from domek_wonen.properties.platform_parsers.realworks_parser import RealworksParser
+from domek_wonen.properties.platform_parsers.realworks_parser import RealworksParser, parse_realworks_address_city_from_url
 
 
 def _source(*, aanbod_url: str = "https://example.nl/aanbod/woningaanbod") -> PropertySource:
@@ -70,6 +70,15 @@ def test_realworks_parser_ignores_unrelated_aanbod_urls() -> None:
     assert verkoopadvies_candidates[0] == "https://example.nl/aanbod/woningaanbod"
     assert "https://example.nl/aankoop_verwerving" not in aankoop_candidates
     assert "https://example.nl/gratis-verkoopadvies" not in verkoopadvies_candidates
+
+
+def test_realworks_parser_parses_house_slug_address_and_city() -> None:
+    address_raw, city_raw = parse_realworks_address_city_from_url(
+        "https://example.nl/aanbod/woningaanbod/asten/koop/huis-8967467-mgr.-van-dijkstraat-2"
+    )
+
+    assert address_raw == "Mgr. van Dijkstraat 2"
+    assert city_raw == "Asten"
 
 
 def test_realworks_parser_extracts_address_price_and_status_from_detail_fixture(monkeypatch) -> None:

@@ -10,7 +10,13 @@ sys.path.insert(0, str(BASE_DIR))
 sys.path.insert(0, str(BASE_DIR / "scraper" / "src"))
 
 from domek_wonen.properties.models import PropertyCandidate, PropertySource
-from domek_wonen.properties.property_discovery_engine import REPORT_FILENAME, restore_latest_discovery_if_missing, run_property_discovery
+from domek_wonen.properties.property_discovery_engine import (
+    REPORT_FILENAME,
+    _is_valid_city_raw,
+    _normalize_city_raw,
+    restore_latest_discovery_if_missing,
+    run_property_discovery,
+)
 from scripts.property_discovery_worker import run_worker
 
 
@@ -882,8 +888,460 @@ def test_property_discovery_invalid_address_raw_is_excluded_from_matching_ready_
 
     report_text = output.report_path.read_text(encoding="utf-8")
     assert "- Invalid address_raw: 1" in report_text
-    assert "- Needs review: 1" in report_text
+    assert "- Needs review: 0" in report_text
     assert "- Clean available properties: 0" in report_text
+
+
+def test_property_discovery_normalizes_city_with_in_prefix() -> None:
+    assert _normalize_city_raw("in Asten") == "Asten"
+    assert _normalize_city_raw("in Bergen Op Zoom") == "Bergen op Zoom"
+    assert _normalize_city_raw("in 'S-Hertogenbosch") == "'s-Hertogenbosch"
+
+
+def test_property_discovery_rejects_invalid_short_or_numeric_city() -> None:
+    assert _is_valid_city_raw("C") is False
+    assert _is_valid_city_raw("2") is False
+
+
+def test_property_discovery_empty_price_cannot_be_clean(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_worker(**kwargs):
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "properties": [
+                        {
+                            **asdict(
+                                _candidate(
+                                    property_url="https://example.nl/woningen/vier-heultjes-99-sprang-capelle",
+                                    classification="property_detail_candidate",
+                                )
+                            ),
+                            "address_raw": "Vier Heultjes 99",
+                            "city_raw": "Sprang-Capelle",
+                            "price_raw": "",
+                            "status_raw": "beschikbaar",
+                            "extraction_source": "realworks_parser",
+                        }
+                    ],
+                    "rejected": [],
+                    "errors": [],
+                    "duration_seconds": 0.01,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return _completed()
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+    )
+
+    with (output.run_dir / "matching_ready_inventory.csv").open("r", encoding="utf-8", newline="") as handle:
+        inventory_rows = list(csv.DictReader(handle))
+
+    assert len(inventory_rows) == 1
+    assert inventory_rows[0]["price_eur"] == ""
+    assert inventory_rows[0]["needs_review"] == "true"
+    assert inventory_rows[0]["needs_review_reason"] == "invalid_price"
+
+
+def test_property_discovery_price_per_cannot_be_clean(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_worker(**kwargs):
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "properties": [
+                        {
+                            **asdict(
+                                _candidate(
+                                    property_url="https://example.nl/woningen/vier-heultjes-99-sprang-capelle",
+                                    classification="property_detail_candidate",
+                                )
+                            ),
+                            "address_raw": "Vier Heultjes 99",
+                            "city_raw": "Sprang-Capelle",
+                            "price_raw": "EUR 80 per",
+                            "status_raw": "beschikbaar",
+                            "extraction_source": "realworks_parser",
+                        }
+                    ],
+                    "rejected": [],
+                    "errors": [],
+                    "duration_seconds": 0.01,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return _completed()
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+    )
+
+    with (output.run_dir / "matching_ready_inventory.csv").open("r", encoding="utf-8", newline="") as handle:
+        inventory_rows = list(csv.DictReader(handle))
+
+    assert len(inventory_rows) == 1
+    assert inventory_rows[0]["needs_review"] == "true"
+    assert inventory_rows[0]["needs_review_reason"] == "invalid_price"
+
+
+def test_property_discovery_decimal_per_price_cannot_be_clean(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_worker(**kwargs):
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "properties": [
+                        {
+                            **asdict(
+                                _candidate(
+                                    property_url="https://example.nl/woningen/vier-heultjes-99-sprang-capelle",
+                                    classification="property_detail_candidate",
+                                )
+                            ),
+                            "address_raw": "Vier Heultjes 99",
+                            "city_raw": "Sprang-Capelle",
+                            "price_raw": "EUR 114,62 per",
+                            "status_raw": "beschikbaar",
+                            "extraction_source": "realworks_parser",
+                        }
+                    ],
+                    "rejected": [],
+                    "errors": [],
+                    "duration_seconds": 0.01,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return _completed()
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+    )
+
+    with (output.run_dir / "matching_ready_inventory.csv").open("r", encoding="utf-8", newline="") as handle:
+        inventory_rows = list(csv.DictReader(handle))
+
+    assert len(inventory_rows) == 1
+    assert inventory_rows[0]["needs_review"] == "true"
+    assert inventory_rows[0]["needs_review_reason"] == "invalid_price"
+
+
+def test_property_discovery_low_purchase_price_cannot_be_clean(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_worker(**kwargs):
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "properties": [
+                        {
+                            **asdict(
+                                _candidate(
+                                    property_url="https://example.nl/woningen/vier-heultjes-99-sprang-capelle",
+                                    classification="property_detail_candidate",
+                                )
+                            ),
+                            "address_raw": "Vier Heultjes 99",
+                            "city_raw": "Sprang-Capelle",
+                            "price_raw": "EUR 50.000",
+                            "status_raw": "beschikbaar",
+                            "extraction_source": "realworks_parser",
+                        }
+                    ],
+                    "rejected": [],
+                    "errors": [],
+                    "duration_seconds": 0.01,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return _completed()
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+    )
+
+    with (output.run_dir / "matching_ready_inventory.csv").open("r", encoding="utf-8", newline="") as handle:
+        inventory_rows = list(csv.DictReader(handle))
+
+    assert len(inventory_rows) == 1
+    assert inventory_rows[0]["price_eur"] == "50000"
+    assert inventory_rows[0]["needs_review"] == "true"
+    assert inventory_rows[0]["needs_review_reason"] == "invalid_price"
+
+
+def test_property_discovery_valid_purchase_price_can_stay_clean(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_worker(**kwargs):
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "properties": [
+                        {
+                            **asdict(
+                                _candidate(
+                                    property_url="https://example.nl/woningen/vier-heultjes-99-sprang-capelle",
+                                    classification="property_detail_candidate",
+                                )
+                            ),
+                            "address_raw": "Vier Heultjes 99",
+                            "city_raw": "Sprang-Capelle",
+                            "price_raw": "EUR 315.000 k.k.",
+                            "status_raw": "beschikbaar",
+                            "extraction_source": "realworks_parser",
+                        }
+                    ],
+                    "rejected": [],
+                    "errors": [],
+                    "duration_seconds": 0.01,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return _completed()
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+    )
+
+    with (output.run_dir / "matching_ready_inventory.csv").open("r", encoding="utf-8", newline="") as handle:
+        inventory_rows = list(csv.DictReader(handle))
+
+    assert len(inventory_rows) == 1
+    assert inventory_rows[0]["price_eur"] == "315000"
+    assert inventory_rows[0]["needs_review"] == "false"
+    assert inventory_rows[0]["status"] == "beschikbaar"
+
+
+def test_property_discovery_unknown_status_cannot_be_clean(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_worker(**kwargs):
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "properties": [
+                        {
+                            **asdict(
+                                _candidate(
+                                    property_url="https://example.nl/woningen/vier-heultjes-99-sprang-capelle",
+                                    classification="property_detail_candidate",
+                                )
+                            ),
+                            "address_raw": "Vier Heultjes 99",
+                            "city_raw": "Sprang-Capelle",
+                            "price_raw": "EUR 425.000",
+                            "status_raw": "mystery",
+                            "extraction_source": "realworks_parser",
+                        }
+                    ],
+                    "rejected": [],
+                    "errors": [],
+                    "duration_seconds": 0.01,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return _completed()
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+    )
+
+    with (output.run_dir / "matching_ready_inventory.csv").open("r", encoding="utf-8", newline="") as handle:
+        inventory_rows = list(csv.DictReader(handle))
+
+    assert len(inventory_rows) == 1
+    assert inventory_rows[0]["status"] == "unknown"
+    assert inventory_rows[0]["needs_review"] == "true"
+    assert inventory_rows[0]["needs_review_reason"] == "unknown_status"
+
+
+def test_property_discovery_report_needs_review_matches_inventory_csv(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_worker(**kwargs):
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "properties": [
+                        {
+                            **asdict(
+                                _candidate(
+                                    property_url="https://example.nl/woningen/vier-heultjes-99-sprang-capelle",
+                                    classification="property_detail_candidate",
+                                )
+                            ),
+                            "address_raw": "Vier Heultjes 99",
+                            "city_raw": "in Asten",
+                            "price_raw": "",
+                            "status_raw": "beschikbaar",
+                            "extraction_source": "realworks_parser",
+                        }
+                    ],
+                    "rejected": [
+                        {
+                            **asdict(
+                                _candidate(
+                                    property_url="https://example.nl/woningen/detail",
+                                    classification="property_detail_candidate",
+                                )
+                            ),
+                            "address_raw": "",
+                            "status_raw": "beschikbaar",
+                            "needs_review": True,
+                            "needs_review_reason": "invalid_address_raw",
+                            "review_reason": "missing address after detail extraction",
+                            "address_quality": "invalid",
+                        }
+                    ],
+                    "errors": [],
+                    "duration_seconds": 0.01,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return _completed()
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+    )
+
+    with (output.run_dir / "matching_ready_inventory.csv").open("r", encoding="utf-8", newline="") as handle:
+        inventory_rows = list(csv.DictReader(handle))
+
+    inventory_needs_review = sum(1 for row in inventory_rows if row["needs_review"] == "true")
+    report_text = output.report_path.read_text(encoding="utf-8")
+
+    assert inventory_needs_review == 1
+    assert "- Needs review: 1" in report_text
 
 
 def test_property_discovery_engine_platform_realworks_filters_only_realworks_sources(tmp_path: Path, monkeypatch) -> None:

@@ -153,9 +153,7 @@ def render_report(
     by_status = Counter(record.status for record in inventory)
     by_source = Counter(record.source_id for record in inventory)
     invalid_address_raw_count = sum(1 for record in rejected if record.needs_review_reason == "invalid_address_raw")
-    needs_review_count = sum(1 for record in inventory if record.needs_review == "true") + sum(
-        1 for record in rejected if record.needs_review == "true"
-    )
+    needs_review_count = sum(1 for record in inventory if record.needs_review == "true")
     clean_available_properties = sum(
         1 for record in inventory if record.status == "beschikbaar" and record.needs_review != "true"
     )

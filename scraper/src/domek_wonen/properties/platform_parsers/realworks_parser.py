@@ -48,6 +48,11 @@ _DETAIL_PATH_PATTERNS = (
     re.compile(r"/woningen/[^/]+$"),
     re.compile(r"/(?:huis|appartement|woning)-[^/]+$"),
 )
+_REALWORKS_HOUSE_SLUG_PATTERN = re.compile(
+    r"/aanbod/woningaanbod/(?P<city>[^/]+)/koop/(?P<slug>huis-\d+-.+)$",
+    flags=re.IGNORECASE,
+)
+_LOWERCASE_PARTICLES = {"aan", "de", "den", "der", "het", "in", "of", "op", "te", "ten", "ter", "van"}
 
 
 def _normalize_url(url: str) -> str:
@@ -138,6 +143,40 @@ def _confidence(candidate: PropertyCandidate) -> float:
     return min(score, 0.95)
 
 
+def _format_slug_token(token: str, *, lowercase_particles: set[str]) -> str:
+    lowered = token.casefold()
+    if lowered in lowercase_particles:
+        return lowered
+    if lowered == "'s":
+        return "'s"
+    if token.endswith(".") and len(token) > 1:
+        core = token[:-1]
+        return f"{core[:1].upper()}{core[1:].lower()}."
+    return token[:1].upper() + token[1:].lower()
+
+
+def _format_slug_value(value: str, *, lowercase_particles: set[str]) -> str:
+    parts = [part for part in value.split("-") if part]
+    if not parts:
+        return ""
+    return " ".join(_format_slug_token(part, lowercase_particles=lowercase_particles) for part in parts)
+
+
+def parse_realworks_address_city_from_url(property_url: str) -> tuple[str, str]:
+    path = urlsplit(property_url).path.rstrip("/")
+    match = _REALWORKS_HOUSE_SLUG_PATTERN.search(path)
+    if not match:
+        return "", ""
+    city_slug = match.group("city")
+    address_slug = re.sub(r"^huis-\d+-", "", match.group("slug"), flags=re.IGNORECASE)
+    address_raw = _format_slug_value(address_slug, lowercase_particles=_LOWERCASE_PARTICLES)
+    city_raw = _format_slug_value(
+        city_slug,
+        lowercase_particles={"aan", "de", "den", "der", "het", "op", "te", "ten", "ter", "van"},
+    )
+    return address_raw, city_raw
+
+
 class RealworksParser:
     def __init__(self) -> None:
         self._detail_extractor = DetailPageExtractor()
@@ -213,7 +252,9 @@ class RealworksParser:
                     candidate = self._detail_extractor.enrich(candidate, detail_response.text, detail_response.url or detail_url)
                     candidate = replace(candidate, extraction_source="realworks_parser")
                 else:
-                    slug_address, slug_city = derive_address_from_slug(detail_url)
+                    slug_address, slug_city = parse_realworks_address_city_from_url(detail_url)
+                    if not slug_address:
+                        slug_address, slug_city = derive_address_from_slug(detail_url)
                     candidate = replace(
                         candidate,
                         address_raw=slug_address,
@@ -222,7 +263,9 @@ class RealworksParser:
                     )
 
                 if not candidate.address_raw:
-                    slug_address, slug_city = derive_address_from_slug(candidate.property_url)
+                    slug_address, slug_city = parse_realworks_address_city_from_url(candidate.property_url)
+                    if not slug_address:
+                        slug_address, slug_city = derive_address_from_slug(candidate.property_url)
                     if slug_address:
                         candidate = replace(candidate, address_raw=slug_address, city_raw=candidate.city_raw or slug_city)
 

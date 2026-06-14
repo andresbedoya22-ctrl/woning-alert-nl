@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -192,6 +193,84 @@ def _unique_reasons(*reason_groups: list[str]) -> str:
     return "; ".join(dict.fromkeys(reasons))
 
 
+_CITY_LOWERCASE_PARTICLES = {"aan", "de", "den", "der", "het", "op", "te", "ten", "ter", "van"}
+_INVALID_PRICE_PATTERNS = (
+    " per ",
+    " per maand",
+    "/m²",
+    "/m2",
+    "m²",
+    "m2",
+    "servicekosten",
+    "huur",
+)
+
+
+def _format_place_token(token: str, *, lowercase_particles: set[str], is_first: bool) -> str:
+    lowered = token.casefold()
+    if lowered == "'s":
+        return "'s"
+    if lowered in lowercase_particles and not is_first:
+        return lowered
+    return token[:1].upper() + token[1:].lower()
+
+
+def _normalize_city_raw(city_raw: str) -> str:
+    value = re.sub(r"\s+", " ", (city_raw or "").strip())
+    if not value:
+        return ""
+    value = re.sub(r"(?i)^in\s+", "", value).strip()
+    if not value:
+        return ""
+
+    parts = [segment for segment in re.split(r"([ -])", value) if segment]
+    formatted: list[str] = []
+    word_index = 0
+    for part in parts:
+        if part in {" ", "-"}:
+            formatted.append(part)
+            continue
+        formatted.append(
+            _format_place_token(part, lowercase_particles=_CITY_LOWERCASE_PARTICLES, is_first=(word_index == 0))
+        )
+        word_index += 1
+    return "".join(formatted)
+
+
+def _is_valid_city_raw(city_raw: str) -> bool:
+    normalized = _normalize_city_raw(city_raw)
+    if not normalized:
+        return False
+    collapsed = re.sub(r"[^A-Za-zÀ-ÿ']", "", normalized)
+    if len(collapsed) <= 1:
+        return False
+    if normalized.isnumeric():
+        return False
+    return True
+
+
+def _select_needs_review_reason(current: str, *candidates: str) -> str:
+    if current:
+        return current
+    for candidate in candidates:
+        if candidate:
+            return candidate
+    return ""
+
+
+def _is_valid_price(price_raw: str, price_eur: str) -> bool:
+    normalized_price_raw = f" {(price_raw or '').strip().casefold()} "
+    if any(pattern in normalized_price_raw for pattern in _INVALID_PRICE_PATTERNS):
+        return False
+    if not price_eur.isdigit():
+        return False
+    if int(price_eur) < 100000:
+        return False
+    if not (price_raw or "").strip():
+        return False
+    return True
+
+
 def _apply_address_quality_gate(candidate: PropertyCandidate) -> PropertyCandidate:
     review_reasons = [candidate.review_reason] if candidate.review_reason else []
     address_raw = (candidate.address_raw or "").strip()
@@ -210,6 +289,7 @@ def _apply_address_quality_gate(candidate: PropertyCandidate) -> PropertyCandida
 
     needs_review = candidate.needs_review
     needs_review_reason = candidate.needs_review_reason
+    city_raw = _normalize_city_raw(city_raw)
     if address_quality != "valid":
         if not address_raw and not city_raw:
             if candidate.detail_extraction_status == "failed":
@@ -217,8 +297,12 @@ def _apply_address_quality_gate(candidate: PropertyCandidate) -> PropertyCandida
             else:
                 review_reasons.append("missing address")
         needs_review = True
-        needs_review_reason = "invalid_address_raw"
+        needs_review_reason = _select_needs_review_reason(needs_review_reason, "invalid_address_raw")
         review_reasons.append("invalid address_raw after quality gate")
+    if not _is_valid_city_raw(city_raw):
+        needs_review = True
+        needs_review_reason = _select_needs_review_reason(needs_review_reason, "invalid_city_raw")
+        review_reasons.append("invalid city_raw after quality gate")
 
     return replace(
         candidate,
@@ -233,7 +317,7 @@ def _apply_address_quality_gate(candidate: PropertyCandidate) -> PropertyCandida
 
 
 def _to_rejected_record(candidate: PropertyCandidate) -> PropertyRejectedRecord:
-    rejection_reason = candidate.excluded_reason or candidate.review_reason
+    rejection_reason = candidate.needs_review_reason or candidate.excluded_reason or candidate.review_reason
     if not rejection_reason and candidate.property_url_classification not in {"", "other"}:
         rejection_reason = candidate.property_url_classification
     return PropertyRejectedRecord(
@@ -294,16 +378,34 @@ def _to_inventory_record(
     classifier: PropertyStatusClassifier,
 ) -> PropertyInventoryRecord:
     status = classifier.classify(candidate.status_raw, candidate.title, candidate.price_raw)
+    price_eur = parse_price_eur(candidate.price_raw)
     review_reasons: list[str] = []
+    needs_review_reason = candidate.needs_review_reason
     if candidate.needs_review and candidate.review_reason:
         review_reasons.append(candidate.review_reason)
+    if not _is_valid_price(candidate.price_raw, price_eur):
+        review_reasons.append("invalid price")
+        needs_review_reason = _select_needs_review_reason(needs_review_reason, "invalid_price")
     if status == "unknown":
         review_reasons.append("unknown status")
+        needs_review_reason = _select_needs_review_reason(needs_review_reason, "unknown_status")
     if not candidate.address_raw and not candidate.city_raw:
         if candidate.detail_extraction_status == "failed":
             review_reasons.append("missing address after detail extraction")
         else:
             review_reasons.append("missing address")
+    if not _is_valid_city_raw(candidate.city_raw):
+        review_reasons.append("invalid city_raw")
+        needs_review_reason = _select_needs_review_reason(needs_review_reason, "invalid_city_raw")
+    if candidate.extraction_source != "realworks_parser":
+        fallback_clean = (
+            candidate.address_quality == "valid"
+            and _is_valid_city_raw(candidate.city_raw)
+            and _is_valid_price(candidate.price_raw, price_eur)
+            and status == "beschikbaar"
+        )
+        if not fallback_clean:
+            review_reasons.append("fallback extraction requires valid address, city, price, and beschikbaar status")
 
     return PropertyInventoryRecord(
         property_id=_property_id(candidate),
@@ -316,7 +418,7 @@ def _to_inventory_record(
         city_raw=candidate.city_raw,
         gemeente=candidate.gemeente,
         price_raw=candidate.price_raw,
-        price_eur=parse_price_eur(candidate.price_raw),
+        price_eur=price_eur,
         status=status,
         status_raw=candidate.status_raw,
         living_area_raw=candidate.living_area_raw,
@@ -333,7 +435,7 @@ def _to_inventory_record(
         extraction_confidence=f"{candidate.extraction_confidence:.2f}",
         address_quality=candidate.address_quality,
         needs_review="true" if review_reasons else "false",
-        needs_review_reason=candidate.needs_review_reason if review_reasons else "",
+        needs_review_reason=needs_review_reason if review_reasons else "",
         review_reason="; ".join(dict.fromkeys(review_reasons)),
     )
 
