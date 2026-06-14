@@ -5,8 +5,8 @@ import re
 from dataclasses import replace
 from html import unescape
 from html.parser import HTMLParser
-from urllib.parse import urlparse
 
+from .address_quality import derive_address_from_slug as derive_address_from_slug_fallback
 from .models import PropertyCandidate
 
 STATUS_PATTERNS = (
@@ -99,33 +99,6 @@ def _extract_energy_label(text: str) -> str:
     return match.group(1).upper() if match else ""
 
 
-def _slug_to_address(property_url: str) -> tuple[str, str]:
-    path = (urlparse(property_url).path or "").strip("/").lower()
-    if not path:
-        return "", ""
-    slug = path.split("/")[-1]
-    slug = re.sub(r"\.(html|htm|php)$", "", slug)
-    slug = re.sub(r"-(?:te-koop|koopwoning|woning|huis|appartement)$", "", slug)
-    slug = re.sub(r"-\d{4}[a-z]{2}$", "", slug)
-    parts = [part for part in slug.split("-") if part]
-    if len(parts) < 3:
-        return "", ""
-
-    number_index = -1
-    for index, part in enumerate(parts):
-        if any(character.isdigit() for character in part):
-            number_index = index
-            break
-    if number_index <= 0 or number_index >= len(parts) - 1:
-        return "", ""
-
-    address_parts = parts[: number_index + 1]
-    city_parts = parts[number_index + 1 :]
-    address_raw = " ".join(address_parts).title()
-    city_raw = "-".join(city_parts).title() if len(city_parts) > 1 else city_parts[0].title()
-    return address_raw, city_raw
-
-
 def _iter_json_ld_records(html: str) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for match in JSON_LD_PATTERN.finditer(html or ""):
@@ -184,7 +157,7 @@ class DetailPageExtractor:
                 candidate = replace(candidate, title=name)
 
         if not address_raw:
-            slug_address, slug_city = _slug_to_address(final_url or candidate.property_url)
+            slug_address, slug_city = derive_address_from_slug_fallback(final_url or candidate.property_url)
             if slug_address:
                 address_raw = slug_address
                 city_raw = city_raw or slug_city
@@ -241,4 +214,4 @@ class DetailPageExtractor:
 
 
 def derive_address_from_slug(property_url: str) -> tuple[str, str]:
-    return _slug_to_address(property_url)
+    return derive_address_from_slug_fallback(property_url)
