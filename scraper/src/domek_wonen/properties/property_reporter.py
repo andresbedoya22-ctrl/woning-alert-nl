@@ -33,7 +33,9 @@ INVENTORY_FIELDNAMES = [
     "last_seen_at",
     "discovery_run_id",
     "extraction_confidence",
+    "address_quality",
     "needs_review",
+    "needs_review_reason",
     "review_reason",
 ]
 
@@ -63,7 +65,9 @@ CANDIDATE_FIELDNAMES = [
     "detail_extraction_status",
     "detail_error",
     "extraction_confidence",
+    "address_quality",
     "needs_review",
+    "needs_review_reason",
     "review_reason",
 ]
 
@@ -111,7 +115,9 @@ def candidate_to_row(candidate: PropertyCandidate) -> dict[str, str]:
         "detail_extraction_status": candidate.detail_extraction_status,
         "detail_error": candidate.detail_error,
         "extraction_confidence": f"{candidate.extraction_confidence:.2f}",
+        "address_quality": candidate.address_quality,
         "needs_review": "true" if candidate.needs_review else "false",
+        "needs_review_reason": candidate.needs_review_reason,
         "review_reason": candidate.review_reason,
     }
 
@@ -146,6 +152,13 @@ def render_report(
     timed_out = [result for result in failed if result.timed_out]
     by_status = Counter(record.status for record in inventory)
     by_source = Counter(record.source_id for record in inventory)
+    invalid_address_raw_count = sum(1 for record in rejected if record.needs_review_reason == "invalid_address_raw")
+    needs_review_count = sum(1 for record in inventory if record.needs_review == "true") + sum(
+        1 for record in rejected if record.needs_review == "true"
+    )
+    clean_available_properties = sum(
+        1 for record in inventory if record.status == "beschikbaar" and record.needs_review != "true"
+    )
     top_source_lines = [
         f"- {source_id}: {count}"
         for source_id, count in by_source.most_common(10)
@@ -184,7 +197,10 @@ def render_report(
             f"- Properties found: {len(candidates)}",
             f"- Properties matching ready: {len(inventory)}",
             f"- Rejected candidates: {len(rejected)}",
+            f"- Invalid address_raw: {invalid_address_raw_count}",
+            f"- Needs review: {needs_review_count}",
             f"- Available properties: {by_status.get('beschikbaar', 0)}",
+            f"- Clean available properties: {clean_available_properties}",
             f"- Under offer: {by_status.get('onder_bod', 0)}",
             f"- Sold: {by_status.get('verkocht', 0) + by_status.get('verkocht_ov', 0)}",
             f"- Unknown status: {by_status.get('unknown', 0)}",

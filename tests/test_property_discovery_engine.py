@@ -649,7 +649,7 @@ def test_property_discovery_engine_preserves_partial_results_after_worker_timeou
     assert output.sources_attempted == 1
     assert output.sources_timeout == 1
     assert output.total_property_candidates == 2
-    assert output.deduped_properties == 1
+    assert output.deduped_properties == 0
 
 
 def test_property_discovery_engine_carredewit_like_partial_timeout_does_not_drop_to_zero(tmp_path: Path, monkeypatch) -> None:
@@ -743,11 +743,147 @@ def test_property_discovery_inventory_marks_empty_address_for_review(tmp_path: P
 
     with (output.run_dir / "property_inventory.csv").open("r", encoding="utf-8", newline="") as handle:
         inventory_rows = list(csv.DictReader(handle))
+    with (output.run_dir / "rejected_property_candidates.csv").open("r", encoding="utf-8", newline="") as handle:
+        rejected_rows = list(csv.DictReader(handle))
+
+    assert inventory_rows == []
+    assert len(rejected_rows) == 1
+    assert rejected_rows[0]["address_raw"] == ""
+    assert rejected_rows[0]["address_quality"] == "invalid"
+    assert rejected_rows[0]["needs_review"] == "true"
+    assert rejected_rows[0]["needs_review_reason"] == "invalid_address_raw"
+    assert "missing address after detail extraction" in rejected_rows[0]["review_reason"]
+
+
+def test_property_discovery_invalid_address_raw_uses_slug_fallback_and_stays_in_inventory(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_worker(**kwargs):
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "properties": [
+                        {
+                            **asdict(
+                                _candidate(
+                                    property_url="https://example.nl/woningen/vier-heultjes-99-sprang-capelle",
+                                    classification="property_detail_candidate",
+                                )
+                            ),
+                            "address_raw": "k.k. Snel naar Aanbod Aankopen Verkopen",
+                            "price_raw": "EUR 425.000 k.k.",
+                            "status_raw": "beschikbaar",
+                        }
+                    ],
+                    "rejected": [],
+                    "errors": [],
+                    "duration_seconds": 0.01,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return _completed()
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+    )
+
+    with (output.run_dir / "matching_ready_inventory.csv").open("r", encoding="utf-8", newline="") as handle:
+        inventory_rows = list(csv.DictReader(handle))
 
     assert len(inventory_rows) == 1
-    assert inventory_rows[0]["address_raw"] == ""
-    assert inventory_rows[0]["needs_review"] == "true"
-    assert "missing address after detail extraction" in inventory_rows[0]["review_reason"]
+    assert inventory_rows[0]["address_raw"] == "Vier Heultjes 99"
+    assert inventory_rows[0]["city_raw"] == "Sprang-Capelle"
+    assert inventory_rows[0]["address_quality"] == "valid"
+    assert inventory_rows[0]["needs_review_reason"] == ""
+
+
+def test_property_discovery_invalid_address_raw_is_excluded_from_matching_ready_and_sent_to_rejected(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,confidence_score,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,example.nl,https://example.nl,Breda,Noord-Brabant,seed,https://example.nl/aanbod,valid,80,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_worker(**kwargs):
+        kwargs["output_path"].write_text(
+            json.dumps(
+                {
+                    "status": "succeeded",
+                    "properties": [
+                        {
+                            **asdict(
+                                _candidate(
+                                    property_url="https://example.nl/woningen/detail",
+                                    classification="property_detail_candidate",
+                                )
+                            ),
+                            "address_raw": "Diensten Verkoop Aankoop Taxatie Energielabel Snel naar Aanbod 123",
+                            "price_raw": "EUR 410.000 k.k.",
+                            "status_raw": "beschikbaar",
+                        }
+                    ],
+                    "rejected": [],
+                    "errors": [],
+                    "duration_seconds": 0.01,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return _completed()
+
+    monkeypatch.setattr("domek_wonen.properties.property_discovery_engine._run_source_worker_subprocess", fake_worker)
+
+    output = run_property_discovery(
+        province="noord-brabant",
+        max_sources=1,
+        max_properties_per_source=10,
+        source_csv_path=csv_path,
+        runs_base_dir=tmp_path / "runs",
+        latest_dir=tmp_path / "latest",
+    )
+
+    with (output.run_dir / "matching_ready_inventory.csv").open("r", encoding="utf-8", newline="") as handle:
+        inventory_rows = list(csv.DictReader(handle))
+    with (output.run_dir / "rejected_property_candidates.csv").open("r", encoding="utf-8", newline="") as handle:
+        rejected_rows = list(csv.DictReader(handle))
+
+    assert inventory_rows == []
+    assert len(rejected_rows) == 1
+    assert rejected_rows[0]["property_url"] == "https://example.nl/woningen/detail"
+    assert rejected_rows[0]["price_raw"] == "EUR 410.000 k.k."
+    assert rejected_rows[0]["status_raw"] == "beschikbaar"
+    assert rejected_rows[0]["address_quality"] == "invalid"
+    assert rejected_rows[0]["needs_review"] == "true"
+    assert rejected_rows[0]["needs_review_reason"] == "invalid_address_raw"
+    assert "invalid address_raw after quality gate" in rejected_rows[0]["review_reason"]
+
+    report_text = output.report_path.read_text(encoding="utf-8")
+    assert "- Invalid address_raw: 1" in report_text
+    assert "- Needs review: 1" in report_text
+    assert "- Clean available properties: 0" in report_text
 
 
 def test_property_discovery_rejected_candidates_skips_empty_rows(tmp_path: Path, monkeypatch) -> None:

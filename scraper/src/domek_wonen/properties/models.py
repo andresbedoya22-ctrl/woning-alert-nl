@@ -60,7 +60,9 @@ class PropertyCandidate:
     detail_extraction_status: str = "skipped"
     detail_error: str = ""
     extraction_confidence: float = 0.0
+    address_quality: str = ""
     needs_review: bool = False
+    needs_review_reason: str = ""
     review_reason: str = ""
 
 
@@ -91,7 +93,9 @@ class PropertyInventoryRecord:
     last_seen_at: str
     discovery_run_id: str
     extraction_confidence: str
+    address_quality: str
     needs_review: str
+    needs_review_reason: str
     review_reason: str
 
 
@@ -117,7 +121,9 @@ class PropertyRejectedRecord:
     detail_extraction_status: str
     detail_error: str
     extraction_confidence: str
+    address_quality: str
     needs_review: str
+    needs_review_reason: str
     review_reason: str
     candidate_type: str
     link_text: str

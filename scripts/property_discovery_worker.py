@@ -12,7 +12,8 @@ sys.path.insert(0, str(BASE_DIR))
 sys.path.insert(0, str(BASE_DIR / "scraper" / "src"))
 
 from domek_wonen.properties.listing_page_crawler import ListingPageCrawler
-from domek_wonen.properties.detail_page_extractor import DetailPageExtractor, derive_address_from_slug
+from domek_wonen.properties.address_quality import derive_address_from_slug
+from domek_wonen.properties.detail_page_extractor import DetailPageExtractor
 from domek_wonen.properties.models import PropertyCandidate, PropertySource
 from domek_wonen.properties.property_card_extractor import PropertyCardExtractor
 from domek_wonen.properties.property_discovery_engine import _annotate_candidate, _normalize_candidate
@@ -82,7 +83,9 @@ def _with_detail_status(candidate: PropertyCandidate, *, status: str) -> Propert
         detail_extraction_status=status,
         detail_error="",
         extraction_confidence=candidate.extraction_confidence,
+        address_quality=candidate.address_quality,
         needs_review=candidate.needs_review,
+        needs_review_reason=candidate.needs_review_reason,
         review_reason=candidate.review_reason,
     )
 
@@ -149,7 +152,9 @@ def _finalize_candidate(candidate: PropertyCandidate) -> PropertyCandidate:
         detail_extraction_status=candidate.detail_extraction_status,
         detail_error=candidate.detail_error,
         extraction_confidence=candidate.extraction_confidence,
+        address_quality=candidate.address_quality,
         needs_review=bool(review_reasons),
+        needs_review_reason=candidate.needs_review_reason,
         review_reason="; ".join(dict.fromkeys(review_reasons)),
     )
 
@@ -207,7 +212,9 @@ def _enrich_candidates(
                         detail_extraction_status="failed",
                         detail_error=detail_result.error or "detail page fetch failed",
                         extraction_confidence=candidate.extraction_confidence,
+                        address_quality=candidate.address_quality,
                         needs_review=candidate.needs_review,
+                        needs_review_reason=candidate.needs_review_reason,
                         review_reason=candidate.review_reason,
                     )
             except Exception as exc:
@@ -238,7 +245,9 @@ def _enrich_candidates(
                     detail_extraction_status="failed",
                     detail_error=str(exc),
                     extraction_confidence=candidate.extraction_confidence,
+                    address_quality=candidate.address_quality,
                     needs_review=candidate.needs_review,
+                    needs_review_reason=candidate.needs_review_reason,
                     review_reason=candidate.review_reason,
                 )
         enriched.append(_finalize_candidate(current))

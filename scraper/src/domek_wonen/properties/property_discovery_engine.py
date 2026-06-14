@@ -11,6 +11,7 @@ from dataclasses import fields, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .address_quality import classify_address_quality, derive_address_from_slug
 from .models import (
     CrawlResult,
     PropertyCandidate,
@@ -176,7 +177,55 @@ def _normalize_candidate(candidate: PropertyCandidate) -> PropertyCandidate:
         candidate,
         property_url=property_url or candidate.property_url,
         needs_review=bool(review_reasons),
+        needs_review_reason=candidate.needs_review_reason,
         review_reason="; ".join(dict.fromkeys(reason for reason in review_reasons if reason)),
+    )
+
+
+def _unique_reasons(*reason_groups: list[str]) -> str:
+    reasons: list[str] = []
+    for group in reason_groups:
+        reasons.extend(reason for reason in group if reason)
+    return "; ".join(dict.fromkeys(reasons))
+
+
+def _apply_address_quality_gate(candidate: PropertyCandidate) -> PropertyCandidate:
+    review_reasons = [candidate.review_reason] if candidate.review_reason else []
+    address_raw = (candidate.address_raw or "").strip()
+    city_raw = (candidate.city_raw or "").strip()
+    property_url = candidate.property_url or ""
+    address_quality = classify_address_quality(address_raw, property_url)
+    extraction_source = candidate.extraction_source
+
+    if address_quality in {"weak", "invalid"}:
+        slug_address, slug_city = derive_address_from_slug(property_url)
+        if slug_address:
+            address_raw = slug_address
+            city_raw = city_raw or slug_city
+            extraction_source = "url_slug"
+            address_quality = classify_address_quality(address_raw, property_url)
+
+    needs_review = candidate.needs_review
+    needs_review_reason = candidate.needs_review_reason
+    if address_quality != "valid":
+        if not address_raw and not city_raw:
+            if candidate.detail_extraction_status == "failed":
+                review_reasons.append("missing address after detail extraction")
+            else:
+                review_reasons.append("missing address")
+        needs_review = True
+        needs_review_reason = "invalid_address_raw"
+        review_reasons.append("invalid address_raw after quality gate")
+
+    return replace(
+        candidate,
+        address_raw=address_raw,
+        city_raw=city_raw,
+        extraction_source=extraction_source,
+        address_quality=address_quality,
+        needs_review=needs_review,
+        needs_review_reason=needs_review_reason,
+        review_reason=_unique_reasons(review_reasons),
     )
 
 
@@ -205,7 +254,9 @@ def _to_rejected_record(candidate: PropertyCandidate) -> PropertyRejectedRecord:
         detail_extraction_status=candidate.detail_extraction_status,
         detail_error=candidate.detail_error,
         extraction_confidence=f"{candidate.extraction_confidence:.2f}",
+        address_quality=candidate.address_quality,
         needs_review="true" if candidate.needs_review else "false",
+        needs_review_reason=candidate.needs_review_reason,
         review_reason=candidate.review_reason,
         candidate_type=candidate.candidate_type,
         link_text=candidate.link_text,
@@ -226,7 +277,9 @@ def _annotate_candidate(candidate: PropertyCandidate, url_classifier: PropertyUr
         excluded_reason=classification.excluded_reason,
         is_property_like=classification.is_property_like,
         property_url_classification=classification.classification,
+        address_quality=candidate.address_quality,
         needs_review=bool(candidate.needs_review or review_reasons),
+        needs_review_reason=candidate.needs_review_reason,
         review_reason="; ".join(dict.fromkeys(reason for reason in review_reasons if reason)),
     )
 
@@ -275,7 +328,9 @@ def _to_inventory_record(
         last_seen_at=run_id,
         discovery_run_id=run_id,
         extraction_confidence=f"{candidate.extraction_confidence:.2f}",
+        address_quality=candidate.address_quality,
         needs_review="true" if review_reasons else "false",
+        needs_review_reason=candidate.needs_review_reason if review_reasons else "",
         review_reason="; ".join(dict.fromkeys(review_reasons)),
     )
 
@@ -287,12 +342,12 @@ def _build_outputs(
     dedupe: PropertyDedupe,
     classifier: PropertyStatusClassifier,
 ) -> tuple[list[PropertyCandidate], list[PropertyCandidate], list[PropertyInventoryRecord], list[PropertyRejectedRecord]]:
-    deduped_candidates = dedupe.dedupe(candidates)
+    deduped_candidates = [_apply_address_quality_gate(candidate) for candidate in dedupe.dedupe(candidates)]
     accepted_candidates: list[PropertyCandidate] = []
     rejected_candidates: list[PropertyCandidate] = []
 
     for candidate in deduped_candidates:
-        if candidate.property_url_classification == "property_detail_candidate":
+        if candidate.property_url_classification == "property_detail_candidate" and candidate.address_quality == "valid":
             accepted_candidates.append(candidate)
         else:
             rejected_candidates.append(candidate)
@@ -323,7 +378,15 @@ def _write_checkpoint(
     rejected_rows = [
         rejected_to_row(record)
         for record in rejected
-        if (record.property_url or "").strip() or (record.rejection_reason or "").strip()
+        if any(
+            (
+                (record.property_url or "").strip(),
+                (record.address_raw or "").strip(),
+                (record.city_raw or "").strip(),
+                (record.price_raw or "").strip(),
+                (record.status_raw or "").strip(),
+            )
+        )
     ]
 
     write_csv(run_dir / "property_candidates.csv", candidate_rows, CANDIDATE_FIELDNAMES)
