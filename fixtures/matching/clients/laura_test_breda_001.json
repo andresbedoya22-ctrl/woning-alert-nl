@@ -1,0 +1,20 @@
+{
+  "client_id": "laura_test_breda_001",
+  "max_budget_eur": 500000,
+  "preferred_cities": [
+    "Breda",
+    "Bergen op Zoom",
+    "Oosterhout",
+    "Etten-Leur",
+    "'s-Hertogenbosch"
+  ],
+  "min_rooms": 3,
+  "min_m2": 80,
+  "preferred_energy_labels": [
+    "A",
+    "B",
+    "C"
+  ],
+  "wants_garden_or_balcony": true,
+  "language": "es"
+}
