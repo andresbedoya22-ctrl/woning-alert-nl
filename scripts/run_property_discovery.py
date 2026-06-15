@@ -44,6 +44,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--disable-detail-extraction", action="store_true", help="Disable optional detail page enrichment")
     parser.add_argument("--platform", default="", help="Only process sources detected for a specific platform, e.g. realworks")
+    parser.add_argument("--source-domain", default="", help="Only process a specific root domain, e.g. kinmakelaars.nl")
     parser.add_argument(
         "--platform-fingerprint-input",
         type=Path,
@@ -91,6 +92,7 @@ def _effective_options(args: argparse.Namespace) -> dict[str, int | bool | str]:
         "disable_detail_extraction": args.disable_detail_extraction,
         "platform": args.platform,
         "platform_fingerprint_input": args.platform_fingerprint_input,
+        "source_domain": args.source_domain,
         "disable_platform_parsers": args.disable_platform_parsers,
         "include_invalid_sources": args.include_invalid_sources,
         "verbose": True,

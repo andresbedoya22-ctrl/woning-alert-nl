@@ -8,15 +8,26 @@ sys.path.insert(0, str(BASE_DIR / "scraper" / "src"))
 
 from domek_wonen.discovery.website_fetcher import FetchResponse
 from domek_wonen.properties.models import PropertySource
-from domek_wonen.properties.platform_parsers.realworks_parser import RealworksParser, parse_realworks_address_city_from_url
+from domek_wonen.properties.platform_parsers.realworks_parser import (
+    RealworksParser,
+    normalize_kin_city_from_url,
+    parse_realworks_address_city_from_url,
+)
+from domek_wonen.properties.property_status_classifier import parse_price_eur
 
 
-def _source(*, aanbod_url: str = "https://example.nl/aanbod/woningaanbod") -> PropertySource:
+def _source(
+    *,
+    aanbod_url: str = "https://example.nl/aanbod/woningaanbod",
+    source_id: str = "example.nl",
+    root_domain: str = "example.nl",
+    website: str = "https://example.nl",
+) -> PropertySource:
     return PropertySource(
-        source_id="example.nl",
+        source_id=source_id,
         office_name="Example",
-        root_domain="example.nl",
-        website="https://example.nl",
+        root_domain=root_domain,
+        website=website,
         aanbod_url=aanbod_url,
         gemeente="Breda",
         province="Noord-Brabant",
@@ -57,6 +68,7 @@ def test_realworks_parser_derives_listing_candidates_when_aanbod_url_missing() -
         "https://example.nl/aanbod/woningaanbod/koop",
         "https://example.nl/aanbod/woningen",
         "https://example.nl/wonen",
+        "https://example.nl/aanbod/wonen/te-koop",
     ]
 
 
@@ -79,6 +91,13 @@ def test_realworks_parser_parses_house_slug_address_and_city() -> None:
 
     assert address_raw == "Mgr. van Dijkstraat 2"
     assert city_raw == "Asten"
+
+
+def test_realworks_parser_normalizes_kin_city_from_url() -> None:
+    assert (
+        normalize_kin_city_from_url("https://www.kinmakelaars.nl/aanbod/wonen/tilburg/trouwlaan-285/6a2bf64c53154f207c087a8e")
+        == "Tilburg"
+    )
 
 
 def test_realworks_parser_extracts_address_price_and_status_from_detail_fixture(monkeypatch) -> None:
@@ -188,3 +207,82 @@ def test_realworks_parser_ignores_realworks_filter_urls() -> None:
     assert detail_urls == [
         "https://example.nl/aanbod/woningaanbod/asten/koop/huis-10218392-hulterman-29",
     ]
+
+
+def test_realworks_parser_detects_kin_ogonline_detail_urls_from_snapshot_fixture() -> None:
+    parser = RealworksParser()
+    fixture_html = (BASE_DIR / "tests" / "fixtures" / "properties" / "kin_ogonline_listing.html").read_text(
+        encoding="utf-8"
+    )
+
+    detail_urls = parser.extract_detail_urls(
+        "https://www.kinmakelaars.nl/aanbod/wonen/te-koop",
+        fixture_html,
+        root_domain="kinmakelaars.nl",
+    )
+
+    assert detail_urls == [
+        "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/trouwlaan-285/6a2bf64c53154f207c087a8e",
+        "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/roemerhof-16/6a29685e53154f207cdd5c04",
+    ]
+
+
+def test_realworks_parser_extracts_kin_listing_fields_when_detail_fetch_fails(monkeypatch) -> None:
+    listing_html = (BASE_DIR / "tests" / "fixtures" / "properties" / "kin_ogonline_listing.html").read_text(
+        encoding="utf-8"
+    )
+
+    class FakeFetcher:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+        def fetch(self, url: str) -> FetchResponse:
+            if url.rstrip("/") == "https://www.kinmakelaars.nl/aanbod/wonen/te-koop":
+                return FetchResponse(url=url, status_code=200, text=listing_html)
+            return FetchResponse(url=url, error="detail fetch intentionally skipped")
+
+        def extract_internal_links(self, base_url: str, html: str) -> list[str]:
+            from domek_wonen.discovery.website_fetcher import WebsiteFetcher
+
+            helper = WebsiteFetcher(timeout_seconds=1, delay_seconds=0)
+            try:
+                return helper.extract_internal_links(base_url, html)
+            finally:
+                helper.close()
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr("domek_wonen.properties.platform_parsers.realworks_parser.WebsiteFetcher", FakeFetcher)
+
+    candidates = RealworksParser().parse(
+        _source(
+            aanbod_url="http://www.kinmakelaars.nl/aanbod/wonen/te-koop",
+            source_id="kinmakelaars.nl",
+            root_domain="kinmakelaars.nl",
+            website="http://www.kinmakelaars.nl",
+        ),
+        max_properties_per_source=2,
+        page_timeout_seconds=5,
+    )
+
+    assert len(candidates) == 2
+    assert [candidate.property_url for candidate in candidates] == [
+        "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/trouwlaan-285/6a2bf64c53154f207c087a8e",
+        "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/roemerhof-16/6a29685e53154f207cdd5c04",
+    ]
+    assert candidates[0].source_url == "https://www.kinmakelaars.nl/aanbod/wonen/te-koop"
+    assert candidates[0].address_raw == "Trouwlaan 285"
+    assert candidates[0].city_raw == "Tilburg"
+    assert candidates[0].city_raw != "Galerijflat In Tilburg"
+    assert "220.000" in candidates[0].price_raw
+    assert parse_price_eur(candidates[0].price_raw) == "220000"
+    assert candidates[0].status_raw == "Nieuw"
+    assert candidates[0].living_area_raw.startswith("38")
+    assert candidates[0].rooms_raw == "2 kamers"
+    assert candidates[0].rooms_count == "2"
+    assert candidates[0].living_area_m2 == "38"
+    assert candidates[0].property_type == "apartment"
+    assert candidates[0].image_url == "https://media02.ogonline.nl/pl-import/66aa38af0773b21cac8f8da0/6a2bf64c53154f207c087a8e/rw-api-sha/trouwlaan-285.jpg"
+    assert candidates[0].detail_extraction_status == "failed"
+    assert candidates[1].address_raw == "Roemerhof 16"

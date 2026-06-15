@@ -28,6 +28,7 @@ No commitear outputs generados por ejecuciones del pipeline, especialmente:
 - `data/discovery/platform_fingerprint/`
 - `data/email_previews/`
 - `data/matching/`
+- `data/source_debug/`
 
 Si un cambio necesita ejemplos o evidencia, referenciar los archivos generados localmente sin agregarlos al commit.
 

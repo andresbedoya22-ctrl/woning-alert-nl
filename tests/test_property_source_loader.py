@@ -32,6 +32,24 @@ def test_source_loader_keeps_only_active_official_valid_sources(tmp_path: Path) 
     assert SourceLoader(csv_path).load(province="noord-brabant", include_invalid_sources=True)[-2].source_id == "bad-4"
 
 
+def test_source_loader_filters_by_source_domain(tmp_path: Path) -> None:
+    csv_path = tmp_path / "sources.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "source_id,office_name,root_domain,website,gemeente,province,source_origin,aanbod_url,aanbod_url_quality,aanbod_url_type,confidence_score,source_quality_status,source_quality_reason,needs_review,review_reason,legal_status,last_seen_at,last_audited_at,is_active",
+                "ok-1,Official One,kinmakelaars.nl,https://kinmakelaars.nl,Breda,Noord-Brabant,seed,https://kinmakelaars.nl/aanbod,valid,listing_index,80,valid,,false,,allowed_official_source,20260613T000000Z,,true",
+                "ok-2,Official Two,other.nl,https://other.nl,Breda,Noord-Brabant,seed,https://other.nl/aanbod,valid,listing_index,80,valid,,false,,allowed_official_source,20260613T000000Z,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    sources = SourceLoader(csv_path).load(province="noord-brabant", source_domain="kinmakelaars.nl")
+
+    assert [source.source_id for source in sources] == ["ok-1"]
+
+
 def test_source_loader_raises_clear_error_when_csv_is_missing(tmp_path: Path) -> None:
     missing_path = tmp_path / "makelaar_sources_master.csv"
 

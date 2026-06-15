@@ -35,6 +35,9 @@ data/discovery/platform_fingerprint/
 data/discovery/cache/
 data/email_previews/
 data/matching/
+data/platform_fingerprint/
 data/property_discovery/
 data/properties/latest/
 data/properties/runs/
+data/source_capture_audit/
+data/source_debug/

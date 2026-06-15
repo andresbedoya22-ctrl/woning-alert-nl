@@ -792,6 +792,7 @@ def run_property_discovery(
     disable_detail_extraction: bool = False,
     platform: str = "",
     platform_fingerprint_input: Path = DEFAULT_PLATFORM_FINGERPRINT_INPUT,
+    source_domain: str = "",
     disable_platform_parsers: bool = False,
     include_invalid_sources: bool = False,
     verbose: bool = True,
@@ -813,7 +814,8 @@ def run_property_discovery(
             f"timeout_ms={timeout_ms} source_timeout_seconds={source_timeout_seconds} "
             f"page_timeout_seconds={page_timeout_seconds} max_detail_pages={max_detail_pages} "
             f"detail_timeout_seconds={detail_timeout_seconds} disable_detail_extraction={disable_detail_extraction} "
-            f"platform={platform or 'all'} disable_platform_parsers={disable_platform_parsers} output_dir={run_dir}"
+            f"platform={platform or 'all'} source_domain={source_domain or 'all'} "
+            f"disable_platform_parsers={disable_platform_parsers} output_dir={run_dir}"
         )
 
     restore_latest_discovery_if_missing(source_csv_path)
@@ -825,6 +827,7 @@ def run_property_discovery(
             include_invalid_sources=include_invalid_sources,
             platform_filter=platform,
             platform_fingerprint_path=platform_fingerprint_input,
+            source_domain=source_domain,
         )
     except MissingSourceFileError as exc:
         finished_at = _utc_now()

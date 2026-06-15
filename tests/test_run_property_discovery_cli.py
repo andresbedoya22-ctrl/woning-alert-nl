@@ -53,6 +53,8 @@ def test_property_cli_parse_args(monkeypatch) -> None:
             "--disable-detail-extraction",
             "--platform",
             "realworks",
+            "--source-domain",
+            "kinmakelaars.nl",
             "--platform-fingerprint-input",
             "custom-platforms.csv",
             "--disable-platform-parsers",
@@ -72,6 +74,7 @@ def test_property_cli_parse_args(monkeypatch) -> None:
     assert args.detail_timeout_seconds == 10
     assert args.disable_detail_extraction is True
     assert args.platform == "realworks"
+    assert args.source_domain == "kinmakelaars.nl"
     assert args.platform_fingerprint_input == Path("custom-platforms.csv")
     assert args.disable_platform_parsers is True
     assert args.include_invalid_sources is True
@@ -117,6 +120,7 @@ def test_property_cli_main_supports_zero_max_sources(monkeypatch, tmp_path: Path
             "disable_detail_extraction": False,
             "platform": "",
             "platform_fingerprint_input": DEFAULT_PLATFORM_FINGERPRINT_INPUT,
+            "source_domain": "",
             "disable_platform_parsers": False,
             "include_invalid_sources": False,
             "verbose": True,
@@ -136,6 +140,7 @@ def test_property_cli_smoke_defaults() -> None:
     assert options["detail_timeout_seconds"] == 5
     assert options["platform"] == ""
     assert options["platform_fingerprint_input"] == DEFAULT_PLATFORM_FINGERPRINT_INPUT
+    assert options["source_domain"] == ""
     assert options["disable_platform_parsers"] is False
     assert options["include_invalid_sources"] is False
 

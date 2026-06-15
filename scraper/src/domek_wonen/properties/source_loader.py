@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .models import PropertySource
 from .platform_parser_registry import detect_platform_for_row, load_platform_assignments
@@ -34,11 +35,13 @@ class SourceLoader:
         include_invalid_sources: bool = False,
         platform_filter: str = "",
         platform_fingerprint_path: Path | None = None,
+        source_domain: str = "",
     ) -> list[PropertySource]:
         target_province = normalize_province(province)
         loaded: list[PropertySource] = []
         platform_assignments = load_platform_assignments(platform_fingerprint_path) if platform_fingerprint_path else {}
         normalized_platform_filter = (platform_filter or "").strip().lower()
+        normalized_source_domain = _normalize_source_domain(source_domain)
         self.last_skipped_invalid_aanbod_url_count = 0
         if not self.csv_path.exists():
             raise MissingSourceFileError(self.csv_path)
@@ -53,6 +56,8 @@ class SourceLoader:
                     detected_platform=detected_platform,
                 )
                 if source is None:
+                    continue
+                if normalized_source_domain and source.root_domain != normalized_source_domain:
                     continue
                 if target_province and source.province != target_province:
                     continue
@@ -108,3 +113,12 @@ class SourceLoader:
             source_origin=(row.get("source_origin") or "").strip(),
             detected_platform=detected_platform,
         )
+
+
+def _normalize_source_domain(value: str) -> str:
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        return ""
+    if normalized.startswith(("http://", "https://")):
+        return (urlsplit(normalized).netloc or "").strip().lower()
+    return normalized.strip("/")
