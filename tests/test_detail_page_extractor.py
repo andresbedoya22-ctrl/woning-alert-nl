@@ -36,6 +36,7 @@ def test_detail_page_extractor_extracts_address_from_h1() -> None:
     assert enriched.status_raw.lower() == "beschikbaar"
     assert enriched.rooms_raw == "5 kamers"
     assert enriched.bedrooms_count == ""
+    assert enriched.property_type == ""
     assert enriched.energy_label == "A"
     assert enriched.extraction_source == "detail_page"
     assert enriched.detail_extraction_status == "succeeded"
@@ -65,6 +66,27 @@ def test_detail_page_extractor_extracts_bedrooms_without_promoting_ambiguous_kam
     assert enriched.bedrooms_count == "3"
     assert enriched.living_area_m2 == "101"
     assert enriched.has_balcony == "false"
+
+
+def test_detail_page_extractor_extracts_property_type_signals() -> None:
+    apartment = DetailPageExtractor().enrich(
+        _candidate("https://example.nl/woningen/appartement-1-breda"),
+        """
+        <html><body><div>Type woning Appartement</div></body></html>
+        """,
+        "https://example.nl/woningen/appartement-1-breda",
+    )
+
+    house = DetailPageExtractor().enrich(
+        _candidate("https://example.nl/woningen/woonhuis-1-breda"),
+        """
+        <html><body><div>Soort woning Woonhuis</div></body></html>
+        """,
+        "https://example.nl/woningen/woonhuis-1-breda",
+    )
+
+    assert apartment.property_type == "apartment"
+    assert house.property_type == "house"
 
 
 def test_detail_page_extractor_fallback_from_url_slug_is_legible() -> None:

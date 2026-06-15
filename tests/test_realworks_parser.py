@@ -126,6 +126,7 @@ def test_realworks_parser_extracts_address_price_and_status_from_detail_fixture(
     assert candidates[0].rooms_count == "5"
     assert candidates[0].bedrooms_count == "3"
     assert candidates[0].living_area_m2 == "123"
+    assert candidates[0].property_type == "apartment"
     assert candidates[0].energy_label == "A"
     assert candidates[0].has_garden == "true"
     assert candidates[0].has_balcony == "true"

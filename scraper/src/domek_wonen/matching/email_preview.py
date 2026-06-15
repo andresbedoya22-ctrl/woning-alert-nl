@@ -30,6 +30,8 @@ EXCLUSION_REASONS = (
     "excluded_missing_bedrooms",
     "excluded_over_budget",
     "excluded_bedrooms_below_min",
+    "excluded_missing_property_type",
+    "excluded_wrong_property_type",
 )
 _REPORT_VALUE_RE = re.compile(r"^- ([^:]+): (.+)$", re.MULTILINE)
 
@@ -407,6 +409,7 @@ def _render_match_card(
     <div class="score">Score<br />{escape(row.get("score", "") or "-")}</div>
   </div>
   <div class="meta">
+    {_render_meta_item(language, "property_type", row.get("property_type", "") or "-")}
     {_render_meta_item(language, "address", row.get("address_raw", "") or address_fallback)}
     {_render_meta_item(language, "city", row.get("city_raw", "") or "-")}
     {_render_meta_item(language, "price", _format_currency(row.get("price_eur", "")))}
@@ -439,17 +442,18 @@ def _build_advisor_review_report(
     top_matches: list[dict[str, str]],
 ) -> str:
     top_lines = [
-        "| # | property_id | address | city | price_eur | bedrooms | m2 | energy | score | warnings |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| # | property_id | address | city | price_eur | property_type | bedrooms | m2 | energy | score | warnings |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for index, row in enumerate(top_matches, start=1):
         top_lines.append(
-            "| {index} | {property_id} | {address} | {city} | {price} | {bedrooms} | {m2} | {energy} | {score} | {warnings} |".format(
+            "| {index} | {property_id} | {address} | {city} | {price} | {property_type} | {bedrooms} | {m2} | {energy} | {score} | {warnings} |".format(
                 index=index,
                 property_id=row.get("property_id", "") or "-",
                 address=row.get("address_raw", "") or "-",
                 city=row.get("city_raw", "") or "-",
                 price=row.get("price_eur", "") or "-",
+                property_type=row.get("property_type", "") or "-",
                 bedrooms=row.get("bedrooms_count", "") or "-",
                 m2=row.get("living_area_m2", "") or "-",
                 energy=row.get("energy_label", "") or "-",
@@ -458,7 +462,7 @@ def _build_advisor_review_report(
             )
         )
     if len(top_lines) == 2:
-        top_lines.append("| - | - | - | - | - | - | - | - | - | No matches |")
+        top_lines.append("| - | - | - | - | - | - | - | - | - | - | No matches |")
 
     warning_lines = ["- None"] if not warning_counts else [
         f"- {warning}: {count}" for warning, count in sorted(warning_counts.items(), key=lambda item: (-item[1], item[0]))
@@ -569,16 +573,20 @@ def _explain_match(*, language: str, client: ClientProfile, row: dict[str, str])
         elif city in client.target_cities or city in client.compatible_cities:
             reasons.append(_translate(language, "target_area", city))
 
+    property_type = row.get("property_type", "").strip()
+    if property_type and client.required_property_types:
+        reasons.append(_translate(language, "property_type_ok", property_type))
+
     bedrooms = _parse_optional_int(row.get("bedrooms_count"))
     if bedrooms is not None and bedrooms >= client.min_bedrooms:
         reasons.append(_translate(language, "bedrooms_ok", str(bedrooms)))
 
     m2 = _parse_optional_int(row.get("living_area_m2"))
-    if m2 is not None and m2 >= client.min_m2:
+    if m2 is not None and (client.min_m2 is None or m2 >= client.min_m2):
         reasons.append(_translate(language, "m2_ok", str(m2)))
 
     energy_label = (row.get("energy_label", "") or "").strip().upper()
-    if energy_label and energy_label in client.preferred_energy_labels:
+    if client.energy_label_is_relevant and energy_label and energy_label in client.preferred_energy_labels:
         reasons.append(_translate(language, "energy_ok", energy_label))
 
     if _row_has_outdoor_space(row):
@@ -630,6 +638,8 @@ def _render_meta_item(language: str, key: str, value: str) -> str:
             "energy_label": "Energielabel",
         },
     }
+    labels["es"]["property_type"] = "Tipo de vivienda"
+    labels["nl"]["property_type"] = "Woningtype"
     label = labels[language][key]
     return (
         f"<div class='meta-item'><span class='meta-label'>{escape(label)}</span>"
@@ -691,6 +701,8 @@ def _translate(language: str, key: str, *args: str) -> str:
             "fallback_explanation": "Score {0}. Deze woning verschijnt omdat hij de harde filters haalt en genoeg signalen heeft voor review.",
         },
     }
+    translations["es"]["property_type_ok"] = "tiene tipo de vivienda compatible ({0})"
+    translations["nl"]["property_type_ok"] = "heeft een passend woningtype ({0})"
     return translations[language][key].format(*args)
 
 

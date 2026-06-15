@@ -9,6 +9,7 @@ from domek_wonen.matching.matching_v1 import run_matching_v1
 
 
 CLIENT_FIXTURE = Path("fixtures/matching/clients/client_test_brabant_001.json")
+APARTMENT_CLIENT_FIXTURE = Path("fixtures/matching/clients/client_test_apartment_260k_001.json")
 FIELDNAMES = [
     "property_id",
     "address_raw",
@@ -18,6 +19,7 @@ FIELDNAMES = [
     "status",
     "needs_review",
     "address_quality",
+    "property_type",
     "rooms",
     "rooms_raw",
     "rooms_count",
@@ -50,12 +52,13 @@ def _base_row(property_id: str, **overrides: str) -> dict[str, str]:
         "status": "beschikbaar",
         "needs_review": "false",
         "address_quality": "valid",
+        "property_type": "house",
         "rooms": "4",
         "rooms_raw": "4 kamers",
         "rooms_count": "4",
         "bedrooms_count": "3",
         "m2": "95",
-        "living_area_raw": "95 mÂ²",
+        "living_area_raw": "95 m2",
         "living_area_m2": "95",
         "energy_label": "B",
         "has_garden": "true",
@@ -241,3 +244,130 @@ def test_matching_v1_preferred_cities_do_not_open_hard_filter(tmp_path: Path) ->
 
     assert result.total_hard_filter_passed == 0
     assert rows[0]["exclusion_reason"] == "excluded_outside_target_area"
+
+
+def test_matching_v1_excludes_wrong_property_type(tmp_path: Path) -> None:
+    inventory_csv_path = tmp_path / "property_discovery" / "runs" / "20260614T184638Z" / "matching_ready_inventory.csv"
+    _write_inventory_csv(
+        inventory_csv_path,
+        [
+            _base_row(
+                "wrong_type",
+                city_raw="Tilburg",
+                gemeente="Tilburg",
+                price_eur="250000",
+                bedrooms_count="2",
+                property_type="house",
+            ),
+        ],
+    )
+
+    result = run_matching_v1(
+        inventory_csv_path=inventory_csv_path,
+        client_fixture_path=APARTMENT_CLIENT_FIXTURE,
+        matching_runs_dir=tmp_path / "matching" / "runs",
+    )
+
+    with result.results_path.open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert result.total_hard_filter_passed == 0
+    assert result.exclusion_counts["excluded_wrong_property_type"] == 1
+    assert rows[0]["exclusion_reason"] == "excluded_wrong_property_type"
+
+
+def test_matching_v1_excludes_missing_property_type_when_required(tmp_path: Path) -> None:
+    inventory_csv_path = tmp_path / "property_discovery" / "runs" / "20260614T184638Z" / "matching_ready_inventory.csv"
+    _write_inventory_csv(
+        inventory_csv_path,
+        [
+            _base_row(
+                "missing_type",
+                city_raw="Tilburg",
+                gemeente="Tilburg",
+                price_eur="250000",
+                bedrooms_count="2",
+                property_type="",
+            ),
+        ],
+    )
+
+    result = run_matching_v1(
+        inventory_csv_path=inventory_csv_path,
+        client_fixture_path=APARTMENT_CLIENT_FIXTURE,
+        matching_runs_dir=tmp_path / "matching" / "runs",
+    )
+
+    with result.results_path.open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert result.total_hard_filter_passed == 0
+    assert result.exclusion_counts["excluded_missing_property_type"] == 1
+    assert rows[0]["exclusion_reason"] == "excluded_missing_property_type"
+
+
+def test_matching_v1_ignores_energy_label_when_not_relevant(tmp_path: Path) -> None:
+    inventory_csv_path = tmp_path / "property_discovery" / "runs" / "20260614T184638Z" / "matching_ready_inventory.csv"
+    _write_inventory_csv(
+        inventory_csv_path,
+        [
+            _base_row(
+                "apartment_without_energy",
+                city_raw="Tilburg",
+                gemeente="Tilburg",
+                price_eur="250000",
+                bedrooms_count="1",
+                property_type="apartment",
+                energy_label="",
+                has_garden="",
+                has_balcony="",
+            ),
+        ],
+    )
+
+    result = run_matching_v1(
+        inventory_csv_path=inventory_csv_path,
+        client_fixture_path=APARTMENT_CLIENT_FIXTURE,
+        matching_runs_dir=tmp_path / "matching" / "runs",
+    )
+
+    with result.results_path.open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert result.total_hard_filter_passed == 1
+    assert result.warning_counts == {}
+    assert rows[0]["hard_filter_passed"] == "true"
+    assert rows[0]["warnings"] == ""
+
+
+def test_matching_v1_runs_for_apartment_260k_client(tmp_path: Path) -> None:
+    inventory_csv_path = tmp_path / "property_discovery" / "runs" / "20260614T184638Z" / "matching_ready_inventory.csv"
+    _write_inventory_csv(
+        inventory_csv_path,
+        [
+            _base_row(
+                "apartment_match",
+                city_raw="Waalwijk",
+                gemeente="Waalwijk",
+                price_eur="255000",
+                bedrooms_count="1",
+                property_type="studio",
+                energy_label="G",
+                has_garden="",
+                has_balcony="true",
+            ),
+        ],
+    )
+
+    result = run_matching_v1(
+        inventory_csv_path=inventory_csv_path,
+        client_fixture_path=APARTMENT_CLIENT_FIXTURE,
+        matching_runs_dir=tmp_path / "matching" / "runs",
+    )
+
+    with result.results_path.open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert result.client_id == "client_test_apartment_260k_001"
+    assert result.total_hard_filter_passed == 1
+    assert rows[0]["property_type"] == "studio"

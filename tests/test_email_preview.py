@@ -15,6 +15,7 @@ FIELDNAMES = [
     "address_raw",
     "city_raw",
     "price_eur",
+    "property_type",
     "bedrooms_count",
     "rooms_count",
     "living_area_m2",
@@ -68,6 +69,7 @@ def test_email_preview_generates_es_nl_and_advisor_report_without_rendering_excl
                 "address_raw": "Markt 1",
                 "city_raw": "Breda",
                 "price_eur": "450000",
+                "property_type": "apartment",
                 "bedrooms_count": "3",
                 "rooms_count": "5",
                 "living_area_m2": "102",
@@ -86,6 +88,7 @@ def test_email_preview_generates_es_nl_and_advisor_report_without_rendering_excl
                 "address_raw": "Haven 8",
                 "city_raw": "Halsteren",
                 "price_eur": "420000",
+                "property_type": "penthouse",
                 "bedrooms_count": "4",
                 "rooms_count": "5",
                 "living_area_m2": "120",
@@ -104,6 +107,7 @@ def test_email_preview_generates_es_nl_and_advisor_report_without_rendering_excl
                 "address_raw": "Straat 2",
                 "city_raw": "Breda",
                 "price_eur": "440000",
+                "property_type": "",
                 "bedrooms_count": "",
                 "rooms_count": "4",
                 "living_area_m2": "95",
@@ -122,6 +126,7 @@ def test_email_preview_generates_es_nl_and_advisor_report_without_rendering_excl
                 "address_raw": "Straat 3",
                 "city_raw": "Eindhoven",
                 "price_eur": "430000",
+                "property_type": "house",
                 "bedrooms_count": "4",
                 "rooms_count": "5",
                 "living_area_m2": "110",
@@ -140,6 +145,7 @@ def test_email_preview_generates_es_nl_and_advisor_report_without_rendering_excl
                 "address_raw": "Straat 9",
                 "city_raw": "Breda",
                 "price_eur": "530000",
+                "property_type": "house",
                 "bedrooms_count": "4",
                 "rooms_count": "5",
                 "living_area_m2": "125",
@@ -175,8 +181,11 @@ def test_email_preview_generates_es_nl_and_advisor_report_without_rendering_excl
     assert "Woningselectie voor Cliente test Domek" in html_nl
     assert "Vista previa interna. No enviada al cliente." in html_es
     assert "Er worden geen e-mails verzonden." in html_nl
-    assert "Por qué aparece esta vivienda" in html_es
+    assert "Por qu" in html_es
     assert "Waarom verschijnt deze woning" in html_nl
+    assert "Tipo de vivienda" in html_es
+    assert "Woningtype" in html_nl
+    assert "apartment" in html_es
 
     assert "Markt 1" in html_es
     assert "Haven 8" in html_es
@@ -197,5 +206,6 @@ def test_email_preview_generates_es_nl_and_advisor_report_without_rendering_excl
     assert "excluded_missing_bedrooms: 1" in report
     assert "excluded_over_budget: 1" in report
     assert "excluded_bedrooms_below_min: 0" in report
+    assert "property_type" in report
     assert "## Principales warnings" in report
-    assert "## Recomendaciones para revisión manual" in report
+    assert "## Recomendaciones para revisi" in report

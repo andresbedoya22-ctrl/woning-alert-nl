@@ -22,6 +22,18 @@ LIVING_AREA_PATTERN = r"\d+\s?m[²2]\s*(?:woonoppervlakte|wonen|living)?"
 PLOT_AREA_PATTERN = r"\d+\s?m[²2]\s*(?:perceel|plot|kavel)"
 ROOMS_PATTERN = r"\d+\s*(?:kamers?|rooms?)"
 ENERGY_LABEL_PATTERN = r"(?:energielabel|energy label)\s*[:\-]?\s*([a-g]\+{0,3})"
+PROPERTY_TYPE_PATTERNS = (
+    (re.compile(r"\b(?:type woning|soort woning)\s*[:\-]?\s*appartement\b", flags=re.IGNORECASE), "apartment"),
+    (re.compile(r"\bappartement\b", flags=re.IGNORECASE), "apartment"),
+    (re.compile(r"\b(?:type woning|soort woning)\s*[:\-]?\s*woonhuis\b", flags=re.IGNORECASE), "house"),
+    (re.compile(r"\bwoonhuis\b", flags=re.IGNORECASE), "house"),
+    (re.compile(r"\b(?:type woning|soort woning)\s*[:\-]?\s*studio\b", flags=re.IGNORECASE), "studio"),
+    (re.compile(r"\bstudio\b", flags=re.IGNORECASE), "studio"),
+    (re.compile(r"\b(?:type woning|soort woning)\s*[:\-]?\s*maisonnette\b", flags=re.IGNORECASE), "maisonette"),
+    (re.compile(r"\bmaisonnette\b", flags=re.IGNORECASE), "maisonette"),
+    (re.compile(r"\b(?:type woning|soort woning)\s*[:\-]?\s*penthouse\b", flags=re.IGNORECASE), "penthouse"),
+    (re.compile(r"\bpenthouse\b", flags=re.IGNORECASE), "penthouse"),
+)
 BEDROOMS_PATTERNS = (
     re.compile(r"\b(\d+)\s*(?:slaapkamers?|bedrooms?)\b", flags=re.IGNORECASE),
     re.compile(r"\b(?:aantal\s+)?(?:slaapkamers?|bedrooms?)\s*[:\-]?\s*(\d+)\b", flags=re.IGNORECASE),
@@ -123,6 +135,13 @@ def _extract_energy_label(text: str) -> str:
     return match.group(1).upper() if match else ""
 
 
+def _extract_property_type(text: str) -> str:
+    for pattern, normalized_value in PROPERTY_TYPE_PATTERNS:
+        if pattern.search(text or ""):
+            return normalized_value
+    return ""
+
+
 def _extract_first_count(text: str, patterns: tuple[re.Pattern[str], ...]) -> str:
     for pattern in patterns:
         match = pattern.search(text or "")
@@ -218,6 +237,7 @@ class DetailPageExtractor:
         rooms_count = candidate.rooms_count
         bedrooms_count = candidate.bedrooms_count
         living_area_m2 = candidate.living_area_m2
+        property_type = candidate.property_type
         energy_label = candidate.energy_label
         has_garden = candidate.has_garden
         has_balcony = candidate.has_balcony
@@ -240,6 +260,8 @@ class DetailPageExtractor:
                 bedrooms_count = _extract_first_count(text, BEDROOMS_PATTERNS)
             if not living_area_m2:
                 living_area_m2 = _extract_first_count(text, LIVING_AREA_M2_PATTERNS)
+            if not property_type:
+                property_type = _extract_property_type(text)
             if not energy_label:
                 energy_label = _extract_energy_label(text)
             if not has_garden:
@@ -265,6 +287,7 @@ class DetailPageExtractor:
                 rooms_count != candidate.rooms_count and bool(rooms_count),
                 bedrooms_count != candidate.bedrooms_count and bool(bedrooms_count),
                 living_area_m2 != candidate.living_area_m2 and bool(living_area_m2),
+                property_type != candidate.property_type and bool(property_type),
                 energy_label != candidate.energy_label and bool(energy_label),
                 has_garden != candidate.has_garden and bool(has_garden),
                 has_balcony != candidate.has_balcony and bool(has_balcony),
@@ -284,6 +307,7 @@ class DetailPageExtractor:
             rooms_count=rooms_count,
             bedrooms_count=bedrooms_count,
             living_area_m2=living_area_m2,
+            property_type=property_type,
             energy_label=energy_label,
             has_garden=has_garden,
             has_balcony=has_balcony,

@@ -19,12 +19,16 @@ _NUMBER_RE = re.compile(r"(\d+)")
 @dataclass(frozen=True)
 class ClientProfile:
     client_id: str
+    name: str
     max_budget_eur: int
     target_cities: tuple[str, ...]
     compatible_cities: tuple[str, ...]
     preferred_cities: tuple[str, ...]
+    required_property_types: tuple[str, ...]
     min_bedrooms: int
-    min_m2: int
+    min_m2: int | None
+    energy_label_min: str
+    energy_label_is_relevant: bool
     preferred_energy_labels: tuple[str, ...]
     wants_garden_or_balcony: bool
     language: str
@@ -50,15 +54,28 @@ class MatchingRunResult:
 
 def load_client_profile(client_fixture_path: Path) -> ClientProfile:
     payload = json.loads(client_fixture_path.read_text(encoding="utf-8"))
+    min_m2_value = payload.get("min_m2")
+    required_property_types = tuple(
+        normalized
+        for value in payload.get("required_property_types", [])
+        if (normalized := _normalize_property_type(str(value)))
+    )
+    energy_label_min = str(payload.get("energy_label_min", "") or "").upper()
+    energy_label_is_relevant = bool(payload.get("energy_label_is_relevant", True))
+    preferred_energy_labels_payload = payload.get("preferred_energy_labels", [])
     return ClientProfile(
         client_id=str(payload["client_id"]),
+        name=str(payload.get("name", payload["client_id"])),
         max_budget_eur=int(payload["max_budget_eur"]),
         target_cities=tuple(str(value) for value in payload.get("target_cities", [])),
         compatible_cities=tuple(str(value) for value in payload.get("compatible_cities", [])),
         preferred_cities=tuple(str(value) for value in payload["preferred_cities"]),
+        required_property_types=required_property_types,
         min_bedrooms=int(payload["min_bedrooms"]),
-        min_m2=int(payload["min_m2"]),
-        preferred_energy_labels=tuple(str(value).upper() for value in payload["preferred_energy_labels"]),
+        min_m2=int(min_m2_value) if min_m2_value is not None else None,
+        energy_label_min=energy_label_min,
+        energy_label_is_relevant=energy_label_is_relevant,
+        preferred_energy_labels=tuple(str(value).upper() for value in preferred_energy_labels_payload),
         wants_garden_or_balcony=bool(payload["wants_garden_or_balcony"]),
         language=str(payload["language"]),
     )
@@ -124,6 +141,7 @@ def run_matching_v1(
                 "address_raw",
                 "city_raw",
                 "price_eur",
+                "property_type",
                 "bedrooms_count",
                 "rooms_count",
                 "living_area_m2",
@@ -190,6 +208,12 @@ def _hard_filter_exclusion_reason(row: dict[str, str], client: ClientProfile) ->
         return "excluded_over_budget"
     if not _city_in_allowed_area(row, client):
         return "excluded_outside_target_area"
+    if client.required_property_types:
+        property_type = _normalize_property_type(row.get("property_type", ""))
+        if not property_type:
+            return "excluded_missing_property_type"
+        if property_type not in client.required_property_types:
+            return "excluded_wrong_property_type"
     bedrooms_count = _parse_optional_int(row.get("bedrooms_count"))
     if client.min_bedrooms > 0:
         if bedrooms_count is None:
@@ -219,14 +243,15 @@ def _score_row(row: dict[str, str], client: ClientProfile) -> tuple[int, list[st
     living_area_m2 = _parse_optional_int(row.get("living_area_m2")) or _parse_optional_int(row.get("m2")) or _parse_first_number(row.get("living_area_raw", ""))
     if living_area_m2 is None:
         warnings.append("missing_m2")
-    elif living_area_m2 >= client.min_m2:
+    elif client.min_m2 is None or living_area_m2 >= client.min_m2:
         score += 15.0
 
     energy_label = row.get("energy_label", "").strip().upper()
-    if not energy_label:
-        warnings.append("missing_energy_label")
-    elif energy_label in client.preferred_energy_labels:
-        score += 10.0
+    if client.energy_label_is_relevant:
+        if not energy_label:
+            warnings.append("missing_energy_label")
+        elif energy_label in client.preferred_energy_labels:
+            score += 10.0
 
     if client.wants_garden_or_balcony:
         outdoor_space = _detect_garden_or_balcony(row)
@@ -250,18 +275,20 @@ def _build_report(
     exclusion_counts: dict[str, int],
 ) -> str:
     top_lines = [
-        "| # | property_id | city | price_eur | bedrooms | m2 | score | warnings | url |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| # | property_id | city | price_eur | property_type | bedrooms | m2 | energy_label | score | warnings | url |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for index, row in enumerate(top_matches, start=1):
         top_lines.append(
-            "| {index} | {property_id} | {city} | {price} | {bedrooms} | {m2} | {score} | {warnings} | {url} |".format(
+            "| {index} | {property_id} | {city} | {price} | {property_type} | {bedrooms} | {m2} | {energy_label} | {score} | {warnings} | {url} |".format(
                 index=index,
                 property_id=row["property_id"],
                 city=row["city_raw"] or "-",
                 price=row["price_eur"] or "-",
+                property_type=row.get("property_type", "") or "-",
                 bedrooms=row["bedrooms_count"] or "-",
                 m2=row["living_area_m2"] or "-",
+                energy_label=row.get("energy_label", "") or "-",
                 score=row["score"],
                 warnings=row["warnings"] or "-",
                 url=row["property_url"] or "-",
@@ -269,7 +296,7 @@ def _build_report(
         )
 
     if len(top_lines) == 2:
-        top_lines.append("| - | - | - | - | - | - | - | No matches | - |")
+        top_lines.append("| - | - | - | - | - | - | - | - | - | No matches | - |")
 
     warning_lines = ["- None"] if not warning_counts else [
         f"- {warning}: {count}" for warning, count in sorted(warning_counts.items(), key=lambda item: (-item[1], item[0]))
@@ -282,10 +309,11 @@ def _build_report(
         "- Budget: 20-30 points, with higher score when the property stays further below the max budget.",
         "- Target area: hard filter using `target_cities` plus explicit `compatible_cities`.",
         "- Preferred city: 30 points for cities listed in `preferred_cities`; this does not widen the hard filter.",
+        "- Property type: hard filter when `required_property_types` is configured; missing or non-matching values are excluded.",
         "- Bedrooms: hard filter when `bedrooms_count` exists and is below `min_bedrooms`, or when it is missing for this client.",
         "- Rooms: 15 points if present and `>= min_bedrooms`; missing only adds a warning and never substitutes `bedrooms_count`.",
         "- m2: 15 points if present and `>= min_m2`; missing only adds a warning.",
-        "- Energy label: 10 points if present and preferred; missing only adds a warning.",
+        "- Energy label: only scores when `energy_label_is_relevant=true`; otherwise it is display-only.",
         "- Garden or balcony: 10 points if the signal exists and matches; missing only adds a warning.",
     ]
 
@@ -372,6 +400,7 @@ def _build_result_row(
         "address_raw": row.get("address_raw", ""),
         "city_raw": row.get("city_raw", ""),
         "price_eur": row.get("price_eur", ""),
+        "property_type": row.get("property_type", ""),
         "bedrooms_count": row.get("bedrooms_count", ""),
         "rooms_count": row.get("rooms_count", row.get("rooms", "")),
         "living_area_m2": row.get("living_area_m2", row.get("m2", "")),
@@ -419,6 +448,21 @@ def _normalize_text(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value or "")
     ascii_text = "".join(character for character in normalized if not unicodedata.combining(character))
     return " ".join(ascii_text.replace("-", " ").replace("'", "").split()).casefold()
+
+
+def _normalize_property_type(value: str) -> str:
+    mapping = {
+        "apartment": "apartment",
+        "appartement": "apartment",
+        "house": "house",
+        "woonhuis": "house",
+        "studio": "studio",
+        "maisonette": "maisonette",
+        "maisonnette": "maisonette",
+        "penthouse": "penthouse",
+        "unknown": "unknown",
+    }
+    return mapping.get(_normalize_text(value), "")
 
 
 def _utc_run_id() -> str:

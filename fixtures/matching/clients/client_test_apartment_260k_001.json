@@ -1,0 +1,33 @@
+{
+  "client_id": "client_test_apartment_260k_001",
+  "name": "Cliente test apartamento 260k",
+  "language": "es",
+  "max_budget_eur": 260000,
+  "target_cities": [
+    "Tilburg",
+    "Waalwijk",
+    "'s-Hertogenbosch",
+    "Nieuwkuijk",
+    "Drunen"
+  ],
+  "compatible_cities": [],
+  "preferred_cities": [
+    "Tilburg",
+    "Waalwijk",
+    "'s-Hertogenbosch",
+    "Nieuwkuijk",
+    "Drunen"
+  ],
+  "required_property_types": [
+    "apartment",
+    "appartement",
+    "studio",
+    "maisonette",
+    "penthouse"
+  ],
+  "min_bedrooms": 1,
+  "min_m2": null,
+  "energy_label_min": "G",
+  "energy_label_is_relevant": false,
+  "wants_garden_or_balcony": false
+}

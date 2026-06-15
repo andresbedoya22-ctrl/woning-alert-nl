@@ -63,6 +63,7 @@ class PropertyCandidate:
     rooms_count: str = ""
     bedrooms_count: str = ""
     living_area_m2: str = ""
+    property_type: str = ""
     energy_label: str = ""
     has_garden: str = ""
     has_balcony: str = ""
@@ -98,6 +99,7 @@ class PropertyInventoryRecord:
     rooms_count: str
     bedrooms_count: str
     living_area_m2: str
+    property_type: str
     energy_label: str
     has_garden: str
     has_balcony: str
@@ -133,6 +135,7 @@ class PropertyRejectedRecord:
     rooms_count: str
     bedrooms_count: str
     living_area_m2: str
+    property_type: str
     energy_label: str
     has_garden: str
     has_balcony: str
