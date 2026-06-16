@@ -23,8 +23,9 @@ def normalize_province(value: str) -> str:
 
 
 class SourceLoader:
-    def __init__(self, csv_path: Path) -> None:
+    def __init__(self, csv_path: Path, *, override_csv_path: Path | None = None) -> None:
         self.csv_path = csv_path
+        self.override_csv_path = override_csv_path
         self.last_skipped_invalid_aanbod_url_count = 0
 
     def load(
@@ -45,26 +46,52 @@ class SourceLoader:
         self.last_skipped_invalid_aanbod_url_count = 0
         if not self.csv_path.exists():
             raise MissingSourceFileError(self.csv_path)
-        with self.csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
-            for row in csv.DictReader(handle):
-                detected_platform = detect_platform_for_row(row, platform_assignments)
-                if normalized_platform_filter and detected_platform != normalized_platform_filter:
-                    continue
-                source = self._build_source(
-                    row,
-                    include_invalid_sources=include_invalid_sources,
-                    detected_platform=detected_platform,
-                )
-                if source is None:
-                    continue
-                if normalized_source_domain and source.root_domain != normalized_source_domain:
-                    continue
-                if target_province and source.province != target_province:
-                    continue
-                loaded.append(source)
-                if max_sources is not None and max_sources >= 0 and len(loaded) >= max_sources:
-                    break
+        for row in self._iter_rows():
+            detected_platform = detect_platform_for_row(row, platform_assignments)
+            if normalized_platform_filter and detected_platform != normalized_platform_filter:
+                continue
+            source = self._build_source(
+                row,
+                include_invalid_sources=include_invalid_sources,
+                detected_platform=detected_platform,
+            )
+            if source is None:
+                continue
+            if normalized_source_domain and source.root_domain != normalized_source_domain:
+                continue
+            if target_province and source.province != target_province:
+                continue
+            loaded.append(source)
+            if max_sources is not None and max_sources >= 0 and len(loaded) >= max_sources:
+                break
         return loaded
+
+    def _iter_rows(self) -> list[dict[str, str]]:
+        with self.csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            base_rows = list(csv.DictReader(handle))
+        if self.override_csv_path is None or not self.override_csv_path.exists():
+            return base_rows
+
+        row_by_key: dict[tuple[str, str, str], dict[str, str]] = {}
+        base_order: list[tuple[str, str, str]] = []
+        for row in base_rows:
+            key = _row_key(row)
+            if key not in row_by_key:
+                base_order.append(key)
+            row_by_key[key] = row
+
+        override_order: list[tuple[str, str, str]] = []
+        with self.override_csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            for override_row in csv.DictReader(handle):
+                key = _row_key(override_row)
+                override_order.append(key)
+                base_row = row_by_key.get(key, {})
+                row_by_key[key] = _merge_row(base_row, override_row)
+
+        override_keys = set(override_order)
+        merged_rows = [row_by_key[key] for key in override_order]
+        merged_rows.extend(row_by_key[key] for key in base_order if key not in override_keys)
+        return merged_rows
 
     def _build_source(
         self,
@@ -122,3 +149,23 @@ def _normalize_source_domain(value: str) -> str:
     if normalized.startswith(("http://", "https://")):
         return (urlsplit(normalized).netloc or "").strip().lower()
     return normalized.strip("/")
+
+
+def _row_key(row: dict[str, str]) -> tuple[str, str, str]:
+    source_id = (row.get("source_id") or "").strip().lower()
+    if source_id:
+        return ("source_id", source_id, "")
+    root_domain = (row.get("root_domain") or "").strip().lower()
+    gemeente = (row.get("gemeente") or "").strip().lower()
+    province = normalize_province(row.get("province") or "").strip().lower()
+    return (root_domain, gemeente, province)
+
+
+def _merge_row(base_row: dict[str, str], override_row: dict[str, str]) -> dict[str, str]:
+    merged = dict(base_row)
+    for key, value in override_row.items():
+        if value is None:
+            continue
+        if value != "":
+            merged[key] = value
+    return merged

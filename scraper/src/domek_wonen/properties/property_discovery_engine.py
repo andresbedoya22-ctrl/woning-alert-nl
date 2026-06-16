@@ -39,6 +39,7 @@ from .source_loader import MissingSourceFileError, SourceLoader, normalize_provi
 
 BASE_DIR = Path(__file__).resolve().parents[4]
 DEFAULT_SOURCE_CSV_PATH = BASE_DIR / "data" / "discovery" / "latest" / "makelaar_sources_master.csv"
+DEFAULT_SOURCE_OVERRIDE_CSV_PATH = BASE_DIR / "data" / "discovery" / "reference" / "property_discovery_source_overrides.csv"
 DEFAULT_PLATFORM_FINGERPRINT_INPUT = (
     BASE_DIR / "data" / "discovery" / "platform_fingerprint" / "platform_fingerprint_results.csv"
 )
@@ -92,6 +93,16 @@ def _recommended_build_command(source_csv_path: Path) -> str:
         f"--input {_relative_windows_path(discovered_path)} "
         f"--output {_relative_windows_path(source_csv_path)}"
     )
+
+
+def _default_override_path_for(source_csv_path: Path) -> Path | None:
+    try:
+        if source_csv_path.resolve() == DEFAULT_SOURCE_CSV_PATH.resolve():
+            return DEFAULT_SOURCE_OVERRIDE_CSV_PATH
+    except FileNotFoundError:
+        if source_csv_path == DEFAULT_SOURCE_CSV_PATH:
+            return DEFAULT_SOURCE_OVERRIDE_CSV_PATH
+    return None
 
 
 def restore_latest_discovery_if_missing(source_csv_path: Path) -> bool:
@@ -802,7 +813,7 @@ def run_property_discovery(
     run_id, run_dir = _create_run_dir(runs_base_dir, run_id)
     report_path = run_dir / REPORT_FILENAME
 
-    loader = SourceLoader(source_csv_path)
+    loader = SourceLoader(source_csv_path, override_csv_path=_default_override_path_for(source_csv_path))
     dedupe = PropertyDedupe()
     classifier = PropertyStatusClassifier()
     effective_timeout_ms = min(timeout_ms, page_timeout_seconds * 1000)
