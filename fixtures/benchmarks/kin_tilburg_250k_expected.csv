@@ -1,0 +1,7 @@
+expected_id,address,city,price_eur,property_type,rooms_count,living_area_m2,energy_label,status_expected,source_note
+kin_tilburg_250k_001,Trouwlaan 285,Tilburg,220000,apartment,2,38,,beschikbaar,KIN manual benchmark Tilburg 0 km max 250k
+kin_tilburg_250k_002,Roemerhof 16,Tilburg,180000,apartment,2,23,A,beschikbaar,KIN manual benchmark Tilburg 0 km max 250k
+kin_tilburg_250k_003,Roemerhof 29,Tilburg,165000,apartment,1,21,B,beschikbaar,KIN manual benchmark Tilburg 0 km max 250k
+kin_tilburg_250k_004,Roemerhof 5,Tilburg,175000,apartment,,,,beschikbaar,KIN manual benchmark Tilburg 0 km max 250k
+kin_tilburg_250k_005,Roemerhof 26,Tilburg,185000,apartment,,,,beschikbaar,KIN manual benchmark Tilburg 0 km max 250k
+kin_tilburg_250k_006,Korte Nieuwstraat 112,Tilburg,250000,apartment,,,,verkocht_onder_voorbehoud,KIN manual benchmark Tilburg 0 km max 250k
