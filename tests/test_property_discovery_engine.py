@@ -12,11 +12,17 @@ sys.path.insert(0, str(BASE_DIR / "scraper" / "src"))
 from domek_wonen.properties.models import PropertyCandidate, PropertySource
 from domek_wonen.properties.property_discovery_engine import (
     REPORT_FILENAME,
+    _annotate_candidate,
+    _build_outputs,
     _is_valid_city_raw,
     _normalize_city_raw,
+    _normalize_candidate,
     restore_latest_discovery_if_missing,
     run_property_discovery,
 )
+from domek_wonen.properties.property_dedupe import PropertyDedupe
+from domek_wonen.properties.property_status_classifier import PropertyStatusClassifier
+from domek_wonen.properties.property_url_classifier import PropertyUrlClassifier
 from scripts.property_discovery_worker import run_worker
 
 
@@ -138,6 +144,43 @@ def test_property_discovery_engine_filters_noise_from_inventory(tmp_path: Path, 
     assert [row["property_url"] for row in inventory_rows] == ["https://example.nl/aanbod/moleneindplein-163-7189"]
     assert any(row["property_url"] == "https://example.nl/diensten/aankoopmakelaar" for row in rejected_rows)
     assert all("/contact" not in row["property_url"] for row in inventory_rows)
+
+
+def test_property_discovery_engine_promotes_kin_minimal_valid_candidate_to_matching_ready() -> None:
+    candidate = PropertyCandidate(
+        source_id="kinmakelaars.nl",
+        source_url="https://www.kinmakelaars.nl/aanbod/wonen/te-koop",
+        root_domain="kinmakelaars.nl",
+        gemeente="Tilburg",
+        property_url="https://www.kinmakelaars.nl/aanbod/wonen/tilburg/roemerhof-16/6a29685e53154f207cdd5c04",
+        address_raw="Roemerhof 16",
+        city_raw="Tilburg",
+        price_raw="EUR 180.000 k.k.",
+        status_raw="Nieuw",
+        rooms_raw="2 kamers",
+        rooms_count="2",
+        living_area_raw="23 m2",
+        living_area_m2="23",
+        property_type="apartment",
+        extraction_source="realworks_parser",
+        detail_extraction_status="failed",
+    )
+
+    annotated = _annotate_candidate(_normalize_candidate(candidate), PropertyUrlClassifier())
+    accepted_candidates, rejected_candidates, inventory, rejected = _build_outputs(
+        [annotated],
+        run_id="20260616T000000Z",
+        dedupe=PropertyDedupe(),
+        classifier=PropertyStatusClassifier(),
+    )
+
+    assert len(accepted_candidates) == 1
+    assert len(rejected_candidates) == 0
+    assert len(rejected) == 0
+    assert len(inventory) == 1
+    assert inventory[0].address_raw == "Roemerhof 16"
+    assert inventory[0].status == "beschikbaar"
+    assert inventory[0].needs_review == "false"
 
 
 def test_property_discovery_engine_continues_after_source_error_and_writes_report(tmp_path: Path, monkeypatch) -> None:

@@ -36,3 +36,13 @@ def test_property_url_classifier_accepts_detail_candidate() -> None:
 
     assert result.classification == "property_detail_candidate"
     assert result.is_property_like is True
+
+
+def test_property_url_classifier_accepts_kin_ogonline_detail_candidate() -> None:
+    result = PropertyUrlClassifier().classify(
+        "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/roemerhof-16/6a29685e53154f207cdd5c04",
+        "kinmakelaars.nl",
+    )
+
+    assert result.classification == "property_detail_candidate"
+    assert result.is_property_like is True

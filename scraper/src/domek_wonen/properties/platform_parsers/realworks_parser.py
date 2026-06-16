@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import re
+import unicodedata
 from dataclasses import replace
 from html import unescape
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 from domek_wonen.discovery.website_fetcher import WebsiteFetcher
 
@@ -57,8 +59,12 @@ _OGONLINE_DETAIL_LINK_PATTERN = re.compile(
     flags=re.IGNORECASE,
 )
 _OGONLINE_CARD_PATTERN = re.compile(
-    r"<a[^>]+href=\"(?P<href>/aanbod/wonen/[^\"#]+/[a-z0-9]+)\"[^>]*>(?P<body>.*?)</a>",
+    r"<a[^>]+href=[\"'](?P<href>/aanbod/wonen/[^\"'#]+/[a-z0-9]+)[\"'][^>]*>(?P<body>.*?)</a>",
     flags=re.IGNORECASE | re.DOTALL,
+)
+_OGONLINE_LISTINGS_API_URL_PATTERN = re.compile(
+    r"https://cpl01\.ogonline\.nl/api/listings\?[^\"'\s<]+",
+    flags=re.IGNORECASE,
 )
 _REALWORKS_HOUSE_SLUG_PATTERN = re.compile(
     r"/aanbod/woningaanbod/(?P<city>[^/]+)/koop/(?P<slug>huis-\d+-.+)$",
@@ -297,6 +303,164 @@ def _build_listing_seed_candidate(
     )
 
 
+def _coerce_int(value: object) -> str:
+    if isinstance(value, bool) or value is None:
+        return ""
+    try:
+        return str(int(value))
+    except (TypeError, ValueError):
+        return ""
+
+
+def _normalize_location_key(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value or "")
+    ascii_text = "".join(character for character in normalized if not unicodedata.combining(character))
+    return re.sub(r"[^a-z0-9]+", " ", ascii_text.casefold()).strip()
+
+
+def _slugify_path_value(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value or "")
+    ascii_text = "".join(character for character in normalized if not unicodedata.combining(character))
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_text.casefold()).strip("-")
+    return slug
+
+
+def _extract_ogonline_listings_api_url(html: str) -> str:
+    match = _OGONLINE_LISTINGS_API_URL_PATTERN.search(unescape(html or ""))
+    if not match:
+        return ""
+    return _normalize_url(match.group(0))
+
+
+def _set_query_page(url: str, page: int) -> str:
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["page"] = str(page)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def _format_ogonline_price(doc: dict[str, object]) -> str:
+    sales_price = doc.get("salesPrice")
+    if not isinstance(sales_price, dict):
+        return ""
+    amount = sales_price.get("amount")
+    if isinstance(amount, bool) or amount in (None, ""):
+        return ""
+    try:
+        amount_value = int(amount)
+    except (TypeError, ValueError):
+        return ""
+    amount_text = f"{amount_value:,}".replace(",", ".")
+    condition = sales_price.get("condition")
+    suffix = ""
+    if isinstance(condition, dict):
+        suffix = _collapse_whitespace(str(condition.get("title") or ""))
+    return _collapse_whitespace(f"EUR {amount_text} {suffix}".strip())
+
+
+def _format_ogonline_status(status: object) -> str:
+    normalized = _collapse_whitespace(str(status or "")).casefold()
+    mapping = {
+        "available": "beschikbaar",
+        "new": "Nieuw",
+        "sold_ur": "verkocht onder voorbehoud",
+        "sold": "verkocht",
+        "under_offer": "onder bod",
+    }
+    return mapping.get(normalized, _collapse_whitespace(str(status or "")).replace("_", " "))
+
+
+def _extract_ogonline_property_type(doc: dict[str, object]) -> str:
+    consumer = doc.get("consumer")
+    if not isinstance(consumer, dict):
+        return ""
+    if consumer.get("isApartment"):
+        return "apartment"
+    if consumer.get("isHouse"):
+        return "house"
+    return ""
+
+
+def _extract_ogonline_image_url(doc: dict[str, object]) -> str:
+    photos = doc.get("photos")
+    if not isinstance(photos, list) or not photos:
+        return ""
+    first = photos[0]
+    if not isinstance(first, dict):
+        return ""
+    imported = first.get("import")
+    if isinstance(imported, dict) and imported.get("url"):
+        return _normalize_url(str(imported["url"]))
+    return ""
+
+
+def _build_ogonline_api_seed_candidate(
+    source: PropertySource,
+    *,
+    source_url: str,
+    doc: dict[str, object],
+) -> PropertyCandidate | None:
+    property_id = _collapse_whitespace(str(doc.get("id") or ""))
+    title = _collapse_whitespace(str(doc.get("title") or ""))
+    address = doc.get("address")
+    address_line = ""
+    city_raw = ""
+    if isinstance(address, dict):
+        street = _collapse_whitespace(str(address.get("street") or ""))
+        house_number = _collapse_whitespace(str(address.get("houseNumber") or ""))
+        house_number_extension = _collapse_whitespace(str(address.get("houseNumberExtension") or ""))
+        address_line = _collapse_whitespace(f"{street} {house_number}{house_number_extension}".strip())
+        city_raw = _collapse_whitespace(str(address.get("settlement") or ""))
+    address_raw = address_line or title
+    city_raw = city_raw or source.gemeente
+    if not property_id or not address_raw or not city_raw:
+        return None
+
+    city_slug = _slugify_path_value(city_raw)
+    address_slug = _slugify_path_value(address_raw)
+    if not city_slug or not address_slug:
+        return None
+
+    detail_url = _to_absolute_url(source_url, f"/aanbod/wonen/{city_slug}/{address_slug}/{property_id}")
+    consumer = doc.get("consumer") if isinstance(doc.get("consumer"), dict) else {}
+    consumer_details = consumer.get("details") if isinstance(consumer, dict) and isinstance(consumer.get("details"), dict) else {}
+    energy_details = doc.get("energyDetails") if isinstance(doc.get("energyDetails"), dict) else {}
+    rooms_count = _coerce_int(consumer_details.get("rooms"))
+    bedrooms_count = _coerce_int(consumer_details.get("bedrooms"))
+    living_area_m2 = _coerce_int(consumer_details.get("livingSurface"))
+    living_area_raw = f"{living_area_m2} m2" if living_area_m2 else ""
+    rooms_raw = f"{rooms_count} kamers" if rooms_count else ""
+    return PropertyCandidate(
+        source_id=source.source_id,
+        source_url=source_url,
+        root_domain=source.root_domain,
+        gemeente=source.gemeente,
+        property_url=detail_url,
+        candidate_type="platform_parser_detail_url",
+        extraction_method="realworks_listing_api",
+        is_property_like=True,
+        property_url_classification="property_detail_candidate",
+        title=title or address_raw,
+        address_raw=address_raw,
+        city_raw=city_raw,
+        price_raw=_format_ogonline_price(doc),
+        status_raw=_format_ogonline_status(doc.get("status")),
+        living_area_raw=living_area_raw,
+        rooms_raw=rooms_raw,
+        rooms_count=rooms_count,
+        bedrooms_count=bedrooms_count,
+        living_area_m2=living_area_m2,
+        property_type=_extract_ogonline_property_type(doc),
+        energy_label=_collapse_whitespace(str(energy_details.get("energyLabel") or "")).upper(),
+        has_garden="true" if doc.get("hasGarden") else "false" if doc.get("hasGarden") is False else "",
+        has_balcony="true" if doc.get("hasBalcony") else "false" if doc.get("hasBalcony") is False else "",
+        image_url=_extract_ogonline_image_url(doc),
+        extraction_source="realworks_parser",
+        detail_extraction_status="failed",
+        detail_error="detail page fetch failed",
+    )
+
+
 def _format_slug_token(token: str, *, lowercase_particles: set[str]) -> str:
     lowered = token.casefold()
     if lowered in lowercase_particles:
@@ -383,6 +547,97 @@ class RealworksParser:
             )
         return seed_candidates
 
+    def extract_ogonline_api_seed_candidates(
+        self,
+        listing_url: str,
+        html: str,
+        *,
+        source: PropertySource,
+        fetcher: WebsiteFetcher,
+        max_properties_per_source: int,
+    ) -> dict[str, PropertyCandidate]:
+        api_url = _extract_ogonline_listings_api_url(html)
+        if not api_url:
+            return {}
+
+        seed_candidates: dict[str, PropertyCandidate] = {}
+        fallback_candidates: dict[str, PropertyCandidate] = {}
+        source_city_key = _normalize_location_key(source.gemeente)
+        page_url = api_url
+        while page_url:
+            response = fetcher.fetch(page_url)
+            if not response.ok:
+                break
+            try:
+                payload = json.loads(response.text or "{}")
+            except json.JSONDecodeError:
+                break
+            docs = payload.get("docs")
+            if not isinstance(docs, list):
+                break
+            for doc in docs:
+                if not isinstance(doc, dict):
+                    continue
+                candidate = _build_ogonline_api_seed_candidate(
+                    source,
+                    source_url=listing_url,
+                    doc=doc,
+                )
+                if candidate is None or candidate.property_url in seed_candidates or candidate.property_url in fallback_candidates:
+                    continue
+                if not _is_realworks_detail_url(candidate.property_url, root_domain=source.root_domain, classifier=self._url_classifier):
+                    continue
+                candidate_city_key = _normalize_location_key(candidate.city_raw)
+                target = seed_candidates if source_city_key and candidate_city_key == source_city_key else fallback_candidates
+                if not source_city_key:
+                    target = seed_candidates
+                target[candidate.property_url] = candidate
+                if source_city_key and len(seed_candidates) >= max_properties_per_source:
+                    break
+                if not source_city_key and len(seed_candidates) >= max_properties_per_source:
+                    break
+            if source_city_key and len(seed_candidates) >= max_properties_per_source:
+                break
+            if not source_city_key and len(seed_candidates) >= max_properties_per_source:
+                break
+            if not payload.get("hasNextPage"):
+                break
+            next_page = payload.get("nextPage")
+            if isinstance(next_page, int):
+                page_url = _set_query_page(api_url, next_page)
+            else:
+                break
+        if source_city_key and len(seed_candidates) < max_properties_per_source:
+            for property_url, candidate in fallback_candidates.items():
+                if property_url in seed_candidates:
+                    continue
+                seed_candidates[property_url] = candidate
+                if len(seed_candidates) >= max_properties_per_source:
+                    break
+        return seed_candidates
+
+    def prioritize_detail_urls(
+        self,
+        detail_urls: list[str],
+        *,
+        seed_candidates: dict[str, PropertyCandidate],
+        source: PropertySource,
+    ) -> list[str]:
+        source_city_key = _normalize_location_key(source.gemeente)
+        if not source_city_key:
+            return detail_urls
+
+        prioritized: list[str] = []
+        deferred: list[str] = []
+        for detail_url in detail_urls:
+            candidate = seed_candidates.get(detail_url)
+            candidate_city = candidate.city_raw if candidate is not None else normalize_kin_city_from_url(detail_url)
+            if _normalize_location_key(candidate_city) == source_city_key:
+                prioritized.append(detail_url)
+            else:
+                deferred.append(detail_url)
+        return prioritized + deferred
+
     def parse(
         self,
         source: PropertySource,
@@ -404,12 +659,34 @@ class RealworksParser:
                 if not response.ok:
                     continue
                 detail_urls = self.extract_detail_urls(response.url or candidate_url, response.text, root_domain=source.root_domain)
+                api_seed_candidates = self.extract_ogonline_api_seed_candidates(
+                    response.url or candidate_url,
+                    response.text,
+                    source=source,
+                    fetcher=fetcher,
+                    max_properties_per_source=max_properties_per_source,
+                )
+                for detail_url in api_seed_candidates:
+                    if detail_url not in detail_urls:
+                        detail_urls.append(detail_url)
                 if detail_urls:
                     selected_listing_url = response.url or candidate_url
                     selected_detail_urls = detail_urls
                     seed_candidates = self.extract_listing_seed_candidates(
                         selected_listing_url,
                         response.text,
+                        source=source,
+                    )
+                    seed_candidates.update(
+                        {
+                            property_url: candidate
+                            for property_url, candidate in api_seed_candidates.items()
+                            if property_url not in seed_candidates
+                        }
+                    )
+                    selected_detail_urls = self.prioritize_detail_urls(
+                        selected_detail_urls,
+                        seed_candidates=seed_candidates,
                         source=source,
                     )
                     break

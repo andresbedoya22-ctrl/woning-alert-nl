@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 import sys
 
@@ -227,6 +228,36 @@ def test_realworks_parser_detects_kin_ogonline_detail_urls_from_snapshot_fixture
     ]
 
 
+def test_realworks_parser_extracts_kin_benchmark_candidates_from_listing_fixture() -> None:
+    parser = RealworksParser()
+    fixture_html = (BASE_DIR / "tests" / "fixtures" / "properties" / "kin_ogonline_listing_benchmark_cards.html").read_text(
+        encoding="utf-8"
+    )
+
+    seed_candidates = parser.extract_listing_seed_candidates(
+        "https://www.kinmakelaars.nl/aanbod/wonen/te-koop",
+        fixture_html,
+        source=_source(
+            aanbod_url="https://www.kinmakelaars.nl/aanbod/wonen/te-koop",
+            source_id="kinmakelaars.nl",
+            root_domain="kinmakelaars.nl",
+            website="https://www.kinmakelaars.nl",
+        ),
+    )
+
+    assert list(seed_candidates) == [
+        "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/trouwlaan-285/6a2bf64c53154f207c087a8e",
+        "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/roemerhof-16/6a29685e53154f207cdd5c04",
+        "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/roemerhof-29/6a22de7e2b2f318678b94957",
+        "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/roemerhof-5/6a22de7e2b2f318678b94983",
+        "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/roemerhof-26/6a22e5902b2f318678b9cf46",
+        "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/korte-nieuwstraat-112/69fb43a281b2833c1354b74e",
+    ]
+    assert seed_candidates[
+        "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/korte-nieuwstraat-112/69fb43a281b2833c1354b74e"
+    ].status_raw == "Verkocht onder voorbehoud"
+
+
 def test_realworks_parser_extracts_kin_listing_fields_when_detail_fetch_fails(monkeypatch) -> None:
     listing_html = (BASE_DIR / "tests" / "fixtures" / "properties" / "kin_ogonline_listing.html").read_text(
         encoding="utf-8"
@@ -286,3 +317,117 @@ def test_realworks_parser_extracts_kin_listing_fields_when_detail_fetch_fails(mo
     assert candidates[0].image_url == "https://media02.ogonline.nl/pl-import/66aa38af0773b21cac8f8da0/6a2bf64c53154f207c087a8e/rw-api-sha/trouwlaan-285.jpg"
     assert candidates[0].detail_extraction_status == "failed"
     assert candidates[1].address_raw == "Roemerhof 16"
+
+
+def test_realworks_parser_uses_ogonline_api_pagination_for_missing_kin_candidates(monkeypatch) -> None:
+    listing_html = """
+    <html><body>
+      <a href="/aanbod/wonen/tilburg/trouwlaan-285/6a2bf64c53154f207c087a8e" class="property-card">
+        <p>Tilburg</p>
+        <span class="sr-only">Galerijflat in Tilburg</span>
+        <h3>Trouwlaan 285</h3>
+        <p>EUR 220.000 k.k.</p>
+        <div>38 m2</div>
+        <div>2 kamers</div>
+      </a>
+      <script>
+        const api = "https://cpl01.ogonline.nl/api/listings?page=1&amp;limit=2&amp;depth=1&amp;locale=nl&amp;account=kin";
+      </script>
+    </body></html>
+    """
+
+    page_1_payload = {
+        "docs": [
+            {
+                "id": "6a2bf64c53154f207c087a8e",
+                "title": "Trouwlaan 285",
+                "status": "available",
+                "address": {"street": "Trouwlaan", "houseNumber": 285, "settlement": "Tilburg"},
+                "salesPrice": {"amount": 220000, "condition": {"title": "k.k."}},
+                "consumer": {
+                    "isApartment": True,
+                    "details": {"rooms": 2, "bedrooms": 1, "livingSurface": 38},
+                },
+                "energyDetails": {"energyLabel": "A"},
+            },
+        ],
+        "hasNextPage": True,
+        "nextPage": 2,
+    }
+    page_2_payload = {
+        "docs": [
+            {
+                "id": "6a22de7e2b2f318678b94957",
+                "title": "Roemerhof 29",
+                "status": "available",
+                "address": {"street": "Roemerhof", "houseNumber": 29, "settlement": "Tilburg"},
+                "salesPrice": {"amount": 165000, "condition": {"title": "k.k."}},
+                "consumer": {
+                    "isApartment": True,
+                    "details": {"rooms": 1, "bedrooms": 1, "livingSurface": 21},
+                },
+                "energyDetails": {"energyLabel": "B"},
+            },
+            {
+                "id": "69fb43a281b2833c1354b74e",
+                "title": "Korte Nieuwstraat 112",
+                "status": "sold_ur",
+                "address": {"street": "Korte Nieuwstraat", "houseNumber": 112, "settlement": "Tilburg"},
+                "salesPrice": {"amount": 250000, "condition": {"title": "k.k."}},
+                "consumer": {
+                    "isApartment": True,
+                    "details": {"rooms": 2, "bedrooms": 1, "livingSurface": 59},
+                },
+                "energyDetails": {"energyLabel": "C"},
+            },
+        ],
+        "hasNextPage": False,
+        "nextPage": None,
+    }
+
+    class FakeFetcher:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+        def fetch(self, url: str) -> FetchResponse:
+            normalized = url.rstrip("/")
+            if normalized == "https://www.kinmakelaars.nl/aanbod/wonen/te-koop":
+                return FetchResponse(url=url, status_code=200, text=listing_html)
+            if "api/listings" in url and "page=1" in url:
+                return FetchResponse(url=url, status_code=200, text=json.dumps(page_1_payload))
+            if "api/listings" in url and "page=2" in url:
+                return FetchResponse(url=url, status_code=200, text=json.dumps(page_2_payload))
+            return FetchResponse(url=url, error="detail fetch intentionally skipped")
+
+        def extract_internal_links(self, base_url: str, html: str) -> list[str]:
+            from domek_wonen.discovery.website_fetcher import WebsiteFetcher
+
+            helper = WebsiteFetcher(timeout_seconds=1, delay_seconds=0)
+            try:
+                return helper.extract_internal_links(base_url, html)
+            finally:
+                helper.close()
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr("domek_wonen.properties.platform_parsers.realworks_parser.WebsiteFetcher", FakeFetcher)
+
+    candidates = RealworksParser().parse(
+        _source(
+            aanbod_url="https://www.kinmakelaars.nl/aanbod/wonen/te-koop",
+            source_id="kinmakelaars.nl",
+            root_domain="kinmakelaars.nl",
+            website="https://www.kinmakelaars.nl",
+        ),
+        max_properties_per_source=10,
+        page_timeout_seconds=5,
+    )
+
+    assert [candidate.address_raw for candidate in candidates] == [
+        "Trouwlaan 285",
+        "Roemerhof 29",
+        "Korte Nieuwstraat 112",
+    ]
+    assert candidates[1].property_url == "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/roemerhof-29/6a22de7e2b2f318678b94957"
+    assert candidates[2].status_raw == "verkocht onder voorbehoud"

@@ -41,6 +41,7 @@ ADDRESS_OR_ID_PATTERN = re.compile(
     r"(\d{3,}([a-z]{0,3})?$)|(\d{4}\s?[a-z]{2})|([a-z]+(?:-[a-z0-9]+){2,})",
     flags=re.IGNORECASE,
 )
+_OGONLINE_DETAIL_ID_PATTERN = re.compile(r"^[a-z0-9]{8,}$", flags=re.IGNORECASE)
 
 
 @dataclass(slots=True)
@@ -80,6 +81,8 @@ class PropertyUrlClassifier:
         if first in EXACT_INDEX_PATHS and len(segments) == 1:
             return PropertyUrlClassification("listing_index", False, f"listing index: /{first}")
 
+        if self._is_ogonline_detail_path(segments):
+            return PropertyUrlClassification("property_detail_candidate", True, "")
         if first in DETAIL_PREFIXES and len(segments) >= 2 and self._has_property_slug(segments[1:]):
             return PropertyUrlClassification("property_detail_candidate", True, "")
         if self._has_property_slug(segments):
@@ -96,3 +99,13 @@ class PropertyUrlClassifier:
             if ADDRESS_OR_ID_PATTERN.search(segment):
                 return True
         return False
+
+    def _is_ogonline_detail_path(self, segments: list[str]) -> bool:
+        if len(segments) < 5:
+            return False
+        if segments[0] != "aanbod" or segments[1] != "wonen":
+            return False
+        if not _OGONLINE_DETAIL_ID_PATTERN.fullmatch(segments[-1]):
+            return False
+        slug = segments[-2]
+        return "-" in slug and any(character.isdigit() for character in slug)
