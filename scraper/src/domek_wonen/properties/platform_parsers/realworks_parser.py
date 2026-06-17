@@ -36,6 +36,7 @@ _EXCLUDED_SEGMENTS = {
 }
 _EXCLUDED_DETAIL_SLUG_PREFIXES = (
     "bouwperiode-",
+    "pagina-",
     "provincie-",
     "plaats-",
     "woonplaats-",
@@ -43,7 +44,13 @@ _EXCLUDED_DETAIL_SLUG_PREFIXES = (
     "woonoppervlakte-",
     "perceeloppervlakte-",
     "kamers-",
+    "street-",
 )
+_EXCLUDED_DETAIL_SLUGS = {
+    "onder-bod",
+    "verkocht",
+    "verkocht-onder-voorbehoud",
+}
 _DETAIL_INDEX_SEGMENTS = {"aanbod", "woningaanbod", "koop", "woningen", "wonen"}
 _DETAIL_PATH_PATTERNS = (
     re.compile(r"/aanbod/woningaanbod/.+"),
@@ -161,6 +168,8 @@ def _is_realworks_detail_url(url: str, *, root_domain: str, classifier: Property
         return False
     if not segments or segments[-1] in _DETAIL_INDEX_SEGMENTS:
         return False
+    if segments[-1] in _EXCLUDED_DETAIL_SLUGS:
+        return False
     if any(segments[-1].startswith(prefix) for prefix in _EXCLUDED_DETAIL_SLUG_PREFIXES):
         return False
     if _OGONLINE_DETAIL_PATH_PATTERN.search(path):
@@ -224,6 +233,36 @@ def _extract_card_energy_label(text: str) -> str:
 def _extract_card_status(text: str) -> str:
     match = _STATUS_TEXT_PATTERN.search(text or "")
     return _collapse_whitespace(match.group(1)) if match else ""
+
+
+def _looks_like_noise_address(value: str) -> bool:
+    normalized = _collapse_whitespace(value).casefold()
+    if not normalized:
+        return False
+    return normalized.startswith("bekijk bij ") or normalized.startswith("zoeken in ") or normalized.startswith("in ")
+
+
+def _looks_like_noise_city(value: str) -> bool:
+    normalized = _collapse_whitespace(value).casefold()
+    if not normalized:
+        return False
+    if normalized in {"woningen", "woning", "huizen"}:
+        return True
+    return len(re.sub(r"[^a-z]", "", normalized)) <= 2
+
+
+def _parse_realworks_title_address_city(title: str) -> tuple[str, str]:
+    normalized = _collapse_whitespace(title)
+    if not normalized:
+        return "", ""
+    match = re.match(
+        r"^(?P<address>.+?)\s+in\s+(?P<city>[A-Za-zÀ-ÿ' -]+)\s+\d{4}\s?[A-Z]{2}\b",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return "", ""
+    return _collapse_whitespace(match.group("address")), _collapse_whitespace(match.group("city"))
 
 
 def normalize_kin_city_from_url(property_url: str) -> str:
@@ -746,6 +785,15 @@ class RealworksParser:
                         city_raw=inferred_city,
                         property_type=candidate.property_type or inferred_property_type,
                     )
+                title_address, title_city = _parse_realworks_title_address_city(candidate.title)
+                if title_address and _looks_like_noise_address(candidate.address_raw):
+                    candidate = replace(candidate, address_raw=title_address)
+                if title_city and (
+                    not candidate.city_raw
+                    or _looks_like_noise_address(candidate.address_raw)
+                    or _looks_like_noise_city(candidate.city_raw)
+                ):
+                    candidate = replace(candidate, city_raw=title_city)
 
                 candidates.append(
                     replace(

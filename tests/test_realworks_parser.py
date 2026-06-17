@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+from dataclasses import replace
 
 import sys
 
@@ -431,3 +432,81 @@ def test_realworks_parser_uses_ogonline_api_pagination_for_missing_kin_candidate
     ]
     assert candidates[1].property_url == "https://www.kinmakelaars.nl/aanbod/wonen/tilburg/roemerhof-29/6a22de7e2b2f318678b94957"
     assert candidates[2].status_raw == "verkocht onder voorbehoud"
+
+
+def test_realworks_parser_ignores_pagination_and_status_listing_urls() -> None:
+    parser = RealworksParser()
+    listing_html = """
+    <html><body>
+        <a href="/aanbod/woningaanbod/pagina-2">Pagina 2</a>
+        <a href="/aanbod/woningaanbod/verkocht-onder-voorbehoud">Verkocht onder voorbehoud</a>
+        <a href="/aanbod/woningaanbod/street-ringbaan-oost">Street filter</a>
+        <a href="/aanbod/woningaanbod/tilburg/koop/huis-10218392-hulterman-29">Hulterman 29</a>
+    </body></html>
+    """
+
+    detail_urls = parser.extract_detail_urls(
+        "https://example.nl/aanbod/woningaanbod",
+        listing_html,
+        root_domain="example.nl",
+    )
+
+    assert detail_urls == [
+        "https://example.nl/aanbod/woningaanbod/tilburg/koop/huis-10218392-hulterman-29",
+    ]
+
+
+def test_realworks_parser_recovers_address_and_city_from_title_when_detail_fields_are_noisy(monkeypatch) -> None:
+    listing_html = """
+    <html><body>
+        <a href="/aanbod/woningaanbod/tilburg/koop/huis-10291668-besterdplein-2505">Besterdplein 25 05</a>
+    </body></html>
+    """
+
+    class FakeFetcher:
+        def __init__(self, *args, **kwargs) -> None:
+            return None
+
+        def fetch(self, url: str) -> FetchResponse:
+            normalized = url.rstrip("/")
+            if normalized == "https://example.nl/aanbod/woningaanbod":
+                return FetchResponse(url=url, status_code=200, text=listing_html)
+            if normalized.endswith("/huis-10291668-besterdplein-2505"):
+                return FetchResponse(url=url, status_code=200, text="<html><body>detail</body></html>")
+            return FetchResponse(url=url, error="not found")
+
+        def extract_internal_links(self, base_url: str, html: str) -> list[str]:
+            from domek_wonen.discovery.website_fetcher import WebsiteFetcher
+
+            helper = WebsiteFetcher(timeout_seconds=1, delay_seconds=0)
+            try:
+                return helper.extract_internal_links(base_url, html)
+            finally:
+                helper.close()
+
+        def close(self) -> None:
+            return None
+
+    class FakeDetailExtractor:
+        def enrich(self, candidate, html: str, final_url: str):
+            return replace(
+                candidate,
+                title="Besterdplein 25 05 in Tilburg 5014 HP: Appartement te koop.",
+                address_raw="in Tilburg 5014",
+                city_raw="HP",
+                price_raw="€ 269.500,- k.k.",
+                status_raw="te koop",
+                detail_extraction_status="succeeded",
+                detail_error="",
+            )
+
+    monkeypatch.setattr("domek_wonen.properties.platform_parsers.realworks_parser.WebsiteFetcher", FakeFetcher)
+    parser = RealworksParser()
+    monkeypatch.setattr(parser, "_detail_extractor", FakeDetailExtractor())
+
+    candidates = parser.parse(_source(), max_properties_per_source=5, page_timeout_seconds=5)
+
+    assert len(candidates) == 1
+    assert candidates[0].address_raw == "Besterdplein 25 05"
+    assert candidates[0].city_raw == "Tilburg"
+    assert candidates[0].price_raw == "€ 269.500,- k.k."

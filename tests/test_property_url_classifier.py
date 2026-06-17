@@ -13,6 +13,10 @@ def test_property_url_classifier_excludes_non_property_paths() -> None:
     urls = [
         "https://example.nl/",
         "https://example.nl/aanbod",
+        "https://example.nl/woning",
+        "https://example.nl/woningen",
+        "https://example.nl/aankoop",
+        "https://example.nl/verkoop",
         "https://example.nl/huis-verkopen",
         "https://example.nl/diensten/aankoopmakelaar",
         "https://example.nl/contact",
@@ -24,6 +28,10 @@ def test_property_url_classifier_excludes_non_property_paths() -> None:
     assert results == [
         "unknown_non_property",
         "listing_index",
+        "unknown_non_property",
+        "unknown_non_property",
+        "service_page",
+        "unknown_non_property",
         "service_page",
         "service_page",
         "contact_page",
@@ -33,6 +41,13 @@ def test_property_url_classifier_excludes_non_property_paths() -> None:
 
 def test_property_url_classifier_accepts_detail_candidate() -> None:
     result = PropertyUrlClassifier().classify("https://example.nl/aanbod/moleneindplein-163-7189", "example.nl")
+
+    assert result.classification == "property_detail_candidate"
+    assert result.is_property_like is True
+
+
+def test_property_url_classifier_accepts_woning_slug_with_number() -> None:
+    result = PropertyUrlClassifier().classify("https://example.nl/woning/poelruitstraat-20", "example.nl")
 
     assert result.classification == "property_detail_candidate"
     assert result.is_property_like is True

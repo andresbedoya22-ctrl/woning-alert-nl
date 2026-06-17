@@ -42,6 +42,7 @@ ADDRESS_OR_ID_PATTERN = re.compile(
     flags=re.IGNORECASE,
 )
 _OGONLINE_DETAIL_ID_PATTERN = re.compile(r"^[a-z0-9]{8,}$", flags=re.IGNORECASE)
+_ADDRESS_SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*-\d+[a-z0-9/-]*$", flags=re.IGNORECASE)
 
 
 @dataclass(slots=True)
@@ -96,6 +97,8 @@ class PropertyUrlClassifier:
         for segment in segments:
             if segment in SERVICE_SEGMENTS or segment in BLOG_SEGMENTS or segment in LEGAL_SEGMENTS:
                 return False
+            if _ADDRESS_SLUG_PATTERN.fullmatch(segment):
+                return True
             if ADDRESS_OR_ID_PATTERN.search(segment):
                 return True
         return False

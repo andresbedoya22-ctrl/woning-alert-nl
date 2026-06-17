@@ -231,7 +231,20 @@ def _normalize_city_raw(city_raw: str) -> str:
     if not value:
         return ""
     value = re.sub(r"(?i)^in\s+", "", value).strip()
+    value = re.sub(r"^\d{4}\s?[A-Za-z]{2}\s+", "", value).strip()
+    heading_like = " ".join(value.strip().lower().split())
+    if heading_like in {"huizen", "woning", "woningen"}:
+        return ""
+    if heading_like and len(heading_like.split()) >= 4 and any(
+        token in heading_like for token in ("huizen", "woning", "woningen", "koop", "huur", "staan")
+    ):
+        return ""
+    inline_city_match = re.search(r"(?i)\b(?:[a-z]{1,2}\s+)?in\s+([^0-9]+)$", value)
+    if inline_city_match:
+        value = inline_city_match.group(1).strip()
     if not value:
+        return ""
+    if len(re.sub(r"[\W\d_']+", "", value, flags=re.UNICODE)) <= 2:
         return ""
 
     parts = [segment for segment in re.split(r"([ -])", value) if segment]
@@ -252,7 +265,7 @@ def _is_valid_city_raw(city_raw: str) -> bool:
     normalized = _normalize_city_raw(city_raw)
     if not normalized:
         return False
-    collapsed = re.sub(r"[^A-Za-zÀ-ÿ']", "", normalized)
+    collapsed = re.sub(r"[\W\d_']+", "", normalized, flags=re.UNICODE)
     if len(collapsed) <= 1:
         return False
     if normalized.isnumeric():

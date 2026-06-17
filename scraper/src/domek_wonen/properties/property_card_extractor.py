@@ -43,10 +43,11 @@ STATUS_PATTERNS = (
     "verkocht",
     "beschikbaar",
     "te koop",
+    "te huur",
 )
-PRICE_PATTERN = r"€\s?[\d\.\,]+(?:\s*[a-z.]+)?"
-LIVING_AREA_PATTERN = r"\d+\s?m²\s*(?:woonoppervlakte|wonen|living)?"
-PLOT_AREA_PATTERN = r"\d+\s?m²\s*(?:perceel|plot|kavel)"
+PRICE_PATTERN = r"(?:€)\s?[\d\.\,]+(?:\s*[-,/]?\s*(?:k\.k\.|p/m))?|prijs op aanvraag"
+LIVING_AREA_PATTERN = r"\d+\s?m(?:²|2)\s*(?:woonoppervlakte|wonen|living)?"
+PLOT_AREA_PATTERN = r"\d+\s?m(?:²|2)\s*(?:perceel|plot|kavel)"
 ROOMS_PATTERN = r"\d+\s*(?:kamers?|rooms?)"
 
 
@@ -108,6 +109,17 @@ def _normalized_attr(node: HtmlNode, key: str) -> str:
     return (node.attrs.get(key) or "").strip().lower()
 
 
+def _class_blob(node: HtmlNode) -> str:
+    return " ".join(value for value in (_normalized_attr(node, "class"), _normalized_attr(node, "id")) if value)
+
+
+def _class_tokens(node: HtmlNode) -> set[str]:
+    tokens: set[str] = set()
+    for value in (_normalized_attr(node, "class"), _normalized_attr(node, "id")):
+        tokens.update(token for token in value.split() if token)
+    return tokens
+
+
 def _container_score(node: HtmlNode) -> int:
     class_blob = " ".join(
         value for value in (_normalized_attr(node, "class"), _normalized_attr(node, "id")) if value
@@ -123,6 +135,30 @@ def _container_score(node: HtmlNode) -> int:
 def _find_line(text: str, pattern: str) -> str:
     match = re.search(pattern, text, flags=re.IGNORECASE)
     return _collapse_whitespace(match.group(0)) if match else ""
+
+
+def _find_descendant_text_by_class(node: HtmlNode, *class_tokens: str) -> str:
+    for descendant in node.iter_descendants():
+        tokens = _class_tokens(descendant)
+        if all(token in tokens for token in class_tokens):
+            text = descendant.text_content()
+            if text:
+                return text
+    return ""
+
+
+def _normalize_price_raw(value: str) -> str:
+    text = _collapse_whitespace(value)
+    if not text:
+        return ""
+    if "prijs op aanvraag" in text.casefold():
+        return "Prijs op aanvraag"
+    match = re.search(r"(?P<amount>[\d\.\,]+)\s*(?P<suffix>k\.k\.|p/m)\s*€?$", text, flags=re.IGNORECASE)
+    if match:
+        return f"€ {match.group('amount')} {match.group('suffix')}"
+    if "€" in text and not text.startswith("€"):
+        text = f"€ {text.replace('€', '').strip()}"
+    return text
 
 
 def _extract_address(text: str) -> tuple[str, str]:
@@ -154,6 +190,30 @@ def _extract_image_url(container: HtmlNode, base_url: str) -> str:
         if src:
             return urljoin(base_url, src)
     return ""
+
+
+def _extract_image_alt(container: HtmlNode) -> str:
+    for node in container.iter_descendants():
+        if node.tag != "img":
+            continue
+        alt = (node.attrs.get("alt") or "").strip()
+        if alt:
+            return alt
+    return ""
+
+
+def _extract_card_address_city(container: HtmlNode, fallback_text: str) -> tuple[str, str]:
+    title = _find_descendant_text_by_class(container, "card__title")
+    city = _find_descendant_text_by_class(container, "card__city")
+    if title or city:
+        return title, city
+
+    street = _find_descendant_text_by_class(container, "street")
+    city = _find_descendant_text_by_class(container, "city")
+    if street or city:
+        return street, city
+
+    return _extract_address(fallback_text)
 
 
 def _container_signal_score(node: HtmlNode) -> int:
@@ -308,9 +368,15 @@ class PropertyCardExtractor:
             seen_urls.add(normalized_url)
 
             title = _extract_title(container, best_anchor)
-            address_raw, city_raw = _extract_address(container_text)
-            price_raw = _find_line(container_text, PRICE_PATTERN)
-            status_raw = _extract_status(container_text)
+            image_alt = _extract_image_alt(container)
+            address_raw, city_raw = _extract_card_address_city(container, container_text)
+            price_raw = _find_descendant_text_by_class(container, "card__price") or _find_descendant_text_by_class(container, "rlw-price")
+            if not price_raw:
+                price_raw = _find_line(container_text, PRICE_PATTERN)
+            price_raw = _normalize_price_raw(price_raw)
+            status_raw = _find_descendant_text_by_class(container, "rlw-status")
+            if not status_raw:
+                status_raw = _extract_status(image_alt) or _extract_status(container_text)
             living_area_raw = _find_line(container_text, LIVING_AREA_PATTERN)
             plot_area_raw = _find_line(container_text, PLOT_AREA_PATTERN)
             rooms_raw = _find_line(container_text, ROOMS_PATTERN)

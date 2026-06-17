@@ -936,13 +936,20 @@ def test_property_discovery_invalid_address_raw_is_excluded_from_matching_ready_
 
 
 def test_property_discovery_normalizes_city_with_in_prefix() -> None:
+    assert _normalize_city_raw("Tilburg") == "Tilburg"
     assert _normalize_city_raw("in Asten") == "Asten"
     assert _normalize_city_raw("in Bergen Op Zoom") == "Bergen op Zoom"
     assert _normalize_city_raw("in 'S-Hertogenbosch") == "'s-Hertogenbosch"
+    assert _normalize_city_raw("5038 DM Tilburg") == "Tilburg"
+    assert _normalize_city_raw("B in Tilburg") == "Tilburg"
+    assert _normalize_city_raw("Huizen Die te Koop En te Huur Staan") == ""
+    assert _normalize_city_raw("Woningen") == ""
 
 
 def test_property_discovery_rejects_invalid_short_or_numeric_city() -> None:
     assert _is_valid_city_raw("C") is False
+    assert _is_valid_city_raw("Hp") is False
+    assert _is_valid_city_raw("Woningen") is False
     assert _is_valid_city_raw("2") is False
 
 

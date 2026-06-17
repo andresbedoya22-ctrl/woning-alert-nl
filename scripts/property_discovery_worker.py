@@ -125,6 +125,8 @@ def _needs_detail_enrichment(candidate: PropertyCandidate) -> bool:
         return True
     if not (candidate.price_raw or "").strip():
         return True
+    if not (candidate.status_raw or "").strip():
+        return True
     return False
 
 

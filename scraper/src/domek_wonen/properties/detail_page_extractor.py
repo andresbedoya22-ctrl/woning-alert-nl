@@ -16,10 +16,11 @@ STATUS_PATTERNS = (
     "verkocht",
     "beschikbaar",
     "te koop",
+    "te huur",
 )
-PRICE_PATTERN = r"(?:€|eur)\s?[\d\.\,]+(?:\s*[a-z.]+)?"
-LIVING_AREA_PATTERN = r"\d+\s?m[²2]\s*(?:woonoppervlakte|wonen|living)?"
-PLOT_AREA_PATTERN = r"\d+\s?m[²2]\s*(?:perceel|plot|kavel)"
+PRICE_PATTERN = r"(?:€|eur)\s?[\d\.\,]+(?:\s*[-,/]?\s*(?:k\.k\.|p/m))?|prijs op aanvraag"
+LIVING_AREA_PATTERN = r"\d+\s?m(?:[²2]|\s*<sup>\s*2\s*</sup>)\s*(?:woonoppervlakte|wonen|living)?"
+PLOT_AREA_PATTERN = r"\d+\s?m(?:[²2]|\s*<sup>\s*2\s*</sup>)\s*(?:perceel|plot|kavel)"
 ROOMS_PATTERN = r"\d+\s*(?:kamers?|rooms?)"
 ENERGY_LABEL_PATTERN = r"(?:energielabel|energy label)\s*[:\-]?\s*([a-g]\+{0,3})"
 PROPERTY_TYPE_PATTERNS = (

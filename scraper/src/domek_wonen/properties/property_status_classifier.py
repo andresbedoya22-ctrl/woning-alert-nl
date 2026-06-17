@@ -16,7 +16,7 @@ class PropertyStatusClassifier:
             return "verdwenen"
         if "verkocht" in haystack:
             return "verkocht"
-        if any(token in haystack for token in ("beschikbaar", "te koop", "vraagprijs", "prijs op aanvraag", "k.k.")):
+        if any(token in haystack for token in ("beschikbaar", "te koop", "te huur", "vraagprijs", "prijs op aanvraag", "k.k.", "p/m")):
             return "beschikbaar"
         return "unknown"
 
