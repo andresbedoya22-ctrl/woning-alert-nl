@@ -1,0 +1,35 @@
+{
+  "source_domain": "example-static-cards.nl",
+  "parser_family": "html_static_cards",
+  "listing_url": "https://example-static-cards.nl/aanbod/koop",
+  "card_selector": ".listing-card",
+  "detail_url_selector": "a.listing-card__link",
+  "address_selector": ".listing-card__address",
+  "price_selector": ".listing-card__price",
+  "status_selector": ".listing-card__status",
+  "city_selector": ".listing-card__city",
+  "living_area_selector": ".listing-card__living-area",
+  "rooms_selector": ".listing-card__rooms",
+  "image_selector": ".listing-card img",
+  "pagination_strategy": "next_link",
+  "detail_enrichment_required": true,
+  "known_noise_selectors": [
+    ".newsletter",
+    ".cta-banner",
+    ".breadcrumbs"
+  ],
+  "status_mapping": {
+    "beschikbaar": "available",
+    "onder bod": "under_offer",
+    "verkocht": "sold"
+  },
+  "price_patterns": [
+    "€\\s?[\\d\\.,]+",
+    "prijs op aanvraag"
+  ],
+  "qa_expectations": {
+    "min_card_count": 2,
+    "requires_address": true,
+    "requires_price": true
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "source_domain": "example-wordpress-cards.nl",
+  "parser_family": "wordpress_cards",
+  "listing_url": "https://example-wordpress-cards.nl/woningen",
+  "card_selector": ".card.carousel__slide",
+  "detail_url_selector": "a.card__link",
+  "address_selector": ".card__title",
+  "price_selector": ".card__price",
+  "status_selector": ".badge, .card__status",
+  "city_selector": ".card__city",
+  "living_area_selector": ".details__item",
+  "rooms_selector": ".details__rooms",
+  "image_selector": ".card__image",
+  "pagination_strategy": "next_link",
+  "detail_enrichment_required": true,
+  "known_noise_selectors": [
+    ".wp-block-query-pagination",
+    ".breadcrumbs",
+    ".hero"
+  ],
+  "status_mapping": {
+    "beschikbaar": "available",
+    "open huis": "available",
+    "onder bod": "under_offer",
+    "verkocht": "sold"
+  },
+  "price_patterns": [
+    "€\\s?[\\d\\.,]+",
+    "prijs op aanvraag"
+  ],
+  "qa_expectations": {
+    "min_card_count": 2,
+    "requires_address": true,
+    "requires_price": true
+  }
+}

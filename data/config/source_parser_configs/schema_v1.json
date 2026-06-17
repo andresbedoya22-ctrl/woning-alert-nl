@@ -1,0 +1,32 @@
+{
+  "required_fields": [
+    "source_domain",
+    "parser_family",
+    "listing_url",
+    "card_selector",
+    "detail_url_selector",
+    "address_selector",
+    "price_selector",
+    "status_selector",
+    "city_selector",
+    "living_area_selector",
+    "rooms_selector",
+    "image_selector",
+    "pagination_strategy",
+    "detail_enrichment_required",
+    "known_noise_selectors",
+    "status_mapping",
+    "price_patterns",
+    "qa_expectations"
+  ],
+  "allowed_parser_families": [
+    "html_static_cards",
+    "wordpress_cards"
+  ],
+  "allowed_pagination_strategies": [
+    "none",
+    "next_link",
+    "page_param",
+    "load_more"
+  ]
+}

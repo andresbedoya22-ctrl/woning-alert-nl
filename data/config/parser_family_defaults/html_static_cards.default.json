@@ -1,0 +1,29 @@
+{
+  "parser_family": "html_static_cards",
+  "pagination_strategy": "next_link",
+  "detail_enrichment_required": true,
+  "known_noise_selectors": [
+    ".pagination",
+    ".breadcrumbs",
+    ".newsletter",
+    ".hero",
+    ".filters",
+    ".cta"
+  ],
+  "price_patterns": [
+    "€\\s?[\\d\\.,]+",
+    "prijs op aanvraag",
+    "[\\d\\.,]+\\s?k\\.k\\."
+  ],
+  "status_mapping": {
+    "beschikbaar": "available",
+    "te koop": "available",
+    "onder bod": "under_offer",
+    "verkocht": "sold"
+  },
+  "qa_expectations": {
+    "min_card_count": 2,
+    "requires_address": true,
+    "requires_price": true
+  }
+}
