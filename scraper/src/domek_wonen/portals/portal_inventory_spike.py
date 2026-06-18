@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 from collections import Counter
 from dataclasses import asdict
+from datetime import UTC, datetime
 from pathlib import Path
 import re
 import unicodedata
@@ -116,6 +117,13 @@ def summarize_city_result(
 
 
 def generate_markdown_report(result: PortalSpikeResult) -> str:
+    portal_counter = Counter(city_result.portal for city_result in result.city_results)
+    portal_listing_counter = Counter(city_result.portal for city_result in result.city_results for _ in city_result.listings)
+    blocked_results = [
+        city_result
+        for city_result in result.city_results
+        if city_result.source_status != SourceStatus.SUCCESS
+    ]
     lines = [
         f"# {result.report_title}",
         "",
@@ -128,11 +136,32 @@ def generate_markdown_report(result: PortalSpikeResult) -> str:
         lines.append(f"- {status_value}: {count}")
     lines.append("")
 
+    lines.append("## Portal Totals")
+    for portal_name, city_count in sorted(portal_counter.items()):
+        lines.append(
+            f"- {portal_name}: cities={city_count}, listings={portal_listing_counter.get(portal_name, 0)}"
+        )
+    lines.append("")
+
+    lines.append("## Safe To Compare Removals")
+    safe_to_compare_removals = all(city_result.source_status == SourceStatus.SUCCESS for city_result in result.city_results)
+    lines.append(f"- safe_to_compare_removals: {str(safe_to_compare_removals).lower()}")
+    lines.append("")
+
+    if blocked_results:
+        lines.append("## Blocked Or Failed Runs")
+        for city_result in blocked_results:
+            lines.append(
+                f"- {city_result.portal} / {city_result.city_query}: {city_result.source_status.value}"
+            )
+        lines.append("")
+
     for city_result in result.city_results:
         lines.extend(
             [
                 f"## {city_result.portal} - {city_result.city_query}",
                 f"- source_status: {city_result.source_status.value}",
+                f"- safe_to_compare_removals: {str(city_result.source_status == SourceStatus.SUCCESS).lower()}",
                 f"- portal_mode: {city_result.portal_mode.value}",
                 f"- recommended_use: {city_result.recommended_use}",
                 f"- listings: {len(city_result.listings)}",
@@ -149,10 +178,61 @@ def generate_markdown_report(result: PortalSpikeResult) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
+def build_default_output_dir(base_dir: Path, generated_at: str | None = None) -> Path:
+    timestamp = generated_at or datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    return base_dir / timestamp
+
+
+def _city_summary_rows(result: PortalSpikeResult) -> list[dict[str, str | int]]:
+    rows: list[dict[str, str | int]] = []
+    for city_result in result.city_results:
+        rows.append(
+            {
+                "portal": city_result.portal,
+                "portal_mode": city_result.portal_mode.value,
+                "city_query": city_result.city_query,
+                "search_url": city_result.search_url,
+                "source_status": city_result.source_status.value,
+                "page_number": city_result.page_number,
+                "listings_count": len(city_result.listings),
+                "duplicate_url_rate": f"{city_result.duplicate_url_rate:.6f}",
+                "safe_to_compare_removals": str(city_result.source_status == SourceStatus.SUCCESS).lower(),
+                "recommended_use": city_result.recommended_use,
+                "blocked_reason": city_result.blocked_reason,
+            }
+        )
+    return rows
+
+
+def _dedup_summary_rows(result: PortalSpikeResult) -> list[dict[str, str | int]]:
+    rows: list[dict[str, str | int]] = []
+    grouped_listings: dict[tuple[str, str], list[PortalListing]] = {}
+    for city_result in result.city_results:
+        grouped_listings[(city_result.portal, city_result.city_query)] = city_result.listings
+
+    for (portal, city_query), listings in sorted(grouped_listings.items()):
+        dedup_keys = [dedup_key_for_listing(listing) for listing in listings]
+        unique_count = len(set(dedup_keys))
+        duplicate_count = len(dedup_keys) - unique_count
+        rows.append(
+            {
+                "portal": portal,
+                "city_query": city_query,
+                "listings_count": len(listings),
+                "unique_listing_count": unique_count,
+                "duplicate_count": duplicate_count,
+                "duplicate_url_rate": f"{calculate_duplicate_url_rate(listings):.6f}",
+            }
+        )
+    return rows
+
+
 def write_csv_outputs(result: PortalSpikeResult, output_dir: Path) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    listings_path = output_dir / "portal_listings.csv"
-    summary_path = output_dir / "portal_summary.csv"
+    listings_path = output_dir / "portal_inventory_sample.csv"
+    city_summary_path = output_dir / "portal_city_summary.csv"
+    dedup_summary_path = output_dir / "portal_dedup_summary.csv"
+    report_path = output_dir / "portal_inventory_report.md"
 
     with listings_path.open("w", encoding="utf-8", newline="") as handle:
         fieldnames = list(PortalListing.__dataclass_fields__.keys())
@@ -164,7 +244,7 @@ def write_csv_outputs(result: PortalSpikeResult, output_dir: Path) -> dict[str, 
                 row["portal_mode"] = listing.portal_mode.value
                 writer.writerow(row)
 
-    with summary_path.open("w", encoding="utf-8", newline="") as handle:
+    with city_summary_path.open("w", encoding="utf-8", newline="") as handle:
         fieldnames = [
             "portal",
             "portal_mode",
@@ -174,25 +254,34 @@ def write_csv_outputs(result: PortalSpikeResult, output_dir: Path) -> dict[str, 
             "page_number",
             "listings_count",
             "duplicate_url_rate",
+            "safe_to_compare_removals",
             "recommended_use",
             "blocked_reason",
         ]
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
-        for city_result in result.city_results:
-            writer.writerow(
-                {
-                    "portal": city_result.portal,
-                    "portal_mode": city_result.portal_mode.value,
-                    "city_query": city_result.city_query,
-                    "search_url": city_result.search_url,
-                    "source_status": city_result.source_status.value,
-                    "page_number": city_result.page_number,
-                    "listings_count": len(city_result.listings),
-                    "duplicate_url_rate": f"{city_result.duplicate_url_rate:.6f}",
-                    "recommended_use": city_result.recommended_use,
-                    "blocked_reason": city_result.blocked_reason,
-                }
-            )
+        for row in _city_summary_rows(result):
+            writer.writerow(row)
 
-    return {"listings_csv": listings_path, "summary_csv": summary_path}
+    with dedup_summary_path.open("w", encoding="utf-8", newline="") as handle:
+        fieldnames = [
+            "portal",
+            "city_query",
+            "listings_count",
+            "unique_listing_count",
+            "duplicate_count",
+            "duplicate_url_rate",
+        ]
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in _dedup_summary_rows(result):
+            writer.writerow(row)
+
+    report_path.write_text(generate_markdown_report(result), encoding="utf-8")
+
+    return {
+        "report_md": report_path,
+        "listings_csv": listings_path,
+        "city_summary_csv": city_summary_path,
+        "dedup_summary_csv": dedup_summary_path,
+    }
