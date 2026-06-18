@@ -65,8 +65,11 @@ class _FundaHTMLParser(HTMLParser):
         self._card[self._field] = normalize_text(self._card.get(self._field, "") + " " + data)
 
 
-def build_search_url(city: str) -> str:
-    return f"https://www.funda.nl/zoeken/koop?selected_area=%5B%22{quote_plus(normalize_text(city).lower())}%22%5D"
+def build_search_url(city: str, page: int = 1) -> str:
+    url = f"https://www.funda.nl/zoeken/koop?selected_area=%5B%22{quote_plus(normalize_text(city).lower())}%22%5D"
+    if page > 1:
+        return f"{url}&page={page}"
+    return url
 
 
 def parse_listing_cards(html: str, city_query: str, search_url: str, page_number: int) -> list[PortalListing]:

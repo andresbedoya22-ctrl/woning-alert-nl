@@ -63,8 +63,11 @@ class _CardHTMLParser(HTMLParser):
         current_card[self._field] = normalize_text(current_card.get(self._field, "") + " " + data)
 
 
-def build_search_url(city: str) -> str:
-    return f"https://www.huislijn.nl/koopwoning/nederland/{quote_plus(normalize_text(city).lower())}"
+def build_search_url(city: str, page: int = 1) -> str:
+    url = f"https://www.huislijn.nl/koopwoning/nederland/{quote_plus(normalize_text(city).lower())}"
+    if page > 1:
+        return f"{url}?page={page}"
+    return url
 
 
 def parse_listing_cards(html: str, city_query: str, search_url: str, page_number: int) -> list[PortalListing]:

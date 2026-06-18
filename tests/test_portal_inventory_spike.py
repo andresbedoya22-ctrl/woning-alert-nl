@@ -159,6 +159,14 @@ def test_funda_sample_parser_returns_listing_and_is_benchmark_only() -> None:
     assert listings[0].portal_mode == PortalMode.BENCHMARK_ONLY_PERMISSION_REQUIRED
 
 
+def test_portal_build_search_urls_accept_page_argument() -> None:
+    assert huislijn.build_search_url("Tilburg", page=1) == "https://www.huislijn.nl/koopwoning/nederland/tilburg"
+    assert pararius.build_search_url("Tilburg", page=1) == "https://www.pararius.nl/koopwoningen/tilburg"
+    assert funda.build_search_url("Tilburg", page=1) == (
+        "https://www.funda.nl/zoeken/koop?selected_area=%5B%22tilburg%22%5D"
+    )
+
+
 def test_generate_markdown_report_includes_source_status_and_recommended_use(tmp_path: Path) -> None:
     city_result = summarize_city_result(
         portal="funda",
