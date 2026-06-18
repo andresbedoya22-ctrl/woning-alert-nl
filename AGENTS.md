@@ -1,37 +1,54 @@
 # AGENTS.md
 
-Reglas permanentes para cualquier agente que trabaje en este repositorio `Domek Wonen`.
+Reglas permanentes para cualquier agente que trabaje en este repositorio `WoningAlert NL`.
 
-## Objetivo del pipeline
+## Direccion del proyecto
 
-El pipeline de Domek Wonen existe para detectar viviendas nuevas publicadas por makelaars, normalizarlas, deduplicarlas, preparar inventario util para matching con clientes activos y producir resultados antes de que un asesor tenga que buscar manualmente.
+Nueva direccion: `PORTAL-FIRST NATIONAL INVENTORY`.
+
+Objetivo del producto: revisar fuentes nacionales de vivienda una vez al dia, guardar inventario propio, detectar nuevas, removidas y cambiadas, cruzar ese inventario con busquedas de clientes y generar recomendaciones operativas. `Woning Scanner` queda para una fase posterior sobre una base ya estable.
 
 ## Reglas hard
 
 - Ejecutar todo en Windows con PowerShell. No asumir Bash.
-- No usar Funda.
-- No usar Pararius salvo pedido explicito del usuario.
+- Trabajar por fases.
+- Hacer cambios pequenos y testeados.
+- No mezclar fases en una misma tarea.
+- No tocar `PropertyDiscovery`.
 - No leer ni escribir en `data/raw` salvo pedido explicito del usuario.
-- No borrar outputs generados del pipeline.
+- No construir scrapers en esta fase.
+- No dashboard antes de `Daily Sync v1` + `Client Matching v1`.
+- No scanner antes de matching.
+- No makelaar-by-makelaar como camino principal.
+- No CAPTCHA solving.
+- No `2Captcha`.
+- No proxy rotation.
+- No login falso.
+- No fingerprint spoofing.
+- No anti-bot bypass.
+- Funda solo `benchmark-only` sin permiso explicito.
+- Pararius solo `benchmark` y `permission-required`, salvo autorizacion explicita.
+- Stop si aparece `403`, `429`, CAPTCHA o login wall.
+- Registrar `source_status` y continuar con otras fuentes cuando sea seguro hacerlo.
+- Si una fuente falla: no borrar propiedades de esa fuente, fijar `safe_to_compare_removals=false` y usar el ultimo inventario exitoso como `stale`.
 - No usar `git add .`.
 - No hacer commit sin permiso explicito del usuario.
 - No modificar codigo si el pedido solo requiere documentacion o instrucciones operativas.
 
-## Carpetas y artefactos generados que no deben commitearse
+## Orden por fases
 
-No commitear outputs generados por ejecuciones del pipeline, especialmente:
-
-- `data/property_discovery/`
-- `data/property_discovery/latest/`
-- `data/property_discovery/runs/`
-- `data/discovery/latest/`
-- `data/discovery/platform_fingerprint/`
-- `data/email_previews/`
-- `data/matching/`
-- `data/diagnostics/`
-- `data/source_debug/`
-
-Si un cambio necesita ejemplos o evidencia, referenciar los archivos generados localmente sin agregarlos al commit.
+| Fase | Nombre |
+| --- | --- |
+| 0 | GitHub/base limpia |
+| 1 | Portal Inventory Spike |
+| 2 | Huislijn Adapter v1 |
+| 3 | Inventory Core v1 |
+| 4 | Daily Sync v1 |
+| 5 | Client Matching v1 |
+| 6 | Email Draft Generator v1 |
+| 7 | Multi-source Strategy v1 |
+| 8 | Woning Scanner v1 |
+| 9 | MVP operativo |
 
 ## Validacion obligatoria
 
@@ -41,26 +58,38 @@ Cuando se modifique codigo, la validacion minima obligatoria es:
 py -3.12 -m pytest
 ```
 
-No declarar una tarea como terminada si hubo cambios de codigo y esa validacion no corrio o no paso, salvo que el usuario acepte explicitamente esa excepcion.
+Si el entorno no usa `py -3.12`, al menos correr:
 
-## Reglas de `clean_available`
+```powershell
+python -m pytest tests -o cache_dir=tmp.pytest_cache --basetemp=tmp\pytest_phase0a
+```
 
-- `clean_available` es el unico conjunto permitido como entrada a Matching v1.
-- `clean_available` debe representar propiedades normalizadas, deduplicadas y disponibles para matching.
-- No mezclar en matching propiedades rechazadas, duplicadas, invalidas o fuera de disponibilidad.
-- Si hay dudas entre `property_inventory`, `property_candidates` y `matching_ready_inventory`, usar solo el output que represente `clean_available`.
+No declarar una tarea como terminada si hubo cambios de codigo y esa validacion no corrio o no paso, salvo aceptacion explicita del usuario.
 
-## Reglas de Matching v1
+## Manejo de fallas por fuente
 
-- Matching v1 debe usar solo `clean_available`.
-- No descartar una propiedad solo porque falten campos opcionales.
-- `bedrooms_count` puede ser filtro duro cuando el cliente define `min_bedrooms`.
-- `rooms_count` no sustituye `bedrooms_count` salvo señal clara.
-- ubicacion/zona debe poder ser filtro duro.
-- `m2` y `energy_label` siguen siendo scoring/warnings salvo que el cliente los marque como obligatorios.
-- `rooms`, `m2` y `energy_label` son opcionales para Matching v1 salvo configuracion explicita del cliente.
-- La ausencia de `rooms`, `m2` o `energy_label` no convierte una propiedad en no apta para matching por si sola.
-- Los descartes deben basarse en problemas reales de elegibilidad o integridad minima, no en metadata opcional incompleta.
+- Un fallo de una fuente no debe tumbar el run completo.
+- No borrar inventario previo de una fuente fallida.
+- No asumir removals reales si la captura de una fuente fallo.
+- Mantener el ultimo inventario exitoso como referencia `stale` hasta recuperar la fuente.
+
+## Artefactos que no deben commitearse
+
+- `.env`
+- `.env.*`
+- `tmp/`
+- `.pytest_cache/`
+- `data/raw/`
+- `data/diagnostics/`
+- `data/cache/`
+- `cache/`
+- HTML masivo, cache HTML y artefactos transitorios similares
+- outputs generados en `data/property_discovery/`
+- outputs generados en `data/discovery/latest/`
+- outputs generados en `data/discovery/platform_fingerprint/`
+- outputs generados en `data/email_previews/`
+- outputs generados en `data/matching/`
+- outputs generados en `data/source_debug/`
 
 ## Disciplina operativa
 

@@ -1,5 +1,7 @@
 # Python
 .venv/
+.pytest_cache/
+**pycache__/
 __pycache__/
 *.pyc
 
@@ -11,16 +13,17 @@ build/
 
 # Env
 .env
-.env.local
-.env.*.local
+.env.*
 
 # Logs
 logs/
 *.log
 
-# Raw temp
+# Temp and cache
 tmp/
 .cache/
+cache/
+data/cache/
 
 # OS
 .DS_Store
@@ -29,11 +32,23 @@ Thumbs.db
 # Secrets
 *.key
 *.pem
+
+# HTML and captures
+*.html
+*.htm
+*.har
+
+# SQLite temp files
+*.sqlite-wal
+*.sqlite-shm
+
+# Data exclusions
+data/raw/
+data/diagnostics/
 data/discovery/latest/
 data/discovery/runs/
 data/discovery/platform_fingerprint/
 data/discovery/cache/
-data/diagnostics/
 data/email_previews/
 data/matching/
 data/platform_fingerprint/
@@ -42,3 +57,7 @@ data/properties/latest/
 data/properties/runs/
 data/source_capture_audit/
 data/source_debug/
+
+# Keep tracked config/reference data available
+!data/config/
+!data/discovery/reference/
