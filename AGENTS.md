@@ -38,7 +38,12 @@
 - No LLM antes de coarse match.
 - LLM provider objetivo: OpenAI.
 - No modificar `data/raw` salvo instruccion explicita del usuario.
+- No imprimir secrets.
+- No commitear `.env`.
 - No commitear outputs generados.
+- No activar `ENABLE_LLM_EXTRACTION` por defecto.
+- No subir `MAX_LLM_CALLS_PER_RUN` por encima de `0` salvo instruccion explicita de la tarea.
+- No llamar OpenAI en tests unitarios.
 - No usar `git add .`.
 - No hacer push.
 - No hacer commit sin permiso explicito, salvo cuando la tarea autorice commits atomicos.

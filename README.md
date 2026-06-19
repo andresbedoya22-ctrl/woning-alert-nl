@@ -73,6 +73,10 @@ Para el MVP, un daily run es suficiente. La prioridad es una operacion confiable
 - Ningun componente nuevo sin tests.
 - No tocar `data/raw` ni commitear outputs generados.
 
+## Environment
+
+Use `.env.example` as the local template for runtime settings. See [docs/ENVIRONMENT.md](/C:/Projects/domek-wonen/docs/ENVIRONMENT.md) for variables, defaults, secret policy, and the default-disabled LLM and Playwright settings.
+
 ## Comandos base
 
 Instalar dependencias:
