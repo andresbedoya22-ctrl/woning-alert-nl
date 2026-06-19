@@ -141,3 +141,9 @@
 - Hacer commits atomicos.
 - Reportar en el cierre: rama, cambios, validacion, git status final, y riesgos o limites.
 - No mezclar fases.
+
+## Compliance Gate - Regla vinculante
+El modulo `scraper/src/domek_wonen/compliance/robots_gate.py` es el
+guardian unico de la red en el pipeline V4. NINGUN modulo puede hacer
+requests HTTP sin llamar primero a `can_fetch(domain, path)` y recibir
+`True`. Esta regla es vinculante en todos los bloques del pipeline.
