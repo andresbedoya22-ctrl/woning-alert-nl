@@ -80,3 +80,7 @@
 Fase 0 queda cerrada.
 
 No hay blockers tecnicos pendientes dentro del alcance de Fase 0. La recomendacion es pasar a Fase 1 y medir cobertura, estabilidad de URLs, source_status y utilidad de matches antes de construir `Inventory Core`.
+
+## Nota de trazabilidad
+
+- Fase 0.5 quedo committeada como: `42cb1a5 docs: close phase 0 and define phase 1 gate`
