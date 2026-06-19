@@ -1,7 +1,7 @@
 # Python
 .venv/
 .pytest_cache/
-**pycache__/
+**/__pycache__/
 __pycache__/
 *.pyc
 
@@ -38,7 +38,10 @@ Thumbs.db
 *.htm
 *.har
 
-# SQLite temp files
+# SQLite and local DB files
+*.sqlite
+*.sqlite3
+*.db
 *.sqlite-wal
 *.sqlite-shm
 
