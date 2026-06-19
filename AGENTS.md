@@ -72,28 +72,35 @@
 - `storage`
   - SQLite/Postgres u otra persistencia futura.
 - `portals`
-  - portal probes y adapters.
+  - LEGACY/DIAGNOSTICO. Portal probes y adapters del enfoque viejo
+    (Huislijn/Funda/Pararius). NO es el camino V4. No construir sobre ellos.
+    Pendiente de mover a legacy/ en paso futuro.
 - `properties`
-  - legacy reusable y fallback property parsing; no camino principal.
+  - LEGACY/DIAGNOSTICO. property_discovery_engine y parsers asociados del
+    enfoque viejo. Solo el parser source-agnostic validado se rescata, en
+    el paquete harvest/. No construir sobre properties/.
 - `diagnostics`
   - audits y reports.
 - `recommendations` y `woning_scanner`
   - no tocar hasta fase futura salvo instruccion explicita.
 
-## Orden por fases
+## Bloques del pipeline V4
 
-| Fase | Nombre |
+| Bloque | Nombre |
 | --- | --- |
-| 0 | Base limpia y gobierno del repo |
-| 1 | Discovery Census / Portal Inventory Spike |
-| 2 | Huislijn Adapter v1 |
-| 3 | Inventory Core v1 |
-| 4 | Daily Sync v1 |
-| 5 | Client Matching v1 |
-| 6 | Detail Extraction + Validation |
-| 7 | Advisor Draft Generator |
-| 8 | Multi-source Strategy + fallback makelaars |
-| 9 | MVP operativo |
+| 0 | Preparar la mesa (limpieza repo, rama, deps) |
+| 1A | Compliance + Discovery Census (gate mayor) |
+| 1B | Client Profile Audit |
+| 2 | Card Harvester source-agnostic + extractor LLM (sin cablear) |
+| 3 | Discovery productivo por estrategia |
+| 4 | Storage + Change Detection + dedupe canonico |
+| 5 | Coarse Matching (clientes activos) |
+| 6 | Detail Extraction + Validation + Fine Match |
+| 7 | Advisor Draft + Daily Run + Demo |
+
+Los bloques son gate-driven: no se avanza sin pasar la Definition of Done
+del anterior. El Bloque 1A es el gate mayor: su census decide si el
+proyecto sigue como software (verde/amarillo) o pasa a track comercial (rojo).
 
 ## Validacion obligatoria
 
