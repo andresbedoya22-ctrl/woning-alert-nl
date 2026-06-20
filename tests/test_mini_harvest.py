@@ -48,6 +48,7 @@ def test_listing_html_harvest(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.fill_rate_city == 1.0
     assert result.fill_rate_area == 1.0
     assert result.harvest_ok is True
+    assert result.zero_reason is None
 
 
 def test_sitemap_harvest(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -90,6 +91,7 @@ def test_sitemap_harvest(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.listings_parsed == 5
     assert result.fill_rate_price == 1.0
     assert result.fill_rate_city == 1.0
+    assert result.zero_reason is None
 
 
 def test_wp_json_harvest(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -121,6 +123,7 @@ def test_wp_json_harvest(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.fill_rate_price == 1.0
     assert result.fill_rate_city == 1.0
     assert result.fill_rate_area == 1.0
+    assert result.zero_reason is None
 
 
 def test_iframe_only_skipped() -> None:
@@ -220,6 +223,45 @@ def test_no_legacy_imports() -> None:
 
     assert "domek_wonen.properties" not in source
     assert "domek_wonen.portals" not in source
+
+
+def test_zero_reason_for_listing_html_without_cards(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(mini_harvest.robots_gate, "can_fetch", lambda domain, path: True)
+    monkeypatch.setattr(mini_harvest.robots_gate, "crawl_delay", lambda domain: 0.0)
+
+    result = mini_harvest.harvest_domain_sample(
+        "example.nl",
+        "listing_html",
+        aanbod_url="https://example.nl/aanbod",
+        fetcher=lambda url, headers, timeout: FakeResponse(
+            url,
+            200,
+            "<html><body><h1>Geen aanbod</h1></body></html>",
+            {"content-type": "text/html"},
+        ),
+    )
+
+    assert result.listings_found == 0
+    assert result.blocker_reason is None
+    assert result.zero_reason == "listing_html_without_detectable_cards"
+
+
+def test_zero_reason_for_sitemap_without_matching_listing_urls(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(mini_harvest.robots_gate, "can_fetch", lambda domain, path: True)
+    monkeypatch.setattr(mini_harvest.robots_gate, "crawl_delay", lambda domain: 0.0)
+
+    def fetcher(url: str, headers: dict[str, str], timeout: float) -> FakeResponse:
+        return FakeResponse(url, 200, "<urlset><url><loc>https://example.nl/contact</loc></url></urlset>", {"content-type": "application/xml"})
+
+    result = mini_harvest.harvest_domain_sample(
+        "example.nl",
+        "sitemap_with_listings",
+        listing_pattern="/woning/",
+        fetcher=fetcher,
+    )
+
+    assert result.listings_found == 0
+    assert result.zero_reason == "sitemap_urls_missing_or_listing_pattern_unmatched"
 
 
 def test_verdict_thresholds() -> None:

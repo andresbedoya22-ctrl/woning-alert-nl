@@ -6,12 +6,13 @@ import time
 from dataclasses import asdict, dataclass, field
 from html import unescape
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from selectolax.parser import HTMLParser
 
 from domek_wonen.compliance import robots_gate
+from domek_wonen.harvest.card_parser import Listing, harvest, parse_card
 from domek_wonen.runtime_settings import load_runtime_settings
 
 
@@ -24,8 +25,6 @@ SITEMAP_PATHS = (
     "/sitemap/sitemap-index.xml",
 )
 LISTING_HINTS = ("listing", "listings", "woning", "woningen", "aanbod", "huis", "huizen", "koop", "te-koop", "object", "appartement")
-PRICE_PATTERN = r"(?:EUR|€)\s?[\d\.\,]+(?:\s*[-,/]?\s*(?:k\.k\.|p/m))?|prijs op aanvraag"
-AREA_PATTERN = r"\d+\s?m(?:2|²)\b"
 CITY_POSTCODE_PATTERN = re.compile(r"\b\d{4}\s?[A-Z]{2}\s+([A-Z][A-Za-z'().\- ]+)", flags=re.IGNORECASE)
 CITY_LINE_PATTERN = re.compile(r"\b(?:plaats|city|woonplaats)\s*[:\-]?\s*([A-Z][A-Za-z'().\- ]+)", flags=re.IGNORECASE)
 BLOCK_MARKERS = {
@@ -58,6 +57,7 @@ class MiniHarvestResult:
     sample_listings: list[dict[str, str]] = field(default_factory=list)
     blocker_reason: str | None = None
     harvest_ok: bool = False
+    zero_reason: str | None = None
 
 
 @dataclass(slots=True)
@@ -206,16 +206,6 @@ def _extract_wp_rest_bases(types_payload: str) -> list[str]:
     return rest_bases
 
 
-def _find_price(text: str) -> str:
-    match = re.search(PRICE_PATTERN, text or "", flags=re.IGNORECASE)
-    return _normalize_text(match.group(0)) if match else ""
-
-
-def _find_area(text: str) -> str:
-    match = re.search(AREA_PATTERN, text or "", flags=re.IGNORECASE)
-    return _normalize_text(match.group(0)) if match else ""
-
-
 def _find_city(text: str) -> str:
     postcode_match = CITY_POSTCODE_PATTERN.search(text or "")
     if postcode_match:
@@ -223,12 +213,8 @@ def _find_city(text: str) -> str:
     city_match = CITY_LINE_PATTERN.search(text or "")
     if city_match:
         return _normalize_text(city_match.group(1))
-    loose_match = re.search(
-        r"(?:EUR|€)[^A-Z]*[A-Z]?[A-Za-z\.\,\s]*\b([A-Z][A-Za-z'().\-]+(?:\s+[A-Z][A-Za-z'().\-]+)*)\b\s+\d+\s?m(?:2|²)\b",
-        text or "",
-        flags=re.IGNORECASE,
-    )
-    return _normalize_text(loose_match.group(1)) if loose_match else ""
+    parsed = parse_card("https://example.invalid/card", text or "")
+    return parsed.city
 
 
 def _extract_meta_content(html: str, key: str) -> str:
@@ -249,17 +235,23 @@ def _extract_title(tree: HTMLParser, html: str) -> str:
     return ""
 
 
+def _to_mini_listing(listing: Listing) -> MiniHarvestListing:
+    return MiniHarvestListing(
+        source_url=listing.source_url,
+        title=listing.title,
+        price=listing.price,
+        city=listing.city,
+        area=listing.area,
+        address=listing.address,
+    )
+
+
 def _extract_detail_listing(html: str, source_url: str) -> MiniHarvestListing:
     tree = HTMLParser(html or "")
     visible_text = tree.body.text(separator=" ", strip=True) if tree.body else tree.text(separator=" ", strip=True)
-    listing = MiniHarvestListing(
-        source_url=source_url,
-        title=_extract_title(tree, html),
-        price=_find_price(visible_text),
-        city=_find_city(visible_text),
-        area=_find_area(visible_text),
-        address="",
-    )
+    parsed = parse_card(source_url, visible_text)
+    listing = _to_mini_listing(parsed)
+    listing.title = _extract_title(tree, html)
 
     for script in tree.css('script[type="application/ld+json"]'):
         body = _collapse_whitespace(script.text())
@@ -295,76 +287,8 @@ def _extract_detail_listing(html: str, source_url: str) -> MiniHarvestListing:
     if not listing.city:
         listing.city = _find_city(_extract_meta_content(html, "og:description"))
     if not listing.area:
-        listing.area = _find_area(_extract_meta_content(html, "og:description"))
+        listing.area = parse_card(source_url, _extract_meta_content(html, "og:description")).area
     return listing
-
-
-def _container_text(node) -> str:
-    return _normalize_text(node.text(separator=" ", strip=True))
-
-
-def _anchor_score(url: str, text: str) -> int:
-    lowered_url = url.lower()
-    lowered_text = text.lower()
-    score = 0
-    if any(hint in lowered_url for hint in LISTING_HINTS):
-        score += 3
-    if _find_price(text):
-        score += 2
-    if _find_area(text):
-        score += 1
-    if _find_city(text):
-        score += 1
-    if "verkocht" in lowered_text or "onder bod" in lowered_text or "te koop" in lowered_text:
-        score += 1
-    return score
-
-
-def _extract_card_listings(html: str, *, base_url: str, domain: str, max_listings: int) -> list[MiniHarvestListing]:
-    tree = HTMLParser(html or "")
-    listings: list[MiniHarvestListing] = []
-    seen_urls: set[str] = set()
-
-    for anchor in tree.css("a[href]"):
-        href = (anchor.attributes.get("href") or "").strip()
-        if not href:
-            continue
-        resolved_url = urljoin(base_url, href)
-        if (urlsplit(resolved_url).hostname or "").lower() != domain:
-            continue
-
-        container = anchor
-        for _ in range(4):
-            if container.parent is None:
-                break
-            container = container.parent
-            if container.tag in {"article", "li", "div"}:
-                break
-
-        text = _container_text(container)
-        if _anchor_score(resolved_url, text) < 4:
-            continue
-        if resolved_url in seen_urls:
-            continue
-        seen_urls.add(resolved_url)
-
-        title = _normalize_text(anchor.text(separator=" ", strip=True))
-        if not title:
-            heading = container.css_first("h1, h2, h3, h4")
-            title = _normalize_text(heading.text(separator=" ", strip=True)) if heading else ""
-        listings.append(
-            MiniHarvestListing(
-                source_url=resolved_url,
-                title=title,
-                price=_find_price(text),
-                city=_find_city(text),
-                area=_find_area(text),
-                address="",
-            )
-        )
-        if len(listings) >= max_listings:
-            break
-    return listings
 
 
 def _listing_url_matches(url: str, listing_pattern: str | None, domain: str) -> bool:
@@ -383,7 +307,14 @@ def _compute_fill_rate(listings: list[MiniHarvestListing], attr: str) -> float:
     return non_empty / len(listings)
 
 
-def summarize_result(domain: str, strategy: str, listings_found: int, listings: list[MiniHarvestListing], blocker_reason: str | None) -> MiniHarvestResult:
+def summarize_result(
+    domain: str,
+    strategy: str,
+    listings_found: int,
+    listings: list[MiniHarvestListing],
+    blocker_reason: str | None,
+    zero_reason: str | None = None,
+) -> MiniHarvestResult:
     parsed = listings
     fill_rate_price = _compute_fill_rate(parsed, "price")
     fill_rate_city = _compute_fill_rate(parsed, "city")
@@ -400,6 +331,7 @@ def summarize_result(domain: str, strategy: str, listings_found: int, listings: 
         fill_rate_url=fill_rate_url,
         sample_listings=[asdict(listing) for listing in parsed[:3]],
         blocker_reason=blocker_reason,
+        zero_reason=zero_reason,
         harvest_ok=len(parsed) > 0 and blocker_reason is None,
     )
 
@@ -434,11 +366,19 @@ def harvest_domain_sample(
         blocker_reason = _blocked_reason(response)
         if response is None or response.status_code != 200 or blocker_reason is not None:
             return summarize_result(normalized_domain, strategy, 0, [], blocker_reason or "fetch_failed")
-        listings = _extract_card_listings(response.text, base_url=response.url, domain=normalized_domain, max_listings=max_listings)
-        return summarize_result(normalized_domain, strategy, len(listings), listings, None)
+        if not candidate_url.strip():
+            return summarize_result(normalized_domain, strategy, 0, [], None, "empty_aanbod_url")
+        parsed_listings = [
+            _to_mini_listing(listing)
+            for listing in harvest(response.text, base_url=response.url)
+            if (urlsplit(listing.source_url).hostname or "").lower() == normalized_domain
+        ][:max_listings]
+        zero_reason = "listing_html_without_detectable_cards" if not parsed_listings else None
+        return summarize_result(normalized_domain, strategy, len(parsed_listings), parsed_listings, None, zero_reason)
 
     if strategy == "sitemap_with_listings":
         listing_urls: list[str] = []
+        saw_html_sitemap = False
         for sitemap_path in SITEMAP_PATHS:
             response = request_manager.fetch_path(sitemap_path)
             blocker_reason = _blocked_reason(response)
@@ -448,6 +388,8 @@ def harvest_domain_sample(
                 continue
             if response.status_code != 200:
                 continue
+            if "html" in response.headers.get("content-type", "").lower():
+                saw_html_sitemap = True
             locs = _extract_sitemap_urls(response.text)
             nested_sitemaps = [loc for loc in locs if loc.lower().endswith(".xml")]
             listing_urls.extend([loc for loc in locs if _listing_url_matches(loc, listing_pattern, normalized_domain)])
@@ -462,6 +404,8 @@ def harvest_domain_sample(
                     continue
                 if nested_response.status_code != 200:
                     continue
+                if "html" in nested_response.headers.get("content-type", "").lower():
+                    saw_html_sitemap = True
                 nested_urls = _extract_sitemap_urls(nested_response.text)
                 listing_urls.extend([loc for loc in nested_urls if _listing_url_matches(loc, listing_pattern, normalized_domain)])
                 if listing_urls:
@@ -480,7 +424,15 @@ def harvest_domain_sample(
             if detail_response.status_code != 200:
                 continue
             parsed.append(_extract_detail_listing(detail_response.text, detail_response.url))
-        return summarize_result(normalized_domain, strategy, len(listing_urls), parsed, None if parsed else blocker_reason)
+        zero_reason = None
+        if not parsed and blocker_reason is None:
+            if saw_html_sitemap:
+                zero_reason = "sitemap_returned_html_without_urls"
+            elif not listing_urls:
+                zero_reason = "sitemap_urls_missing_or_listing_pattern_unmatched"
+            else:
+                zero_reason = "detail_pages_without_parseable_cards"
+        return summarize_result(normalized_domain, strategy, len(listing_urls), parsed, None if parsed else blocker_reason, zero_reason)
 
     types_response = request_manager.fetch_path("/wp-json/wp/v2/types")
     blocker_reason = _blocked_reason(types_response)
@@ -516,14 +468,9 @@ def harvest_domain_sample(
             content = item.get("content", {})
             content_text = _normalize_text(str(content.get("rendered") or "")) if isinstance(content, dict) else ""
             merged_text = " ".join(part for part in (title, excerpt_text, content_text) if part)
-            listing = MiniHarvestListing(
-                source_url=source_url,
-                title=title,
-                price=_find_price(merged_text),
-                city=_find_city(merged_text),
-                area=_find_area(merged_text),
-                address="",
-            )
+            card = parse_card(source_url, merged_text)
+            card.title = title
+            listing = _to_mini_listing(card)
             if source_url and (not listing.price or not listing.city or not listing.area) and len(parsed) < max_detail_pages:
                 detail_response = request_manager.fetch_url(source_url)
                 detail_blocker = _blocked_reason(detail_response)
@@ -535,7 +482,8 @@ def harvest_domain_sample(
             parsed.append(listing)
         if parsed:
             break
-    return summarize_result(normalized_domain, strategy, listings_found, parsed[:max_listings], None if parsed else blocker_reason)
+    zero_reason = "wp_json_without_listing_items" if not parsed and blocker_reason is None else None
+    return summarize_result(normalized_domain, strategy, listings_found, parsed[:max_listings], None if parsed else blocker_reason, zero_reason)
 
 
 def verdict_from_results(results: list[MiniHarvestResult]) -> str:
@@ -597,7 +545,7 @@ def generate_markdown_report(summary: MiniHarvestRunSummary, results: list[MiniH
             f"- {result.domain}: strategy={result.strategy}, found={result.listings_found}, parsed={result.listings_parsed}, "
             f"price={format_rate(result.fill_rate_price)}, city={format_rate(result.fill_rate_city)}, "
             f"area={format_rate(result.fill_rate_area)}, url={format_rate(result.fill_rate_url)}, "
-            f"blocker={result.blocker_reason or '-'}"
+            f"blocker={result.blocker_reason or '-'}, zero_reason={result.zero_reason or '-'}"
         )
     return "\n".join(lines) + "\n"
 
@@ -629,6 +577,7 @@ def write_run_outputs(
                 "fill_rate_area",
                 "fill_rate_url",
                 "blocker_reason",
+                "zero_reason",
                 "harvest_ok",
             ],
         )
@@ -645,6 +594,7 @@ def write_run_outputs(
                     "fill_rate_area": f"{result.fill_rate_area:.4f}",
                     "fill_rate_url": f"{result.fill_rate_url:.4f}",
                     "blocker_reason": result.blocker_reason or "",
+                    "zero_reason": result.zero_reason or "",
                     "harvest_ok": str(result.harvest_ok).lower(),
                 }
             )
