@@ -152,9 +152,14 @@ def test_wp_json_listings(monkeypatch: pytest.MonkeyPatch) -> None:
             "/": FakeResponse('<meta name="generator" content="WordPress">'),
             "/sitemap.xml": FakeResponse("missing", status_code=404),
             "/sitemap_index.xml": FakeResponse("missing", status_code=404),
+            "/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-json/": FakeResponse('{"namespaces":["wp/v2"]}'),
             "/wp-json/wp/v2/types": FakeResponse(
                 '{"woning":{"slug":"woning","public":true,"rest_base":"woning"}}'
             ),
+            "/wp-json/wp/v2/woning?per_page=1": FakeResponse('[{"id":1}]'),
         }
     )
 
@@ -162,6 +167,7 @@ def test_wp_json_listings(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert result.discovery_strategy is DiscoveryStrategy.wp_json
     assert result.wp_json_listings_found is True
+    assert result.structured_channel_open is True
     assert result.recommended_action == "build_discovery"
 
 
@@ -172,6 +178,11 @@ def test_listing_html_with_cards(monkeypatch: pytest.MonkeyPatch) -> None:
             "/": FakeResponse("<html><body>home</body></html>"),
             "/sitemap.xml": FakeResponse("missing", status_code=404),
             "/sitemap_index.xml": FakeResponse("missing", status_code=404),
+            "/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-json/": FakeResponse("missing", status_code=404),
+            "/wp-json/wp/v2/types": FakeResponse("missing", status_code=404),
             "/aanbod": FakeResponse(
                 """
                 <div class="card">
@@ -198,6 +209,11 @@ def test_needs_js(monkeypatch: pytest.MonkeyPatch) -> None:
             "/": FakeResponse("<html><body>home</body></html>"),
             "/sitemap.xml": FakeResponse("missing", status_code=404),
             "/sitemap_index.xml": FakeResponse("missing", status_code=404),
+            "/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-json/": FakeResponse("missing", status_code=404),
+            "/wp-json/wp/v2/types": FakeResponse("missing", status_code=404),
             "/aanbod": FakeResponse('<div id="app"></div><script src="/app.js"></script>'),
         }
     )
@@ -216,6 +232,11 @@ def test_iframe_only(monkeypatch: pytest.MonkeyPatch) -> None:
             "/": FakeResponse("<html><body>home</body></html>"),
             "/sitemap.xml": FakeResponse("missing", status_code=404),
             "/sitemap_index.xml": FakeResponse("missing", status_code=404),
+            "/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-json/": FakeResponse("missing", status_code=404),
+            "/wp-json/wp/v2/types": FakeResponse("missing", status_code=404),
             "/aanbod": FakeResponse('<iframe src="https://portal.example/listings"></iframe>'),
         }
     )
@@ -232,6 +253,12 @@ def test_blocked_403(monkeypatch: pytest.MonkeyPatch) -> None:
         {
             "/": FakeResponse("<html><body>home</body></html>"),
             "/sitemap.xml": FakeResponse("forbidden", status_code=403),
+            "/sitemap_index.xml": FakeResponse("forbidden", status_code=403),
+            "/sitemap-index.xml": FakeResponse("forbidden", status_code=403),
+            "/wp-sitemap.xml": FakeResponse("forbidden", status_code=403),
+            "/sitemap/sitemap-index.xml": FakeResponse("forbidden", status_code=403),
+            "/wp-json/": FakeResponse("forbidden", status_code=403),
+            "/wp-json/wp/v2/types": FakeResponse("forbidden", status_code=403),
         }
     )
 
@@ -249,7 +276,11 @@ def test_no_signal(monkeypatch: pytest.MonkeyPatch) -> None:
             "/": FakeResponse("<html><body>plain site</body></html>"),
             "/sitemap.xml": FakeResponse("missing", status_code=404),
             "/sitemap_index.xml": FakeResponse("missing", status_code=404),
-            "/aanbod": FakeResponse("<html><body>Geen aanbod momenteel.</body></html>"),
+            "/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-json/": FakeResponse("missing", status_code=404),
+            "/wp-json/wp/v2/types": FakeResponse("missing", status_code=404),
             "/woningen": FakeResponse("<html><body>Geen aanbod momenteel.</body></html>"),
         }
     )
@@ -267,17 +298,21 @@ def test_max_requests_respected(monkeypatch: pytest.MonkeyPatch) -> None:
             "/": FakeResponse('<meta name="generator" content="WordPress">'),
             "/sitemap.xml": FakeResponse("missing", status_code=404),
             "/sitemap_index.xml": FakeResponse("missing", status_code=404),
+            "/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-json/": FakeResponse("missing", status_code=404),
             "/wp-json/wp/v2/types": FakeResponse("{}", status_code=200),
-            "/aanbod": FakeResponse("<html><body>Geen aanbod momenteel.</body></html>"),
-            "/woningen": FakeResponse("<html><body>should not be fetched</body></html>"),
+            "/aanbod": FakeResponse("<html><body>should not be fetched</body></html>"),
         }
     )
 
     result = classify_domain("example.com", fetcher=fetcher)
 
-    assert result.requests_used == 5
-    assert len(fetcher.calls) == 5
-    assert "/woningen" not in fetcher.calls[-1]
+    assert result.requests_used == 8
+    assert len(fetcher.calls) == 8
+    assert "https://example.com/aanbod" in fetcher.calls
+    assert "https://example.com/woningen" not in fetcher.calls
 
 
 def test_uses_compliance_gate(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -301,6 +336,11 @@ def test_known_aanbod_url_used_directly(monkeypatch: pytest.MonkeyPatch) -> None
             "/": FakeResponse("<html><body>home</body></html>"),
             "/sitemap.xml": FakeResponse("missing", status_code=404),
             "/sitemap_index.xml": FakeResponse("missing", status_code=404),
+            "/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-json/": FakeResponse("missing", status_code=404),
+            "/wp-json/wp/v2/types": FakeResponse("missing", status_code=404),
             "/aanbod": FakeResponse(
                 """
                 <div class="card">
@@ -374,8 +414,11 @@ def test_known_aanbod_url_none_uses_generic_routes(monkeypatch: pytest.MonkeyPat
             "/": FakeResponse("<html><body>home</body></html>"),
             "/sitemap.xml": FakeResponse("missing", status_code=404),
             "/sitemap_index.xml": FakeResponse("missing", status_code=404),
-            "/aanbod": FakeResponse("<html><body>Geen aanbod momenteel.</body></html>"),
-            "/woningen": FakeResponse("<html><body>Geen aanbod momenteel.</body></html>"),
+            "/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-json/": FakeResponse("missing", status_code=404),
+            "/wp-json/wp/v2/types": FakeResponse("missing", status_code=404),
         }
     )
 
@@ -408,7 +451,18 @@ def test_no_legacy_imports() -> None:
 
 def test_captcha_marks_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
     _allow_all(monkeypatch)
-    fetcher = FakeFetcher({"/": FakeResponse("<html><body>captcha required</body></html>")})
+    fetcher = FakeFetcher(
+        {
+            "/": FakeResponse("<html><body>Attention Required! g-recaptcha</body></html>", status_code=403),
+            "/sitemap.xml": FakeResponse("forbidden", status_code=403),
+            "/sitemap_index.xml": FakeResponse("forbidden", status_code=403),
+            "/sitemap-index.xml": FakeResponse("forbidden", status_code=403),
+            "/wp-sitemap.xml": FakeResponse("forbidden", status_code=403),
+            "/sitemap/sitemap-index.xml": FakeResponse("forbidden", status_code=403),
+            "/wp-json/": FakeResponse("forbidden", status_code=403),
+            "/wp-json/wp/v2/types": FakeResponse("forbidden", status_code=403),
+        }
+    )
 
     result = classify_domain("example.com", fetcher=fetcher)
 
@@ -425,3 +479,157 @@ def test_domain_classification_shape(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(result, DomainClassification)
     assert result.domain == "example.com"
     assert result.robots_status == "allow"
+    assert result.structured_channel_open is False
+    assert result.html_blocked_but_structured_open is False
+
+
+def test_html_captcha_but_sitemap_open(monkeypatch: pytest.MonkeyPatch) -> None:
+    _allow_all(monkeypatch)
+    fetcher = FakeFetcher(
+        {
+            "/": FakeResponse("<html><body>Attention Required! g-recaptcha</body></html>", status_code=403),
+            "/sitemap.xml": FakeResponse(
+                "<urlset><url><loc>https://example.com/woning/teststraat-1</loc></url></urlset>"
+            ),
+        }
+    )
+
+    result = classify_domain("example.com", fetcher=fetcher)
+
+    assert result.discovery_strategy is DiscoveryStrategy.sitemap_with_listings
+    assert result.structured_channel_open is True
+    assert result.html_blocked_but_structured_open is True
+    assert result.recommended_action == "build_discovery"
+
+
+def test_html_captcha_but_wpjson_open(monkeypatch: pytest.MonkeyPatch) -> None:
+    _allow_all(monkeypatch)
+    fetcher = FakeFetcher(
+        {
+            "/": FakeResponse("<html><body>Attention Required! g-recaptcha</body></html>", status_code=403),
+            "/sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap_index.xml": FakeResponse("missing", status_code=404),
+            "/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-json/": FakeResponse('{"namespaces":["wp/v2"]}'),
+            "/wp-json/wp/v2/types": FakeResponse(
+                '{"woning":{"slug":"woning","public":true,"rest_base":"woning"}}'
+            ),
+            "/wp-json/wp/v2/woning?per_page=1": FakeResponse('[{"id":1}]'),
+        }
+    )
+
+    result = classify_domain("example.com", fetcher=fetcher)
+
+    assert result.discovery_strategy is DiscoveryStrategy.wp_json
+    assert result.structured_channel_open is True
+    assert result.html_blocked_but_structured_open is True
+    assert result.recommended_action == "build_discovery"
+
+
+def test_wp_sitemap_core_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    _allow_all(monkeypatch)
+    fetcher = FakeFetcher(
+        {
+            "/": FakeResponse("<html><body>home</body></html>"),
+            "/sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap_index.xml": FakeResponse("missing", status_code=404),
+            "/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-sitemap.xml": FakeResponse(
+                "<urlset><url><loc>https://example.com/woning/teststraat-1</loc></url></urlset>"
+            ),
+        }
+    )
+
+    result = classify_domain("example.com", fetcher=fetcher)
+
+    assert result.discovery_strategy is DiscoveryStrategy.sitemap_with_listings
+    assert result.sitemap_found is True
+    assert result.sitemap_has_listing_urls is True
+
+
+def test_sitemap_index_nested(monkeypatch: pytest.MonkeyPatch) -> None:
+    _allow_all(monkeypatch)
+    fetcher = FakeFetcher(
+        {
+            "/": FakeResponse("<html><body>home</body></html>"),
+            "/sitemap.xml": FakeResponse(
+                "<sitemapindex><sitemap><loc>https://example.com/woningen-sitemap.xml</loc></sitemap></sitemapindex>"
+            ),
+            "/woningen-sitemap.xml": FakeResponse(
+                "<urlset><url><loc>https://example.com/woning/teststraat-1</loc></url></urlset>"
+            ),
+        }
+    )
+
+    result = classify_domain("example.com", fetcher=fetcher)
+
+    assert result.discovery_strategy is DiscoveryStrategy.sitemap_with_listings
+    assert "https://example.com/woningen-sitemap.xml" in fetcher.calls
+
+
+def test_wpjson_probed_even_if_not_wordpress_fingerprint(monkeypatch: pytest.MonkeyPatch) -> None:
+    _allow_all(monkeypatch)
+    fetcher = FakeFetcher(
+        {
+            "/": FakeResponse("<html><body>plain site</body></html>"),
+            "/sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap_index.xml": FakeResponse("missing", status_code=404),
+            "/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-json/": FakeResponse('{"namespaces":["wp/v2"]}'),
+            "/wp-json/wp/v2/types": FakeResponse(
+                '{"woning":{"slug":"woning","public":true,"rest_base":"woning"}}'
+            ),
+            "/wp-json/wp/v2/woning?per_page=1": FakeResponse('[{"id":1}]'),
+        }
+    )
+
+    result = classify_domain("example.com", fetcher=fetcher)
+
+    assert result.cms_fingerprint_guess == "unknown"
+    assert result.discovery_strategy is DiscoveryStrategy.wp_json
+
+
+def test_captcha_false_positive_footer_word(monkeypatch: pytest.MonkeyPatch) -> None:
+    _allow_all(monkeypatch)
+    fetcher = FakeFetcher(
+        {
+            "/": FakeResponse("<html><body><footer>captcha support line</footer></body></html>"),
+            "/sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap_index.xml": FakeResponse("missing", status_code=404),
+            "/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap/sitemap-index.xml": FakeResponse("missing", status_code=404),
+            "/wp-json/": FakeResponse("missing", status_code=404),
+            "/wp-json/wp/v2/types": FakeResponse("missing", status_code=404),
+        }
+    )
+
+    result = classify_domain("example.com", fetcher=fetcher)
+
+    assert result.discovery_strategy is DiscoveryStrategy.no_signal
+    assert result.blocker_reason is None
+
+
+def test_all_channels_blocked_is_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
+    _allow_all(monkeypatch)
+    fetcher = FakeFetcher(
+        {
+            "/": FakeResponse("<html><body>Attention Required! g-recaptcha</body></html>", status_code=403),
+            "/sitemap.xml": FakeResponse("forbidden", status_code=403),
+            "/sitemap_index.xml": FakeResponse("forbidden", status_code=403),
+            "/sitemap-index.xml": FakeResponse("forbidden", status_code=403),
+            "/wp-sitemap.xml": FakeResponse("forbidden", status_code=403),
+            "/sitemap/sitemap-index.xml": FakeResponse("forbidden", status_code=403),
+            "/wp-json/": FakeResponse("forbidden", status_code=403),
+            "/wp-json/wp/v2/types": FakeResponse("forbidden", status_code=403),
+        }
+    )
+
+    result = classify_domain("example.com", fetcher=fetcher)
+
+    assert result.discovery_strategy is DiscoveryStrategy.blocked
+    assert result.blocker_reason == "captcha"

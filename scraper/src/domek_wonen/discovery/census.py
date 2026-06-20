@@ -36,7 +36,25 @@ _LISTING_PATHS_BY_FINGERPRINT = {
     "unknown": ("/aanbod", "/woningen", "/aanbod/wonen"),
 }
 _EXTRACTABLE_FIELDS_ORDER = ("url", "price", "address", "city", "area")
-_CONTENT_BUDGET = 5
+_CONTENT_BUDGET = 8
+_SITEMAP_PATHS = (
+    "/sitemap.xml",
+    "/sitemap_index.xml",
+    "/sitemap-index.xml",
+    "/wp-sitemap.xml",
+    "/sitemap/sitemap-index.xml",
+)
+_CHALLENGE_MARKERS = (
+    "cf-chl-",
+    "challenge-platform",
+    "checking your browser",
+    "attention required",
+    "g-recaptcha",
+    "grecaptcha",
+    "hcaptcha",
+    "cf-turnstile",
+    "/captcha/",
+)
 
 
 class DiscoveryStrategy(str, Enum):
@@ -60,6 +78,8 @@ class DomainClassification:
     sitemap_found: bool
     sitemap_has_listing_urls: bool
     wp_json_listings_found: bool
+    structured_channel_open: bool
+    html_blocked_but_structured_open: bool
     listing_url_pattern: str | None
     card_fields_extractable: list[str] = field(default_factory=list)
     needs_js: bool = False
@@ -130,8 +150,13 @@ def _default_fetcher(url: str, headers: dict[str, str], timeout: float) -> _Fetc
 
 
 def _blocked_reason(response: _FetchedResponse) -> str | None:
-    if response.status_code in {403, 429}:
-        return f"http_{response.status_code}"
+    if _looks_like_challenge_page(response):
+        if response.status_code in {200, 403, 503}:
+            return "captcha"
+    if response.status_code == 429:
+        return "http_429"
+    if response.status_code == 403:
+        return "http_403"
     haystack = " ".join(
         (
             response.text.lower(),
@@ -139,11 +164,20 @@ def _blocked_reason(response: _FetchedResponse) -> str | None:
             response.headers.get("server", "").lower(),
         )
     )
-    if "captcha" in haystack:
-        return "captcha"
     if "login" in haystack or "sign in" in haystack or "inloggen" in haystack:
         return "login_wall"
     return None
+
+
+def _looks_like_challenge_page(response: _FetchedResponse) -> bool:
+    haystack = " ".join(
+        (
+            response.text.lower(),
+            response.headers.get("location", "").lower(),
+            response.headers.get("server", "").lower(),
+        )
+    )
+    return any(marker in haystack for marker in _CHALLENGE_MARKERS)
 
 
 def _fingerprint_homepage(html: str) -> str:
@@ -209,6 +243,31 @@ def _parse_wp_json_payload(text: str) -> bool:
     return False
 
 
+def _extract_listing_rest_bases(text: str) -> list[str]:
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(payload, dict):
+        return []
+
+    candidates: list[str] = []
+    for key, value in payload.items():
+        if not isinstance(value, dict):
+            continue
+        if value.get("public") is False:
+            continue
+        rest_base = str(value.get("rest_base") or key).strip("/")
+        haystack = " ".join(
+            str(value.get(field, ""))
+            for field in ("slug", "name", "description", "rest_base")
+        ).lower()
+        if key.lower() in _LISTING_HINTS or any(hint in haystack for hint in _LISTING_HINTS):
+            if rest_base and rest_base not in candidates:
+                candidates.append(rest_base)
+    return candidates
+
+
 def _extract_card_fields(html: str) -> tuple[list[str], str | None, bool, bool]:
     tree = HTMLParser(html)
     text = tree.body.text(separator=" ", strip=True) if tree.body else tree.text(separator=" ", strip=True)
@@ -248,7 +307,9 @@ def _extract_card_fields(html: str) -> tuple[list[str], str | None, bool, bool]:
     return normalized_fields, listing_pattern, needs_js, False
 
 
-def _recommended_action(strategy: DiscoveryStrategy) -> str:
+def _recommended_action(strategy: DiscoveryStrategy, *, structured_channel_open: bool = False) -> str:
+    if structured_channel_open:
+        return "build_discovery"
     if strategy in {
         DiscoveryStrategy.sitemap_with_listings,
         DiscoveryStrategy.wp_json,
@@ -351,6 +412,8 @@ def _classification_defaults(domain: str, robots_status_value: str, crawl_delay_
         sitemap_found=False,
         sitemap_has_listing_urls=False,
         wp_json_listings_found=False,
+        structured_channel_open=False,
+        html_blocked_but_structured_open=False,
         listing_url_pattern=None,
         card_fields_extractable=[],
         needs_js=False,
@@ -360,16 +423,125 @@ def _classification_defaults(domain: str, robots_status_value: str, crawl_delay_
     )
 
 
-def _maybe_mark_blocked(classification: DomainClassification, response: _FetchedResponse | None) -> bool:
+def _pick_blocker_reason(reasons: list[str]) -> str | None:
+    for candidate in ("captcha", "login_wall", "http_429", "http_403"):
+        if candidate in reasons:
+            return candidate
+    return reasons[0] if reasons else None
+
+
+def _record_blocked_reason(reasons: list[str], response: _FetchedResponse | None) -> str | None:
     if response is None:
-        return False
+        return None
     reason = _blocked_reason(response)
-    if reason is None:
-        return False
+    if reason is not None:
+        reasons.append(reason)
+    return reason
+
+
+def _apply_structured_channel_open(classification: DomainClassification, *, html_blocked: bool = False) -> None:
+    classification.structured_channel_open = True
+    if html_blocked:
+        classification.html_blocked_but_structured_open = True
+    classification.recommended_action = _recommended_action(
+        classification.discovery_strategy,
+        structured_channel_open=classification.structured_channel_open,
+    )
+
+
+def _apply_blocked_if_needed(classification: DomainClassification, blocked_reasons: list[str]) -> None:
+    if classification.discovery_strategy is not DiscoveryStrategy.no_signal or not blocked_reasons:
+        classification.recommended_action = _recommended_action(
+            classification.discovery_strategy,
+            structured_channel_open=classification.structured_channel_open,
+        )
+        return
     classification.discovery_strategy = DiscoveryStrategy.blocked
+    classification.blocker_reason = _pick_blocker_reason(blocked_reasons)
     classification.recommended_action = _recommended_action(DiscoveryStrategy.blocked)
-    classification.blocker_reason = reason
+
+
+def _probe_sitemaps(
+    classification: DomainClassification,
+    request_manager: _RequestManager,
+    blocked_reasons: list[str],
+    *,
+    html_blocked: bool = False,
+) -> bool:
+    nested_candidate: str | None = None
+    for sitemap_path in _SITEMAP_PATHS:
+        sitemap_response = request_manager.fetch(sitemap_path)
+        classification.requests_used = request_manager.requests_used
+        _record_blocked_reason(blocked_reasons, sitemap_response)
+        if sitemap_response is None or sitemap_response.status_code != 200:
+            continue
+        classification.sitemap_found = True
+        sitemap_urls = _extract_sitemap_urls(sitemap_response.text)
+        listing_pattern = _listing_pattern_from_urls(sitemap_urls)
+        if listing_pattern is not None:
+            classification.sitemap_has_listing_urls = True
+            classification.listing_url_pattern = listing_pattern
+            classification.discovery_strategy = DiscoveryStrategy.sitemap_with_listings
+            _apply_structured_channel_open(classification, html_blocked=html_blocked)
+            return True
+        if nested_candidate is None:
+            for sitemap_url in sitemap_urls:
+                lowered = urlsplit(sitemap_url).path.lower()
+                if lowered.endswith(".xml") and any(hint in lowered for hint in _LISTING_HINTS):
+                    nested_candidate = sitemap_url
+                    break
+        if classification.sitemap_found:
+            break
+
+    if nested_candidate is None:
+        return False
+
+    nested_response = request_manager.fetch_url(nested_candidate)
+    classification.requests_used = request_manager.requests_used
+    _record_blocked_reason(blocked_reasons, nested_response)
+    if nested_response is None or nested_response.status_code != 200:
+        return False
+    nested_urls = _extract_sitemap_urls(nested_response.text)
+    listing_pattern = _listing_pattern_from_urls(nested_urls)
+    if listing_pattern is None:
+        return False
+    classification.sitemap_has_listing_urls = True
+    classification.listing_url_pattern = listing_pattern
+    classification.discovery_strategy = DiscoveryStrategy.sitemap_with_listings
+    _apply_structured_channel_open(classification, html_blocked=html_blocked)
     return True
+
+
+def _probe_wp_json(
+    classification: DomainClassification,
+    request_manager: _RequestManager,
+    blocked_reasons: list[str],
+    *,
+    html_blocked: bool = False,
+) -> bool:
+    types_response = request_manager.fetch("/wp-json/wp/v2/types")
+    classification.requests_used = request_manager.requests_used
+    _record_blocked_reason(blocked_reasons, types_response)
+    if types_response is None or types_response.status_code != 200:
+        return False
+
+    rest_bases = _extract_listing_rest_bases(types_response.text)
+    for rest_base in rest_bases:
+        collection_response = request_manager.fetch(f"/wp-json/wp/v2/{rest_base}?per_page=1")
+        classification.requests_used = request_manager.requests_used
+        _record_blocked_reason(blocked_reasons, collection_response)
+        if collection_response is None or collection_response.status_code != 200:
+            continue
+        try:
+            payload = json.loads(collection_response.text)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, list) and payload:
+            classification.wp_json_listings_found = True
+            classification.discovery_strategy = DiscoveryStrategy.wp_json
+            _apply_structured_channel_open(classification, html_blocked=html_blocked)
+            return True
+    return False
 
 
 def classify_domain(domain: str, fetcher=None, known_aanbod_url: str | None = None) -> DomainClassification:
@@ -388,6 +560,8 @@ def classify_domain(domain: str, fetcher=None, known_aanbod_url: str | None = No
             sitemap_found=False,
             sitemap_has_listing_urls=False,
             wp_json_listings_found=False,
+            structured_channel_open=False,
+            html_blocked_but_structured_open=False,
             listing_url_pattern=None,
             card_fields_extractable=[],
             needs_js=False,
@@ -407,6 +581,8 @@ def classify_domain(domain: str, fetcher=None, known_aanbod_url: str | None = No
             sitemap_found=False,
             sitemap_has_listing_urls=False,
             wp_json_listings_found=False,
+            structured_channel_open=False,
+            html_blocked_but_structured_open=False,
             listing_url_pattern=None,
             card_fields_extractable=[],
             needs_js=False,
@@ -425,54 +601,28 @@ def classify_domain(domain: str, fetcher=None, known_aanbod_url: str | None = No
         sleep_between_requests=fetcher is None,
     )
     classification = _classification_defaults(normalized_domain, robots_status_value, crawl_delay_value)
+    blocked_reasons: list[str] = []
 
     home_response = request_manager.fetch("/")
     classification.requests_used = request_manager.requests_used
-    if _maybe_mark_blocked(classification, home_response):
-        classification.requests_used = request_manager.requests_used
-        return classification
+    home_block_reason = _record_blocked_reason(blocked_reasons, home_response)
+    if home_block_reason is not None:
+        classification.blocker_reason = home_block_reason
     if home_response is not None:
         classification.cms_fingerprint_guess = _fingerprint_homepage(home_response.text)
 
-    for sitemap_path in ("/sitemap.xml", "/sitemap_index.xml"):
-        sitemap_response = request_manager.fetch(sitemap_path)
+    if _probe_sitemaps(classification, request_manager, blocked_reasons, html_blocked=home_block_reason is not None):
         classification.requests_used = request_manager.requests_used
-        if _maybe_mark_blocked(classification, sitemap_response):
-            classification.requests_used = request_manager.requests_used
-            return classification
-        if sitemap_response is None:
-            continue
-        if sitemap_response.status_code == 200:
-            classification.sitemap_found = True
-            sitemap_urls = _extract_sitemap_urls(sitemap_response.text)
-            listing_pattern = _listing_pattern_from_urls(sitemap_urls)
-            if listing_pattern is not None:
-                classification.sitemap_has_listing_urls = True
-                classification.listing_url_pattern = listing_pattern
-                classification.discovery_strategy = DiscoveryStrategy.sitemap_with_listings
-                classification.recommended_action = _recommended_action(classification.discovery_strategy)
-                classification.requests_used = request_manager.requests_used
-                return classification
+        return classification
 
-    if classification.cms_fingerprint_guess == "wordpress":
-        wp_response = request_manager.fetch("/wp-json/wp/v2/types")
+    if _probe_wp_json(classification, request_manager, blocked_reasons, html_blocked=home_block_reason is not None):
         classification.requests_used = request_manager.requests_used
-        if _maybe_mark_blocked(classification, wp_response):
-            classification.requests_used = request_manager.requests_used
-            return classification
-        if wp_response is not None and wp_response.status_code == 200 and _parse_wp_json_payload(wp_response.text):
-            classification.wp_json_listings_found = True
-            classification.discovery_strategy = DiscoveryStrategy.wp_json
-            classification.recommended_action = _recommended_action(classification.discovery_strategy)
-            classification.requests_used = request_manager.requests_used
-            return classification
+        return classification
 
     if normalized_aanbod_url is not None:
         known_listing_response = request_manager.fetch_url(normalized_aanbod_url)
         classification.requests_used = request_manager.requests_used
-        if _maybe_mark_blocked(classification, known_listing_response):
-            classification.requests_used = request_manager.requests_used
-            return classification
+        _record_blocked_reason(blocked_reasons, known_listing_response)
         if known_listing_response is not None and known_listing_response.status_code == 200:
             if _apply_listing_response(classification, known_listing_response):
                 classification.requests_used = request_manager.requests_used
@@ -485,9 +635,7 @@ def classify_domain(domain: str, fetcher=None, known_aanbod_url: str | None = No
     for listing_path in listing_candidates:
         listing_response = request_manager.fetch(listing_path)
         classification.requests_used = request_manager.requests_used
-        if _maybe_mark_blocked(classification, listing_response):
-            classification.requests_used = request_manager.requests_used
-            return classification
+        _record_blocked_reason(blocked_reasons, listing_response)
         if listing_response is None or listing_response.status_code != 200:
             continue
         if _apply_listing_response(classification, listing_response):
@@ -495,5 +643,5 @@ def classify_domain(domain: str, fetcher=None, known_aanbod_url: str | None = No
             return classification
 
     classification.requests_used = request_manager.requests_used
-    classification.recommended_action = _recommended_action(classification.discovery_strategy)
+    _apply_blocked_if_needed(classification, blocked_reasons)
     return classification

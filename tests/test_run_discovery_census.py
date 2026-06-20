@@ -53,6 +53,8 @@ def make_classification(
         sitemap_found=False,
         sitemap_has_listing_urls=False,
         wp_json_listings_found=False,
+        structured_channel_open=False,
+        html_blocked_but_structured_open=False,
         listing_url_pattern=None,
         card_fields_extractable=[],
         needs_js=needs_js,
