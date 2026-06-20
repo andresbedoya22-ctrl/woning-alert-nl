@@ -29,7 +29,7 @@ def runtime_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
 def write_registry(tmp_path: Path, rows: list[dict[str, str]]) -> Path:
     registry_path = tmp_path / "makelaar_sources_master.csv"
     with registry_path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["root_domain", "is_active"])
+        writer = csv.DictWriter(handle, fieldnames=["root_domain", "is_active", "aanbod_url"])
         writer.writeheader()
         writer.writerows(rows)
     return registry_path
@@ -118,7 +118,7 @@ def test_dedupe_domains(tmp_path: Path) -> None:
 def test_classify_called_per_domain() -> None:
     calls: list[str] = []
 
-    def fake_classify(domain: str) -> DomainClassification:
+    def fake_classify(domain: str, known_aanbod_url: str | None = None) -> DomainClassification:
         calls.append(domain)
         return make_classification(domain, DiscoveryStrategy.no_signal)
 
@@ -134,7 +134,7 @@ def test_classify_called_per_domain() -> None:
 
 
 def test_domain_failure_does_not_stop_run() -> None:
-    def fake_classify(domain: str) -> DomainClassification:
+    def fake_classify(domain: str, known_aanbod_url: str | None = None) -> DomainClassification:
         if domain == "beta.nl":
             raise RuntimeError("boom")
         return make_classification(domain, DiscoveryStrategy.listing_html)
@@ -294,6 +294,7 @@ def test_render_report_includes_uncovered_reason() -> None:
         used_all_domains=True,
         domains=["alpha.nl", "beta.nl"],
         summary=summary,
+        aanbod_registry_count=1,
     )
 
     assert "## Distribution by discovery_strategy" in report
@@ -331,7 +332,7 @@ def test_main_writes_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
 def test_timeout_seconds_env_uses_integer_string(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: list[str | None] = []
 
-    def fake_classify(domain: str) -> DomainClassification:
+    def fake_classify(domain: str, known_aanbod_url: str | None = None) -> DomainClassification:
         captured.append(__import__("os").environ.get("WNA_REQUEST_TIMEOUT_SECONDS"))
         return make_classification(domain, DiscoveryStrategy.no_signal)
 
@@ -346,3 +347,69 @@ def test_timeout_seconds_env_uses_integer_string(monkeypatch: pytest.MonkeyPatch
     )
 
     assert captured == ["20"]
+
+
+def test_aanbod_url_passed_to_classify(tmp_path: Path) -> None:
+    registry_path = write_registry(
+        tmp_path,
+        [
+            {"root_domain": "alpha.nl", "is_active": "true", "aanbod_url": "https://alpha.nl/aanbod"},
+            {"root_domain": "beta.nl", "is_active": "true", "aanbod_url": ""},
+        ],
+    )
+    domains, aanbod_urls_by_domain = run_discovery_census.load_registry_data(
+        registry_path,
+        "root_domain",
+        "aanbod_url",
+    )
+    calls: list[tuple[str, str | None]] = []
+
+    def fake_classify(domain: str, known_aanbod_url: str | None = None) -> DomainClassification:
+        calls.append((domain, known_aanbod_url))
+        return make_classification(domain, DiscoveryStrategy.no_signal)
+
+    run_discovery_census.classify_domains(
+        domains,
+        classify=fake_classify,
+        aanbod_urls_by_domain=aanbod_urls_by_domain,
+        delay_seconds=0,
+        sleep=lambda _seconds: None,
+    )
+
+    assert calls == [("alpha.nl", "https://alpha.nl/aanbod"), ("beta.nl", None)]
+
+
+def test_funda_aanbod_url_filtered(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    registry_path = write_registry(
+        tmp_path,
+        [
+            {
+                "root_domain": "mwmakelaardij.nl",
+                "is_active": "true",
+                "aanbod_url": "https://www.funda.nl/makelaars/test/woningaanbod",
+            }
+        ],
+    )
+    output_dir = tmp_path / "out"
+
+    monkeypatch.setattr("scripts.run_discovery_census.resolve_registry_path", lambda _registry: registry_path)
+
+    exit_code = run_discovery_census.main(
+        [
+            "--registry",
+            str(registry_path),
+            "--output-dir",
+            str(output_dir),
+            "--sample",
+            "1",
+        ]
+    )
+
+    assert exit_code == 0
+    with (output_dir / "census_inventory.csv").open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[0]["domain"] == "mwmakelaardij.nl"
+    assert rows[0]["discovery_strategy"] == "blocked"
+    assert rows[0]["recommended_action"] == "commercial_only"
+    assert rows[0]["blocker_reason"] == "aanbod_on_funda_pararius"
+    assert rows[0]["aanbod_url_used"] == "yes"

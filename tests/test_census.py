@@ -294,6 +294,96 @@ def test_uses_compliance_gate(monkeypatch: pytest.MonkeyPatch) -> None:
     assert gate_calls[0] == "/"
 
 
+def test_known_aanbod_url_used_directly(monkeypatch: pytest.MonkeyPatch) -> None:
+    _allow_all(monkeypatch)
+    fetcher = FakeFetcher(
+        {
+            "/": FakeResponse("<html><body>home</body></html>"),
+            "/sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap_index.xml": FakeResponse("missing", status_code=404),
+            "/aanbod": FakeResponse(
+                """
+                <div class="card">
+                  <a href="/woning/teststraat-1">Bekijk woning</a>
+                  <span class="price">â‚¬ 395.000 k.k.</span>
+                  <span class="area">120 m2</span>
+                </div>
+                """
+            ),
+        }
+    )
+
+    result = classify_domain("example.com", fetcher=fetcher, known_aanbod_url="https://example.com/aanbod")
+
+    assert result.discovery_strategy is DiscoveryStrategy.listing_html
+    assert "https://example.com/aanbod" in fetcher.calls
+
+
+def test_funda_aanbod_url_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
+    gate_calls: list[str] = []
+
+    def fake_can_fetch(domain: str, path: str = "/") -> bool:
+        gate_calls.append(f"{domain}{path}")
+        return True
+
+    monkeypatch.setattr("domek_wonen.discovery.census.robots_gate.can_fetch", fake_can_fetch)
+    monkeypatch.setattr("domek_wonen.discovery.census.robots_gate.robots_status", lambda domain: "allow")
+    monkeypatch.setattr("domek_wonen.discovery.census.robots_gate.crawl_delay", lambda domain: 0.0)
+
+    result = classify_domain(
+        "example.com",
+        fetcher=lambda *_args: pytest.fail("funda aanbod should not fetch content"),
+        known_aanbod_url="https://www.funda.nl/makelaars/test/woningaanbod",
+    )
+
+    assert result.discovery_strategy is DiscoveryStrategy.blocked
+    assert result.blocker_reason == "aanbod_on_funda_pararius"
+    assert result.recommended_action == "commercial_only"
+    assert result.requests_used == 0
+    assert gate_calls == ["example.com/"]
+
+
+def test_pararius_aanbod_url_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
+    gate_calls: list[str] = []
+
+    def fake_can_fetch(domain: str, path: str = "/") -> bool:
+        gate_calls.append(f"{domain}{path}")
+        return True
+
+    monkeypatch.setattr("domek_wonen.discovery.census.robots_gate.can_fetch", fake_can_fetch)
+    monkeypatch.setattr("domek_wonen.discovery.census.robots_gate.robots_status", lambda domain: "allow")
+    monkeypatch.setattr("domek_wonen.discovery.census.robots_gate.crawl_delay", lambda domain: 0.0)
+
+    result = classify_domain(
+        "example.com",
+        fetcher=lambda *_args: pytest.fail("pararius aanbod should not fetch content"),
+        known_aanbod_url="https://www.pararius.nl/koopwoningen/test",
+    )
+
+    assert result.discovery_strategy is DiscoveryStrategy.blocked
+    assert result.blocker_reason == "aanbod_on_funda_pararius"
+    assert result.recommended_action == "commercial_only"
+    assert result.requests_used == 0
+    assert gate_calls == ["example.com/"]
+
+
+def test_known_aanbod_url_none_uses_generic_routes(monkeypatch: pytest.MonkeyPatch) -> None:
+    _allow_all(monkeypatch)
+    fetcher = FakeFetcher(
+        {
+            "/": FakeResponse("<html><body>home</body></html>"),
+            "/sitemap.xml": FakeResponse("missing", status_code=404),
+            "/sitemap_index.xml": FakeResponse("missing", status_code=404),
+            "/aanbod": FakeResponse("<html><body>Geen aanbod momenteel.</body></html>"),
+            "/woningen": FakeResponse("<html><body>Geen aanbod momenteel.</body></html>"),
+        }
+    )
+
+    classify_domain("example.com", fetcher=fetcher, known_aanbod_url=None)
+
+    assert "https://example.com/aanbod" in fetcher.calls
+
+
 def test_no_legacy_imports() -> None:
     source_path = Path(__file__).resolve().parents[1] / "scraper" / "src" / "domek_wonen" / "discovery" / "census.py"
     tree = ast.parse(source_path.read_text(encoding="utf-8"))

@@ -28,6 +28,7 @@ DISCOVERABLE_STRATEGIES = {
 }
 INVENTORY_COLUMNS = (
     "domain",
+    "aanbod_url_used",
     "robots_status",
     "robots_crawl_delay",
     "discovery_strategy",
@@ -44,6 +45,10 @@ INVENTORY_COLUMNS = (
 )
 
 
+def _is_truthy(value: str) -> bool:
+    return value.strip().lower() in {"true", "1", "yes"}
+
+
 def utc_timestamp() -> str:
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
@@ -53,6 +58,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a discovery census over a sampled set of makelaar domains.")
     parser.add_argument("--registry", default=None, help="Optional explicit makelaar_sources_master.csv path")
     parser.add_argument("--domain-column", default="root_domain", help="CSV column that contains the clean root domain")
+    parser.add_argument("--aanbod-url-column", default="aanbod_url", help="CSV column that contains the known aanbod URL")
     parser.add_argument("--sample", type=int, default=30, help="Number of unique domains to classify")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducible domain sampling")
     parser.add_argument(
@@ -81,23 +87,39 @@ def resolve_registry_path(registry: str | None) -> Path:
     return resolve_makelaar_sources_master(input_path=explicit_path, restore_latest=True)
 
 
-def load_registry_domains(registry_path: Path, domain_column: str) -> list[str]:
+def load_registry_data(
+    registry_path: Path,
+    domain_column: str,
+    aanbod_url_column: str,
+) -> tuple[list[str], dict[str, str]]:
     with registry_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
-        if domain_column not in (reader.fieldnames or []):
+        fieldnames = reader.fieldnames or []
+        if domain_column not in fieldnames:
             raise ValueError(f"Domain column {domain_column!r} not found in {registry_path}")
 
-        prefer_active = "is_active" in (reader.fieldnames or [])
+        prefer_active = "is_active" in fieldnames
+        has_aanbod_column = aanbod_url_column in fieldnames
         domains: list[str] = []
+        aanbod_urls_by_domain: dict[str, str] = {}
         seen: set[str] = set()
         for row in reader:
-            if prefer_active and str(row.get("is_active", "")).strip().lower() not in {"true", "1", "yes"}:
+            if prefer_active and not _is_truthy(str(row.get("is_active", ""))):
                 continue
             domain = str(row.get(domain_column, "")).strip().lower()
             if not domain or domain in seen:
                 continue
             seen.add(domain)
             domains.append(domain)
+            if has_aanbod_column:
+                aanbod_url = str(row.get(aanbod_url_column, "")).strip()
+                if aanbod_url:
+                    aanbod_urls_by_domain[domain] = aanbod_url
+    return domains, aanbod_urls_by_domain
+
+
+def load_registry_domains(registry_path: Path, domain_column: str) -> list[str]:
+    domains, _ = load_registry_data(registry_path, domain_column, "aanbod_url")
     return domains
 
 
@@ -110,8 +132,9 @@ def sample_domains(domains: list[str], sample_size: int, seed: int) -> tuple[lis
     return rng.sample(domains, sample_size), False
 
 
-def classification_to_row(classification: DomainClassification) -> dict[str, object]:
+def classification_to_row(classification: DomainClassification, *, aanbod_url_used: bool = False) -> dict[str, object]:
     row = asdict(classification)
+    row["aanbod_url_used"] = "yes" if aanbod_url_used else "no"
     row["discovery_strategy"] = classification.discovery_strategy.value
     row["card_fields_extractable"] = ",".join(classification.card_fields_extractable)
     return row
@@ -140,11 +163,13 @@ def classify_domains(
     domains: list[str],
     *,
     classify=classify_domain,
+    aanbod_urls_by_domain: dict[str, str] | None = None,
     delay_seconds: float,
     timeout_seconds: float | None = None,
     sleep=time.sleep,
 ) -> list[DomainClassification]:
     results: list[DomainClassification] = []
+    aanbod_urls_by_domain = aanbod_urls_by_domain or {}
     previous_timeout = os.environ.get("WNA_REQUEST_TIMEOUT_SECONDS")
     try:
         if timeout_seconds is not None:
@@ -153,7 +178,11 @@ def classify_domains(
 
         for index, domain in enumerate(domains):
             try:
-                classification = classify(domain)
+                known_aanbod_url = aanbod_urls_by_domain.get(domain)
+                if known_aanbod_url:
+                    classification = classify(domain, known_aanbod_url=known_aanbod_url)
+                else:
+                    classification = classify(domain)
             except Exception as exc:  # pragma: no cover - exercised via tests through injected classifier
                 classification = failure_classification(domain, exc)
             results.append(classification)
@@ -231,6 +260,7 @@ def render_report(
     used_all_domains: bool,
     domains: list[str],
     summary: dict[str, object],
+    aanbod_registry_count: int,
 ) -> str:
     lines = [
         "# Discovery Census Report",
@@ -242,6 +272,7 @@ def render_report(
         f"- seed: {seed}",
         f"- used_all_domains: {'yes' if used_all_domains else 'no'}",
         f"- sampled_domains: {len(domains)}",
+        f"- registry_aanbod_url_domains: {aanbod_registry_count}",
         "",
         "## Distribution by discovery_strategy",
     ]
@@ -284,16 +315,28 @@ def ensure_output_dir(output_dir: str | None, run_id: str) -> Path:
     return path
 
 
-def write_outputs(output_dir: Path, classifications: list[DomainClassification], report_text: str) -> tuple[Path, Path]:
+def write_outputs(
+    output_dir: Path,
+    classifications: list[DomainClassification],
+    report_text: str,
+    *,
+    aanbod_urls_by_domain: dict[str, str] | None = None,
+) -> tuple[Path, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     inventory_path = output_dir / "census_inventory.csv"
     report_path = output_dir / "census_report.md"
+    aanbod_urls_by_domain = aanbod_urls_by_domain or {}
 
     with inventory_path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=INVENTORY_COLUMNS)
         writer.writeheader()
         for classification in classifications:
-            writer.writerow(classification_to_row(classification))
+            writer.writerow(
+                classification_to_row(
+                    classification,
+                    aanbod_url_used=classification.domain in aanbod_urls_by_domain,
+                )
+            )
 
     report_path.write_text(report_text, encoding="utf-8")
     return inventory_path, report_path
@@ -314,10 +357,15 @@ def print_dry_run(registry_path: Path, args: argparse.Namespace, domains: list[s
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     registry_path = resolve_registry_path(args.registry)
-    domains = load_registry_domains(registry_path, args.domain_column)
+    domains, aanbod_urls_by_domain = load_registry_data(
+        registry_path,
+        args.domain_column,
+        args.aanbod_url_column,
+    )
     sampled_domains, used_all_domains = sample_domains(domains, args.sample, args.seed)
 
     if args.dry_run:
+        print(f"registry_aanbod_url_domains={sum(1 for domain in sampled_domains if domain in aanbod_urls_by_domain)}", flush=True)
         print_dry_run(registry_path, args, sampled_domains, used_all_domains)
         return 0
 
@@ -325,6 +373,7 @@ def main(argv: list[str] | None = None) -> int:
     generated_at = datetime.now(UTC).isoformat()
     classifications = classify_domains(
         sampled_domains,
+        aanbod_urls_by_domain={domain: aanbod_urls_by_domain[domain] for domain in sampled_domains if domain in aanbod_urls_by_domain},
         delay_seconds=args.delay_seconds,
         timeout_seconds=args.timeout_seconds,
     )
@@ -338,9 +387,15 @@ def main(argv: list[str] | None = None) -> int:
         used_all_domains=used_all_domains,
         domains=sampled_domains,
         summary=summary,
+        aanbod_registry_count=sum(1 for domain in sampled_domains if domain in aanbod_urls_by_domain),
     )
     output_dir = ensure_output_dir(args.output_dir, run_id)
-    inventory_path, report_path = write_outputs(output_dir, classifications, report_text)
+    inventory_path, report_path = write_outputs(
+        output_dir,
+        classifications,
+        report_text,
+        aanbod_urls_by_domain={domain: aanbod_urls_by_domain[domain] for domain in sampled_domains if domain in aanbod_urls_by_domain},
+    )
 
     print(inventory_path, flush=True)
     print(report_path, flush=True)

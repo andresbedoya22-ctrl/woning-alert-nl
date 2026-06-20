@@ -81,6 +81,26 @@ def _build_url(domain: str, path: str) -> str:
     return urlunsplit(("https", domain, normalized_path, "", ""))
 
 
+def _normalize_known_aanbod_url(known_aanbod_url: str | None) -> str | None:
+    if known_aanbod_url is None:
+        return None
+    normalized = known_aanbod_url.strip()
+    return normalized or None
+
+
+def _is_portal_aanbod_url(known_aanbod_url: str) -> bool:
+    hostname = (urlsplit(known_aanbod_url).hostname or "").lower()
+    return hostname in {"funda.nl", "www.funda.nl", "pararius.nl", "www.pararius.nl"}
+
+
+def _path_with_query(url: str) -> str:
+    parts = urlsplit(url)
+    path = parts.path or "/"
+    if parts.query:
+        return f"{path}?{parts.query}"
+    return path
+
+
 def _normalize_response(response: object, url: str) -> _FetchedResponse:
     if isinstance(response, _FetchedResponse):
         return response
@@ -280,6 +300,46 @@ class _RequestManager:
         self.requests_used += 1
         return _normalize_response(response, url)
 
+    def fetch_url(self, url: str) -> _FetchedResponse | None:
+        if self.requests_used >= _CONTENT_BUDGET:
+            return None
+        parsed = urlsplit(url)
+        request_domain = (parsed.hostname or self.domain).lower()
+        gate_path = parsed.path or "/"
+        if not robots_gate.can_fetch(request_domain, gate_path):
+            logger.info("Skipping disallowed path %s for domain %s", _path_with_query(url), request_domain)
+            return None
+        if self.sleep_between_requests and self.requests_used > 0 and self.crawl_delay_seconds > 0:
+            time.sleep(self.crawl_delay_seconds)
+        response = self.fetcher(
+            url,
+            {"User-Agent": self.user_agent},
+            self.timeout_seconds,
+        )
+        self.requests_used += 1
+        return _normalize_response(response, url)
+
+
+def _apply_listing_response(classification: DomainClassification, response: _FetchedResponse) -> bool:
+    fields, listing_pattern, needs_js, iframe_only = _extract_card_fields(response.text)
+    if listing_pattern and classification.listing_url_pattern is None:
+        classification.listing_url_pattern = listing_pattern
+    if fields:
+        classification.card_fields_extractable = fields
+        classification.discovery_strategy = DiscoveryStrategy.listing_html
+        classification.recommended_action = _recommended_action(classification.discovery_strategy)
+        return True
+    if needs_js:
+        classification.needs_js = True
+        classification.discovery_strategy = DiscoveryStrategy.listing_js
+        classification.recommended_action = _recommended_action(classification.discovery_strategy)
+        return True
+    if iframe_only:
+        classification.discovery_strategy = DiscoveryStrategy.iframe_only
+        classification.recommended_action = _recommended_action(classification.discovery_strategy)
+        return True
+    return False
+
 
 def _classification_defaults(domain: str, robots_status_value: str, crawl_delay_value: float) -> DomainClassification:
     return DomainClassification(
@@ -312,7 +372,7 @@ def _maybe_mark_blocked(classification: DomainClassification, response: _Fetched
     return True
 
 
-def classify_domain(domain: str, fetcher=None) -> DomainClassification:
+def classify_domain(domain: str, fetcher=None, known_aanbod_url: str | None = None) -> DomainClassification:
     normalized_domain = domain.strip().lower()
     root_allowed = robots_gate.can_fetch(normalized_domain, "/")
     robots_status_value = robots_gate.robots_status(normalized_domain)
@@ -334,6 +394,25 @@ def classify_domain(domain: str, fetcher=None) -> DomainClassification:
             requests_used=0,
             recommended_action=_recommended_action(DiscoveryStrategy.robots_disallow),
             blocker_reason=None,
+        )
+
+    normalized_aanbod_url = _normalize_known_aanbod_url(known_aanbod_url)
+    if normalized_aanbod_url is not None and _is_portal_aanbod_url(normalized_aanbod_url):
+        return DomainClassification(
+            domain=normalized_domain,
+            robots_status=robots_status_value,
+            robots_crawl_delay=crawl_delay_value,
+            discovery_strategy=DiscoveryStrategy.blocked,
+            cms_fingerprint_guess="unknown",
+            sitemap_found=False,
+            sitemap_has_listing_urls=False,
+            wp_json_listings_found=False,
+            listing_url_pattern=None,
+            card_fields_extractable=[],
+            needs_js=False,
+            requests_used=0,
+            recommended_action="commercial_only",
+            blocker_reason="aanbod_on_funda_pararius",
         )
 
     settings = load_runtime_settings(load_dotenv_file=False)
@@ -388,6 +467,17 @@ def classify_domain(domain: str, fetcher=None) -> DomainClassification:
             classification.requests_used = request_manager.requests_used
             return classification
 
+    if normalized_aanbod_url is not None:
+        known_listing_response = request_manager.fetch_url(normalized_aanbod_url)
+        classification.requests_used = request_manager.requests_used
+        if _maybe_mark_blocked(classification, known_listing_response):
+            classification.requests_used = request_manager.requests_used
+            return classification
+        if known_listing_response is not None and known_listing_response.status_code == 200:
+            if _apply_listing_response(classification, known_listing_response):
+                classification.requests_used = request_manager.requests_used
+                return classification
+
     listing_candidates = _LISTING_PATHS_BY_FINGERPRINT.get(
         classification.cms_fingerprint_guess,
         _LISTING_PATHS_BY_FINGERPRINT["unknown"],
@@ -400,24 +490,7 @@ def classify_domain(domain: str, fetcher=None) -> DomainClassification:
             return classification
         if listing_response is None or listing_response.status_code != 200:
             continue
-        fields, listing_pattern, needs_js, iframe_only = _extract_card_fields(listing_response.text)
-        if listing_pattern and classification.listing_url_pattern is None:
-            classification.listing_url_pattern = listing_pattern
-        if fields:
-            classification.card_fields_extractable = fields
-            classification.discovery_strategy = DiscoveryStrategy.listing_html
-            classification.recommended_action = _recommended_action(classification.discovery_strategy)
-            classification.requests_used = request_manager.requests_used
-            return classification
-        if needs_js:
-            classification.needs_js = True
-            classification.discovery_strategy = DiscoveryStrategy.listing_js
-            classification.recommended_action = _recommended_action(classification.discovery_strategy)
-            classification.requests_used = request_manager.requests_used
-            return classification
-        if iframe_only:
-            classification.discovery_strategy = DiscoveryStrategy.iframe_only
-            classification.recommended_action = _recommended_action(classification.discovery_strategy)
+        if _apply_listing_response(classification, listing_response):
             classification.requests_used = request_manager.requests_used
             return classification
 
