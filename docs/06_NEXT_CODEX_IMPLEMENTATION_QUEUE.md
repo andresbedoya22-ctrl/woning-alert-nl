@@ -6,7 +6,7 @@ This is the recommended queue after the agent OS and parser-family architecture 
 
 Do not start with live scraping.
 
-Start with deterministic models, fixtures, and tests. Live adapters come after the inventory core and access policy exist.
+Start with deterministic models, fixtures, source intelligence, and tests. Live adapters come after the inventory core, source intelligence, and access policy exist.
 
 ## PR 2 — Inventory Core v1
 
@@ -38,7 +38,38 @@ tests/test_inventory_diff_engine.py
 - no network access;
 - `py -3.12 -m pytest` passes.
 
-## PR 3 — Access Policy v1
+## PR 3 — Source Intelligence Conversion v1
+
+### Goal
+
+Convert existing makelaar/source discovery data into a measurable source-intelligence dataset before building more parsers.
+
+### Expected files
+
+```text
+scraper/src/domek_wonen/sources/__init__.py
+scraper/src/domek_wonen/sources/source_intelligence_models.py
+scraper/src/domek_wonen/sources/source_intelligence_loader.py
+scraper/src/domek_wonen/sources/source_intelligence_report.py
+scripts/run_source_intelligence_report.py
+tests/fixtures/sources/source_intelligence_seed.csv
+tests/test_source_intelligence_report.py
+```
+
+### Acceptance criteria
+
+- loads a CSV seed with source/domain/aanbod fields;
+- produces counts by source status;
+- produces counts by aanbod URL quality;
+- produces counts by detected platform / delivery mode;
+- recommends parser family placeholders;
+- separates missing, suspect, valid, blocked, legal-review and unknown sources;
+- creates a prioritized manual review queue;
+- no live scraping;
+- no generated outputs committed;
+- `py -3.12 -m pytest` passes.
+
+## PR 4 — Access Policy v1
 
 ### Goal
 
@@ -60,7 +91,7 @@ tests/test_source_access_policy.py
 - decisions include reasons;
 - no parser can ignore access state.
 
-## PR 4 — Delivery Mode Fingerprint v2
+## PR 5 — Delivery Mode Fingerprint v2
 
 ### Goal
 
@@ -81,7 +112,7 @@ tests/test_delivery_fingerprint_v2.py
 - recommends parser family;
 - stays conservative when evidence is weak.
 
-## PR 5 — Parser Config Runner v1
+## PR 6 — Parser Config Runner v1
 
 ### Goal
 
@@ -106,7 +137,7 @@ tests/test_static_html_cards_parser.py
 - produces evidence and confidence;
 - rejects weak cards.
 
-## PR 6 — Transaction Type Classifier
+## PR 7 — Transaction Type Classifier
 
 ### Goal
 
@@ -126,7 +157,7 @@ tests/test_transaction_type_classifier.py
 - ambiguous data maps to `unknown`;
 - koop matching excludes huur/unknown unless explicitly allowed.
 
-## PR 7 — Normalized Listing QA v1
+## PR 8 — Normalized Listing QA v1
 
 ### Goal
 
@@ -147,7 +178,7 @@ tests/test_normalized_listing_qa.py
 - source access is checked;
 - only clean available koop listings reach matching.
 
-## PR 8 — n8n Workflow Specs
+## PR 9 — n8n Workflow Specs
 
 ### Goal
 
@@ -168,15 +199,16 @@ docs/n8n/advisor_email_draft.md
 - errors create triage outputs;
 - AI usage is limited to summaries/drafts/diagnostics.
 
-## PR 9 — First Real Source Family Pilot
+## PR 10 — First Real Source Family Pilot
 
-Only after PR 2-7.
+Only after PR 2-8.
 
-Pick one family:
+Pick one family based on Source Intelligence Conversion v1:
 
+- Realworks stabilization; or
+- OGonline/XHR stabilization; or
 - static HTML cards; or
-- WordPress cards; or
-- Realworks stabilization.
+- WordPress cards.
 
 Acceptance criteria:
 
