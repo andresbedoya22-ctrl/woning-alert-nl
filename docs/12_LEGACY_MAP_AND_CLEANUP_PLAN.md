@@ -99,3 +99,10 @@ This layer does not scrape, make HTTP requests, open websites, use Playwright, v
 property-discovery runtime, or implement parser families. It only reuses local evidence to reduce
 `unknown_manual_review` where platform or delivery signals already exist, making it a bridge toward later
 parser-family implementation.
+
+## Parser Family Readiness Audit v1
+
+`docs/research/PARSER_FAMILY_READINESS_AUDIT_V1.md` records the offline decision to implement `Realworks Parser
+Family Stabilization v1` first. The legacy Realworks parser under `properties/platform_parsers/` should be mined
+for fixture-tested parsing logic, while network orchestration and broad WordPress/static config-runner work remain
+separate later phases.

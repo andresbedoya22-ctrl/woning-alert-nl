@@ -48,6 +48,7 @@
 - Expected files: family implementations, fixtures, configs, tests.
 - Acceptance criteria: approved sources in these families produce normalized listings reliably.
 - Out of scope: matching and orchestration.
+- Parser Family Readiness Audit v1 decision: start with `Realworks Parser Family Stabilization v1` before broad WordPress/static config-runner expansion, because enriched local evidence shows the largest production-ready parser-family pool there.
 
 ## PR 8: Static/WordPress Cards
 
