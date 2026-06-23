@@ -87,3 +87,15 @@ states to conservative research or review outcomes before Access Policy sees the
 score/confidence, timestamps, and review reasons in `notes` or `evidence` so later reporting can explain the
 decision trail. This hardening remains offline and does not scrape, make HTTP requests, use Playwright, probe
 robots live, or modify property-discovery runtime.
+
+## Delivery Mode Evidence Enrichment v1
+
+`scraper/src/domek_wonen/sources/evidence_enrichment.py` adds an offline enrichment step that joins the real
+source master with local technical evidence CSVs. It can read platform fingerprint, source coverage, target-area,
+and delivery-mode evidence artifacts with variable columns, then enrich `SourceIntelligenceRecord` fields before
+Access Policy and Delivery Fingerprint run.
+
+This layer does not scrape, make HTTP requests, open websites, use Playwright, validate robots live, modify
+property-discovery runtime, or implement parser families. It only reuses local evidence to reduce
+`unknown_manual_review` where platform or delivery signals already exist, making it a bridge toward later
+parser-family implementation.

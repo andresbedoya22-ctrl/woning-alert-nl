@@ -130,6 +130,23 @@ It normalizes legacy access states such as `allowed_official_source`, `missing`,
 reporting. The adapter remains offline-only: it does not scrape, make HTTP requests, open websites, use
 Playwright, or validate robots live.
 
+## Delivery Mode Evidence Enrichment v1
+
+`evidence_enrichment.py` joins a legacy source master with local CSV evidence artifacts such as platform
+fingerprint inventories, source coverage inventories, and delivery-mode diagnostics. The join uses normalized
+domains from source, root, website, homepage, and aanbod URL fields. It does not make network requests, open
+websites, use Playwright, validate robots live, scrape pages, or change property-discovery runtime behavior.
+
+The enrichment layer can reduce `unknown_manual_review` when local evidence contains platform, delivery-mode,
+boolean signal, iframe, JSON-LD, sitemap, WordPress, visible-card, or blocker fields. It is a prioritization
+step before parser-family implementation; it does not implement parser families.
+
+Run it with:
+
+```powershell
+py -3.12 scripts/run_enriched_legacy_source_report.py --source-master data/discovery/runs/20260614T122022Z/makelaar_sources_master.csv --evidence data/discovery/platform_fingerprint/platform_fingerprint_results.csv --output tmp/enriched-legacy-source-report.json
+```
+
 ## Next step
 
 The next focused phase is `Access Policy v1` or a richer `Delivery Mode Fingerprint v2`, not runtime parser expansion.
