@@ -7,3 +7,18 @@ This module will own:
 - normalized parser output
 
 The architecture rule is simple: no parser per makelaar. Shared technical patterns belong in parser families, while domain-specific adjustments belong in source configs.
+
+## Realworks Parser Family Stabilization v1
+
+`realworks_family.py` is the first offline V4 parser-family layer for `realworks_public`.
+It accepts already captured HTML through `ParserInput` and returns `ParserFamilyResult`
+with `ParsedListing` rows. It does not fetch pages, open browsers, validate robots live,
+or persist output.
+
+The legacy Realworks parser remains under `properties/platform_parsers/realworks_parser.py`
+for the property-discovery runtime. This V4 family keeps that runtime intact and only
+mines the proven parsing direction: listing detail URLs, card-level address, city, price,
+status, area, rooms, and evidence signals.
+
+Runner integration, source configs, inventory state, stale-source handling, and QA gate
+promotion are later phases.

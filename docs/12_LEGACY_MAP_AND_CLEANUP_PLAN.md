@@ -106,3 +106,14 @@ parser-family implementation.
 Family Stabilization v1` first. The legacy Realworks parser under `properties/platform_parsers/` should be mined
 for fixture-tested parsing logic, while network orchestration and broad WordPress/static config-runner work remain
 separate later phases.
+
+## Realworks Parser Family Stabilization v1
+
+`scraper/src/domek_wonen/parsers/realworks_family.py` adds the first V4 parser-family layer for
+`realworks_public`. It is offline by construction: callers provide captured listing HTML in `ParserInput`, and the
+family emits `ParsedListing` records inside a `ParserFamilyResult`.
+
+This layer does not fetch, scrape live pages, use browser automation, validate robots live, or write inventory. The
+legacy `scraper/src/domek_wonen/properties/platform_parsers/realworks_parser.py` remains intact for the existing
+property-discovery runtime. Integration with a runner, source configs, inventory state, and QA promotion comes after
+this stabilization step.
