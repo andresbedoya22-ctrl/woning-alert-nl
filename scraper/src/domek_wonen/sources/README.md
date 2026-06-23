@@ -48,6 +48,21 @@ sources remain manual-review inputs.
 Later phases should call this layer before delivery-mode fingerprinting, parser-family selection, and
 source-config execution so blocked or permission-bound sources do not enter operational extraction.
 
+## Delivery Mode Fingerprint v2
+
+Delivery Mode Fingerprint v2 turns a `SourceIntelligenceRecord` into an explicit
+`DeliveryFingerprintResult`. It calls Access Policy first, then classifies the delivery mode from
+existing source-intelligence evidence such as platform hints, visible cards, JSON-LD, sitemap flags,
+WordPress REST signals, iframe dependencies, CAPTCHA, login, and `403` markers.
+
+This layer does not make network requests, read `robots.txt` live, use Playwright, scrape pages, or
+execute parser families. Its output is a deterministic offline decision with confidence,
+evidence signals, blocking signals, a recommended action, and a boolean that says whether the source
+may proceed to parser-family work.
+
+If Access Policy blocks production extraction, Delivery Mode Fingerprint v2 always sets
+`can_proceed_to_parser_family` to `False`, even when technical parser-family signals are present.
+
 ## CLI usage
 
 ```powershell
