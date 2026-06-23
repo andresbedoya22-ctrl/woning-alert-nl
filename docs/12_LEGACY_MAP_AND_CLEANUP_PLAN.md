@@ -63,3 +63,14 @@ These stay in place and are treated as historical context, not deleted assets.
 3. Parser-family transition: extract reusable logic from `properties/` into `parsers/` and `inventory/`.
 4. Legacy isolation: move portal-first experiments and superseded docs into clearer legacy locations after replacements exist.
 5. Final cleanup: remove only code and docs proven obsolete after replacement coverage is validated.
+
+## Legacy Source Intelligence Adapter v1
+
+`scraper/src/domek_wonen/sources/legacy_source_adapter.py` is the temporary bridge between legacy local CSV
+artifacts and the new source architecture. It reads source masters, discovery outputs, coverage-style files,
+and platform fingerprint CSVs offline, maps variable legacy columns into `SourceIntelligenceRecord`, and then
+runs the existing Source Intelligence, Access Policy, and Delivery Fingerprint layers.
+
+It does not scrape, make HTTP requests, validate robots live, use browser automation, modify property-discovery
+runtime, or implement parser families. Its purpose is to turn existing artifacts into a real prioritization and
+manual-review report before parser-family implementation begins.

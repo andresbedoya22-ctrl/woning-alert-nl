@@ -1,0 +1,11 @@
+office_name,root_domain,website,koopaanbod_url,aanbod_url_quality,legal_status,detected_platform,source_quality_reason,source_origin,gemeente,province,has_wp_json,has_visible_cards
+Legacy Realworks,realworks-legacy.test,https://www.realworks-legacy.test,https://www.realworks-legacy.test/koopwoningen,valid,allowed,Realworks,realworks public listing evidence,synthetic legacy master,Tilburg,Noord-Brabant,,
+Legacy OGonline,ogonline-legacy.test,https://www.ogonline-legacy.test,https://www.ogonline-legacy.test/woningen,valid,allowed,OGonline,ogonline xhr evidence,synthetic legacy master,Eindhoven,Noord-Brabant,,
+Legacy WordPress,wordpress-legacy.test,https://wordpress-legacy.test,https://wordpress-legacy.test/aanbod,valid,allowed,WordPress,wp-json listing evidence,synthetic legacy master,Breda,Noord-Brabant,true,true
+Legacy Missing,missing-legacy.test,https://missing-legacy.test,,missing,unknown,unknown,no aanbod url,synthetic legacy master,Den Bosch,Noord-Brabant,,
+Legacy Suspect,suspect-legacy.test,https://suspect-legacy.test,https://suspect-legacy.test/search,suspect,researching,unknown,suspect aanbod url,synthetic legacy master,Helmond,Noord-Brabant,,
+Legacy Legal Review,legal-legacy.test,https://legal-legacy.test,https://legal-legacy.test/aanbod,valid,legal_review,Realworks,terms legal_review,synthetic legacy master,Veldhoven,Noord-Brabant,,
+Legacy Funda Wrapper,funda-wrapper-legacy.test,https://funda-wrapper-legacy.test,https://www.funda.nl/makelaar/demo/aanbod,valid,allowed,Funda iframe,funda dependency,synthetic legacy master,Utrecht,Utrecht,,
+Legacy Pararius Wrapper,pararius-wrapper-legacy.test,https://pararius-wrapper-legacy.test,https://www.pararius.nl/makelaar/demo,valid,allowed,Pararius external,pararius dependency,synthetic legacy master,Rotterdam,Zuid-Holland,,
+Legacy Blocked,blocked-legacy.test,https://blocked-legacy.test,https://blocked-legacy.test/aanbod,valid,allowed,Realworks,captcha login 403 stop signal,synthetic legacy master,Amsterdam,Noord-Holland,,
+Legacy Unknown,unknown-legacy.test,https://unknown-legacy.test,https://unknown-legacy.test/aanbod,suspect,unknown,unknown,conflicting evidence manual review,synthetic legacy master,Nijmegen,Gelderland,,

@@ -82,6 +82,42 @@ The JSON report includes:
 
 The CLI also prints a compact stdout summary with top delivery modes, top parser families, and manual-review volume.
 
+## Legacy Source Intelligence Adapter v1
+
+`legacy_source_adapter.py` converts existing offline legacy source artifacts into `SourceIntelligenceRecord`
+objects. It is intended for local CSVs such as source masters, discovery outputs, source coverage files, and
+platform fingerprint artifacts.
+
+Supported legacy columns include `source_id`, `office_name`, `makelaar_name`, `source_name`, `root_domain`,
+`domain`, `source_domain`, `website`, `homepage_url`, `website_url`, `aanbod_url`, `koopaanbod_url`,
+`gemeente`, `city`, `province`, `legal_status`, `source_status`, `aanbod_url_quality`, `detected_platform`,
+`platform`, `source_quality_status`, `source_quality_reason`, `source_origin`, `evidence`, and `notes`.
+Missing columns are allowed.
+
+The adapter does not make HTTP requests, probe robots live, open websites, use Playwright, scrape pages, or
+change property-discovery runtime behavior. It only reads local CSV data.
+
+The combined report flow is:
+
+```text
+legacy source CSV
+-> SourceIntelligenceRecord
+-> AccessPolicyDecision
+-> DeliveryFingerprintResult
+-> combined source intelligence report
+```
+
+Run it with:
+
+```powershell
+py -3.12 scripts/run_legacy_source_intelligence_report.py --input tests/fixtures/sources/legacy_source_master_seed.csv
+py -3.12 scripts/run_legacy_source_intelligence_report.py --input data/discovery/runs/20260614T122022Z/makelaar_sources_master.csv --output tmp/legacy-source-intelligence-report.json
+```
+
+The report includes source-intelligence counts, access-policy summary, delivery-fingerprint summary,
+top parser-family candidates, manual-review queue, blocked sources, permission-required sources, and
+production parser-ready sources.
+
 ## Next step
 
 The next focused phase is `Access Policy v1` or a richer `Delivery Mode Fingerprint v2`, not runtime parser expansion.
