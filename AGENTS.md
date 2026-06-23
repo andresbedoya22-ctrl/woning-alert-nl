@@ -1,122 +1,85 @@
 # AGENTS.md
 
-## Direccion del proyecto
+## Product objective
 
-- Proyecto: `WoningAlert NL V4`
-- Direccion: `Discovery-first Opportunity Pipeline`
-- Objetivo: detectar oportunidades accionables de koopwoningen para clientes activos de Domek con cobertura maxima de fuentes tecnicamente descubribles y un censo explicito de fuentes no descubribles con su razon.
-- El proyecto no es:
-  - un scraper total de todo el mercado;
-  - un pipeline operativo basado en Funda o Pararius;
-  - una estrategia principal makelaar-by-makelaar;
-  - un dashboard o Woning Scanner antes de que matching estable exista.
+WoningAlert NL builds a disciplined housing-source intelligence pipeline for the Dutch koopwoning market. The operational goal is to identify allowed sources, classify technical delivery patterns, build a normalized inventory, compare daily changes safely, match relevant opportunities to active clients, and support advisor review plus later orchestration.
 
-## Reglas hard
+## Strategic architecture
 
-- Ejecutar todo en Windows con PowerShell. No asumir Bash.
-- Trabajar por fases.
-- Hacer cambios pequenos, trazables y testeados.
-- No mezclar fases en una misma tarea.
-- No scraping automatico de Funda.
-- No scraping automatico de Pararius.
-- Funda y Pararius solo benchmark, manual, reference, o permission track, fuera del pipeline operativo.
-- No stealth.
-- No proxies.
+The canonical architecture is:
+
+```text
+source_registry
+-> source_intelligence
+-> access_policy
+-> delivery_mode_fingerprint
+-> parser_family
+-> source_config
+-> normalized_listing
+-> inventory_state
+-> client_matching
+-> advisor_email
+-> n8n_orchestration
+```
+
+The repo must optimize for reusable parser families and source configs, not one parser per makelaar. A makelaar is a commercial entity; a parser family is a reusable technical delivery pattern.
+
+## Forbidden behaviors
+
+- No automatic scraping of Funda.
+- No automatic scraping of Pararius without explicit permission, license, or review.
+- No stealth browser automation.
 - No CAPTCHA solving.
-- No anti-bot bypass.
-- No login falso.
-- No fingerprint spoofing.
-- Stop ante `403`, `429`, CAPTCHA, o login wall.
-- Registrar `source_status` y continuar cuando sea seguro hacerlo.
-- Respetar robots.txt y crawl-delay.
-- Aplicar rate limit por dominio y por host/IP cuando aplique.
-- No Playwright como camino MVP para fuentes JS.
-- Las fuentes JS se clasifican como `js_deferred` o `manual_review` salvo decision futura explicita.
-- No makelaar-by-makelaar como camino principal.
-- No dashboard antes de `Daily Sync v1` y `Client Matching v1`.
-- No `Woning Scanner` antes de matching estable.
-- No LLM antes de coarse match.
-- LLM provider objetivo: OpenAI.
-- No modificar `data/raw` salvo instruccion explicita del usuario.
-- No imprimir secrets.
-- No commitear `.env`.
-- No commitear outputs generados.
-- No activar `ENABLE_LLM_EXTRACTION` por defecto.
-- No subir `MAX_LLM_CALLS_PER_RUN` por encima de `0` salvo instruccion explicita de la tarea.
-- No llamar OpenAI en tests unitarios.
-- No usar `git add .`.
-- No hacer push.
-- No hacer commit sin permiso explicito, salvo cuando la tarea autorice commits atomicos.
-- No modificar codigo funcional si el pedido solo requiere documentacion o gobierno del repo.
+- No residential proxies.
+- No IP rotation to evade controls.
+- No human-simulation anti-bot bypass.
+- No bypass of login walls, `403`, paywalls, robots, or explicit source blocking.
+- No scraping-oriented Playwright path as the MVP for JS-heavy sources.
+- No modification of `data/raw` unless the user explicitly asks.
+- No `git add .`.
+- No push unless the user explicitly asks.
+- No commit without explicit permission, unless the task explicitly authorizes an atomic commit.
 
-## Paquetes V4
+## Non-negotiable rules
 
-- `compliance`
-  - robots, legal gates, rate limiting, source policy.
-- `discovery`
-  - source census y strategy classification.
-- `harvest`
-  - card harvester source-agnostic.
-- `changes`
-  - fingerprinting y change detection.
-- `inventory`
-  - future inventory core.
-- `matching`
-  - coarse y fine match.
-- `extraction`
-  - extraccion con OpenAI despues del coarse match.
-- `validation`
-  - validation, confidence, missing fields.
-- `drafts`
-  - advisor drafts futuros.
-- `storage`
-  - SQLite/Postgres u otra persistencia futura.
-- `portals`
-  - LEGACY/DIAGNOSTICO. Portal probes y adapters del enfoque viejo
-    (Huislijn/Funda/Pararius). NO es el camino V4. No construir sobre ellos.
-    Pendiente de mover a legacy/ en paso futuro.
-- `properties`
-  - LEGACY/DIAGNOSTICO. property_discovery_engine y parsers asociados del
-    enfoque viejo. Solo el parser source-agnostic validado se rescata, en
-    el paquete harvest/. No construir sobre properties/.
-- `diagnostics`
-  - audits y reports.
-- `recommendations` y `woning_scanner`
-  - no tocar hasta fase futura salvo instruccion explicita.
+- Work in Windows PowerShell.
+- Work in bounded phases.
+- Make small, traceable, tested changes.
+- Do not mix architectural phases in one task.
+- Do not claim a file, module, script, or behavior exists without reading the repo state.
+- Preserve functional code, tests, and scripts unless the task explicitly requires a runtime change.
+- If a source fails, do not erase prior successful inventory from that source.
+- Set `safe_to_compare_removals=false` when source capture fails.
+- Keep last successful source inventory as stale reference until recovery.
 
-## Bloques del pipeline V4
+## Source access policy
 
-| Bloque | Nombre |
-| --- | --- |
-| 0 | Preparar la mesa (limpieza repo, rama, deps) |
-| 1A | Compliance + Discovery Census (gate mayor) |
-| 1B | Client Profile Audit |
-| 2 | Card Harvester source-agnostic + extractor LLM (sin cablear) |
-| 3 | Discovery productivo por estrategia |
-| 4 | Storage + Change Detection + dedupe canonico |
-| 5 | Coarse Matching (clientes activos) |
-| 6 | Detail Extraction + Validation + Fine Match |
-| 7 | Advisor Draft + Daily Run + Demo |
+- `allowed`: source is publicly reachable and passes robots plus legal checks for the intended request pattern.
+- `limited`: source can be used only with narrower scope, lower frequency, or reduced fields.
+- `permission_required`: source may be technically reachable but cannot be used operationally without approval.
+- `legal_review`: legal or contractual ambiguity blocks operational use until reviewed.
+- `blocked`: the source presents login, CAPTCHA, `403`, explicit anti-bot, paywall, or equivalent stop signals.
 
-Los bloques son gate-driven: no se avanza sin pasar la Definition of Done
-del anterior. El Bloque 1A es el gate mayor: su census decide si el
-proyecto sigue como software (verde/amarillo) o pasa a track comercial (rojo).
+Funda and Pararius stay outside the operational pipeline. They may be benchmark, manual reference, or permission-track inputs only.
 
-## Validacion obligatoria
+Browser rendering is allowed only to render an already-permitted public page. Rendering or automation to evade controls is forbidden.
 
-- Si cambia codigo: `py -3.12 -m pytest` es obligatorio.
-- Si cambia solo documentacion: `py -3.12 -m pytest` sigue recomendado; si no se corre, debe justificarse.
-- No declarar una tarea terminada si hubo cambios de codigo y la validacion no corrio o no paso, salvo aceptacion explicita del usuario.
+## Parser-family rules
 
-## Manejo de fallas por fuente
+- No parser per makelaar as the default strategy.
+- Build reusable parser families around technical delivery modes.
+- Add source-specific configs before adding a new parser family.
+- Treat unsupported or ambiguous sources as `unknown_manual_review` until evidence supports a family decision.
+- Legacy `properties/` code can inform future parser families, but it is not the target architecture itself.
 
-- Un fallo de una fuente no debe tumbar el run completo.
-- No borrar inventario previo de una fuente fallida.
-- No asumir removals reales si la captura de una fuente fallo.
-- Fijar `safe_to_compare_removals=false` cuando la fuente falla.
-- Mantener el ultimo inventario exitoso como referencia `stale` hasta recuperar la fuente.
+## Data minimization
 
-## Artefactos que no deben commitearse
+- Extract only the minimum fields needed for inventory, QA, matching, and advisor review.
+- Do not copy long listing descriptions into the core model.
+- Do not download images unless permission or license is explicit.
+- Do not move listings into matching before QA and normalization gates pass.
+
+## Generated artifacts that must not be committed
 
 - `.env`
 - `.env.*`
@@ -140,17 +103,47 @@ proyecto sigue como software (verde/amarillo) o pasa a track comercial (rojo).
 - `*.db`
 - `*.sqlite-wal`
 - `*.sqlite-shm`
-- HTML masivo, HAR, previews y runs generados.
+- generated HTML, HAR, preview, and run artifacts
 
-## Disciplina operativa
+## Validation requirements
 
-- Usar rutas explicitas para `git add`.
-- Hacer commits atomicos.
-- Reportar en el cierre: rama, cambios, validacion, git status final, y riesgos o limites.
-- No mezclar fases.
+- If runtime code changes: run `py -3.12 -m pytest`.
+- If only docs or structure change: tests are still recommended; if skipped, explain why.
+- Do not report success for tests that did not run.
+- Do not report a task complete if runtime code changed and validation failed, unless the user explicitly accepts that state.
 
-## Compliance Gate - Regla vinculante
-El modulo `scraper/src/domek_wonen/compliance/robots_gate.py` es el
-guardian unico de la red en el pipeline V4. NINGUN modulo puede hacer
-requests HTTP sin llamar primero a `can_fetch(domain, path)` y recibir
-`True`. Esta regla es vinculante en todos los bloques del pipeline.
+## Matching rules
+
+- Matching consumes only normalized, QA-passed inventory.
+- Keep `transaction_type` separate from listing `status`.
+- Do not mix koop and huur logic accidentally.
+- Dashboard or scanner work waits until inventory and matching are stable.
+- Advisor email generation comes after matching, not before.
+
+## Agent workflow discipline
+
+- Read this file before acting in the repo.
+- Start with `git status --short` and `git branch --show-current` when the task changes files or asks for repo work.
+- Inspect real files before editing.
+- Prefer explicit path allowlists for staging.
+- Keep commits atomic and phase-scoped.
+- Report branch, changed files, validation, final `git status -s`, and risks at close.
+- Never invent repo state, test outcomes, or command results.
+
+## Current priority order
+
+1. Repo Architecture Reset v1.
+2. Source Intelligence Conversion v1.
+3. Access Policy v1.
+4. Delivery Mode Fingerprint v2.
+5. Inventory Core v1.
+6. Parser Config Runner v1.
+7. Parser Families.
+8. QA and Normalization.
+9. Matching and Advisor Emails.
+10. n8n Orchestration.
+11. Dashboard only after inventory and matching are stable.
+
+## Binding network gate
+
+`scraper/src/domek_wonen/compliance/robots_gate.py` remains the single network gate for V4 pipeline work. No runtime module may make HTTP requests without first checking `can_fetch(domain, path)` and receiving `True`.

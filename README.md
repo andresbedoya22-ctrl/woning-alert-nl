@@ -1,92 +1,150 @@
-# WoningAlert NL - Discovery-first Opportunity Pipeline
+# WoningAlert NL
 
-## Objetivo
+WoningAlert NL is a discovery-first housing intelligence system for the Dutch koopwoning market. The product goal is to identify allowed housing sources, classify their technical delivery patterns, build a safe normalized inventory, compare daily changes, match opportunities against active client searches, and prepare advisor-facing outputs.
 
-WoningAlert NL busca detectar oportunidades accionables de koopwoningen para clientes activos de Domek. El objetivo no es prometer un inventario nacional perfecto, sino lograr cobertura maxima de fuentes tecnicamente descubribles y mantener un censo explicito de las fuentes no descubribles con su razon.
+## What problem it solves
 
-El alcance es nacional por diseno, pero honesto en sus huecos. Funda y Pararius no forman parte del pipeline operativo con scraping automatico: quedan en benchmark, manual review, reference, o permission track.
+Advisors should not depend on manual searching across dozens of heterogeneous housing sources. The repo exists to turn scattered public source signals into a controlled inventory pipeline with explicit access policy, reliable change tracking, and matching-ready records.
 
-## Principio de producto
+## What it is not
 
-El valor del producto no es "scrapear todo". El valor es reducir busqueda manual, detectar propiedades nuevas, removidas o cambiadas, y cruzarlas con perfiles reales de clientes para producir acciones utiles.
+- It is not a full-market scraper.
+- It is not an operational pipeline built on automatic Funda scraping.
+- It is not an operational pipeline built on automatic Pararius scraping.
+- It is not a parser-per-makelaar strategy.
+- It is not a dashboard-first project.
+- It is not a stealth automation project.
 
-Para el MVP, un daily run es suficiente. La prioridad es una operacion confiable y medible antes que una cobertura teoricamente total.
+## Core scaling principle
 
-## Arquitectura V4
+WoningAlert NL does not scale by creating one parser per makelaar.
 
-- `A. Compliance Gate`
-  Aplica robots, crawl-delay, rate limiting y politicas de uso antes de cualquier intento de captura.
-- `B. Discovery Census / Strategy Classification`
-  Clasifica cada fuente o dominio como descubrible, bloqueado, js_deferred, manual_review, benchmark, o fallback.
-- `C. Card Harvest`
-  Captura tarjetas o listados livianos desde fuentes aprobadas sin entrar todavia en extraccion detallada costosa.
-- `D. Change Detection`
-  Detecta nuevas, removidas y cambiadas contra el ultimo inventario valido sin borrar inventario previo de fuentes fallidas.
-- `E. Coarse Match`
-  Filtra barato contra perfiles reales de clientes para decidir que candidatos merecen detalle adicional.
-- `F. OpenAI Extraction`
-  Invoca OpenAI solo despues del coarse match para enriquecer el subconjunto candidato.
-- `G. Validation + Confidence`
-  Valida campos, faltantes y consistencia para separar datos confiables de manual_review.
-- `H. Normalization + Fine Match + Advisor Draft`
-  Normaliza los datos finales, recalcula el match fino y prepara insumos para drafts operativos posteriores.
+WoningAlert NL scales by using source intelligence, delivery modes, parser families, and source configs.
 
-## Fuentes y politica de uso
+## Target flow
 
-- `Huislijn`
-  Candidata y prioridad para portal probing e inventario inicial.
-- `Funda`
-  Benchmark, manual, reference, o permission track only. No scraping automatico.
-- `Pararius`
-  Benchmark, manual, o permission track only. No scraping automatico.
-- `Makelaar parsers`
-  Capa fallback o extra. No camino principal.
-- `BAG`, `PDOK`, `EP-Online`
-  Enrichment posterior sobre inventario ya priorizado.
-- `Email alerts`
-  Fuera del core inicial salvo decision posterior.
-
-## Fases
-
-| Fase | Nombre |
-| --- | --- |
-| 0 | Base limpia y gobierno del repo |
-| 1 | Discovery Census / Portal Inventory Spike |
-| 2 | Huislijn Adapter v1 |
-| 3 | Inventory Core v1 |
-| 4 | Daily Sync v1 |
-| 5 | Client Matching v1 |
-| 6 | Detail Extraction + Validation |
-| 7 | Advisor Draft Generator |
-| 8 | Multi-source Strategy + fallback makelaars |
-| 9 | MVP operativo |
-
-## Reglas duras
-
-- No scraping automatico de Funda o Pararius.
-- No anti-bot bypass, stealth, proxies residenciales, CAPTCHA solving, login falso, ni fingerprint spoofing.
-- Respetar robots.txt, crawl-delay, y rate limiting por dominio y por host/IP cuando aplique.
-- Ante `403`, `429`, CAPTCHA, o login wall: marcar `blocked`, `stale`, o `needs_manual_review` y continuar cuando sea seguro hacerlo.
-- El run completo no debe caer por la falla de una sola fuente.
-- Si una fuente falla, no borrar inventario previo de esa fuente.
-- El LLM objetivo es OpenAI y no se invoca antes del coarse match.
-- Ningun componente nuevo sin tests.
-- No tocar `data/raw` ni commitear outputs generados.
-
-## Environment
-
-Use `.env.example` as the local template for runtime settings. See [docs/ENVIRONMENT.md](/C:/Projects/domek-wonen/docs/ENVIRONMENT.md) for variables, defaults, secret policy, and the default-disabled LLM and Playwright settings.
-
-## Comandos base
-
-Instalar dependencias:
-
-```powershell
-python -m pip install -r requirements.txt
+```text
+source_registry
+-> source_intelligence
+-> access_policy
+-> delivery_mode_fingerprint
+-> parser_family
+-> source_config
+-> normalized_listing
+-> inventory_state
+-> client_matching
+-> advisor_email
+-> n8n_orchestration
 ```
 
-Ejecutar tests:
+## High-level architecture
+
+```text
+Discovery / Existing Sources
+        |
+        v
+Source Intelligence
+        |
+        v
+Access Policy
+        |
+        v
+Delivery Mode Fingerprint
+        |
+        v
+Parser Family + Source Config
+        |
+        v
+Normalized Listing
+        |
+        v
+QA / Normalization Gates
+        |
+        v
+Inventory State Engine
+        |
+        v
+Client Matching
+        |
+        v
+Advisor Email / Review Pack
+        |
+        v
+n8n Orchestration
+```
+
+## Main modules
+
+- `scraper/src/domek_wonen/sources/`: source registry, source intelligence, access policy, delivery fingerprinting.
+- `scraper/src/domek_wonen/parsers/`: parser families and domain-level source configs.
+- `scraper/src/domek_wonen/inventory/`: normalized listings, snapshots, diffs, stale-source handling.
+- `scraper/src/domek_wonen/qa/`: quality gates, normalization, dedupe, review states.
+- `scraper/src/domek_wonen/matching/`: current and future matching logic.
+- `scraper/src/domek_wonen/orchestration/`: n8n-facing jobs, schedules, alerts, retries.
+- `scraper/src/domek_wonen/portals/`: legacy or diagnostic portal experiments, not the strategic V4 path.
+- `scraper/src/domek_wonen/properties/`: legacy property-discovery stack to mine for reusable parser-family ideas.
+
+## Non-negotiable rules
+
+- No automatic scraping of Funda.
+- No automatic scraping of Pararius without explicit permission, license, or review.
+- No stealth browser automation.
+- No CAPTCHA solving.
+- No residential proxies.
+- No IP rotation to evade controls.
+- No human simulation to bypass detection.
+- No bypass of login walls, `403`, paywalls, robots, or explicit blocking.
+- If a source blocks access, mark it `blocked`, `permission_required`, or `legal_review`.
+- Extract only minimum necessary data.
+- Do not copy long descriptions.
+- Do not download images without explicit permission or license.
+- Do not move properties into matching before QA gates pass.
+- Do not build dashboard flows before inventory and matching are stable.
+- Do not modify `data/raw` unless the user explicitly asks.
+- Do not commit generated outputs.
+
+## Working with Codex
+
+- Read [AGENTS.md](/C:/Projects/domek-wonen/AGENTS.md) first.
+- Inspect real files before claiming they exist.
+- Prefer small, phase-bounded tasks.
+- Do not broaden scope from docs to runtime code without need.
+- Add or update tests when runtime code changes.
+- Run `py -3.12 -m pytest` after code changes; for docs-only work, run it when practical and report the exact outcome.
+- Report changed files, validation status, branch, and residual risks.
+
+Task template for Codex lives in [docs/09_CODEX_WORKFLOW.md](/C:/Projects/domek-wonen/docs/09_CODEX_WORKFLOW.md).
+
+## Install dependencies
+
+```powershell
+py -3.12 -m pip install -r requirements.txt
+```
+
+## Run tests
 
 ```powershell
 py -3.12 -m pytest
 ```
+
+## Current repo status
+
+As of this architecture reset, the repo already contains:
+
+- discovery and diagnostics code under `scraper/src/domek_wonen/discovery/` and `diagnostics/`;
+- legacy portal and property-discovery modules under `portals/` and `properties/`;
+- current matching code under `matching/`;
+- multiple historical planning docs under `docs/`;
+- scripts for source master, coverage, fingerprinting, matching, and audits under `scripts/`.
+
+This PR reframes that codebase under a professional architecture without deleting existing functional modules.
+
+## Recommended next PRs
+
+- `PR 2: Source Intelligence Conversion v1`
+- `PR 3: Access Policy v1`
+- `PR 4: Delivery Mode Fingerprint v2`
+- `PR 5: Inventory Core v1`
+- `PR 6: Parser Config Runner v1`
+
+For the detailed staged plan, see [docs/11_ROADMAP.md](/C:/Projects/domek-wonen/docs/11_ROADMAP.md).
