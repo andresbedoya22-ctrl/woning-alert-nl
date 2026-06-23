@@ -201,8 +201,7 @@ def test_cli_writes_output_only_when_requested(tmp_path: Path) -> None:
 
     result = subprocess.run(
         [
-            "py",
-            "-3.12",
+            sys.executable,
             "scripts/run_enriched_legacy_source_report.py",
             "--source-master",
             str(source_master),

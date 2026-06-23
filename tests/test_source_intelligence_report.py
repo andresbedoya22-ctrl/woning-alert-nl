@@ -168,8 +168,7 @@ def test_no_network_libraries_are_imported() -> None:
 def test_cli_writes_output_only_when_requested(tmp_path: Path) -> None:
     output_path = tmp_path / "report.json"
     command = [
-        "py",
-        "-3.12",
+        sys.executable,
         "scripts/run_source_intelligence_report.py",
         "--input",
         str(FIXTURE_PATH),

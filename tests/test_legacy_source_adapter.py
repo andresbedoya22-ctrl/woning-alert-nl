@@ -112,8 +112,7 @@ def test_adapter_and_cli_do_not_import_network_or_browser_libraries() -> None:
 def test_cli_prints_summary_and_writes_only_when_requested(tmp_path: Path) -> None:
     output_path = tmp_path / "legacy-report.json"
     command = [
-        "py",
-        "-3.12",
+        sys.executable,
         "scripts/run_legacy_source_intelligence_report.py",
         "--input",
         str(FIXTURE_PATH),

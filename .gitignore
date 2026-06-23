@@ -21,6 +21,7 @@ logs/
 
 # Temp and cache
 tmp/
+tmp.pytest_cache/
 .cache/
 cache/
 data/cache/
