@@ -74,3 +74,16 @@ runs the existing Source Intelligence, Access Policy, and Delivery Fingerprint l
 It does not scrape, make HTTP requests, validate robots live, use browser automation, modify property-discovery
 runtime, or implement parser families. Its purpose is to turn existing artifacts into a real prioritization and
 manual-review report before parser-family implementation begins.
+
+## Legacy Adapter Hardening v1
+
+Legacy Adapter Hardening v1 improves the bridge for the real `makelaar_sources_master.csv` shape without adding
+network behavior. It supports additional legacy metadata columns including `aanbod_url_type`,
+`confidence_score`, `score`, `source_quality_status`, `needs_review`, `review_reason`, `last_seen_at`,
+`last_audited_at`, `run_id`, and `is_active`.
+
+The adapter now normalizes `allowed_official_source` to `allowed` and maps missing/manual-review style legacy
+states to conservative research or review outcomes before Access Policy sees them. It preserves `run_id`,
+score/confidence, timestamps, and review reasons in `notes` or `evidence` so later reporting can explain the
+decision trail. This hardening remains offline and does not scrape, make HTTP requests, use Playwright, probe
+robots live, or modify property-discovery runtime.

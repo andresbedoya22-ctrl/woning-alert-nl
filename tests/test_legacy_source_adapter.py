@@ -14,6 +14,7 @@ from domek_wonen.sources.legacy_source_adapter import (
 
 
 FIXTURE_PATH = Path("tests/fixtures/sources/legacy_source_master_seed.csv")
+HARDENING_FIXTURE_PATH = Path("tests/fixtures/sources/legacy_source_master_hardening_seed.csv")
 
 
 def test_load_legacy_source_records_loads_fixture() -> None:
@@ -128,3 +129,84 @@ def test_cli_prints_summary_and_writes_only_when_requested(tmp_path: Path) -> No
     assert "production_parser_ready_count: 3" in result.stdout
     assert "blocked_count: 2" in result.stdout
     assert "permission_required_count: 1" in result.stdout
+
+
+def _record_by_name(name: str):
+    records = load_legacy_source_records(HARDENING_FIXTURE_PATH)
+    return next(record for record in records if record.source_name == name)
+
+
+def test_legacy_access_statuses_are_normalized() -> None:
+    assert _record_by_name("Allowed Official").access_status == "allowed"
+    assert _record_by_name("Missing Legal").access_status == "researching"
+    assert _record_by_name("Missing Website").access_status == "researching"
+    assert _record_by_name("Needs Review").access_status == "researching"
+    assert _record_by_name("Disabled Legal").access_status == "legal_review"
+    assert _record_by_name("Inactive Source").access_status == "disabled"
+
+
+def test_hardening_metadata_is_preserved_in_evidence_and_notes() -> None:
+    record = _record_by_name("Allowed Official")
+
+    assert "confidence_score=0.91" in record.evidence
+    assert "score=88" in record.evidence
+    assert "source_quality_status=valid" in record.evidence
+    assert "run_id=run-hardening-1" in record.notes
+    assert "last_seen_at=2026-06-01" in record.notes
+    assert "last_audited_at=2026-06-02" in record.notes
+
+
+def test_needs_review_sets_manual_review_and_preserves_review_reason() -> None:
+    record = _record_by_name("Needs Review")
+
+    assert record.recommended_action == "manual_review_needed"
+    assert "manual review reason" in record.evidence
+
+
+def test_aanbod_url_type_and_quality_status_refine_aanbod_status() -> None:
+    assert _record_by_name("Allowed Official").aanbod_url_status == "valid"
+    assert _record_by_name("Detail Page").aanbod_url_status == "suspect"
+    assert _record_by_name("Invalid Quality").aanbod_url_status == "suspect"
+
+
+def test_property_detail_does_not_become_production_ready() -> None:
+    report = build_legacy_source_intelligence_report(HARDENING_FIXTURE_PATH)
+    ready_ids = {item["source_id"] for item in report["production_parser_ready_sources"]}
+
+    assert _record_by_name("Detail Page").source_id not in ready_ids
+
+
+def test_funda_pararius_and_blocker_strings_set_flags() -> None:
+    funda = _record_by_name("Funda Legacy")
+    pararius = _record_by_name("Pararius Legacy")
+    blocked = _record_by_name("Blocked Signals")
+
+    assert funda.is_funda_dependent is True
+    assert pararius.is_pararius_dependent is True
+    assert blocked.has_captcha is True
+    assert blocked.has_login is True
+    assert blocked.has_403 is True
+
+
+def test_generated_source_id_is_deterministic_when_missing() -> None:
+    first = _record_by_name("Generated Id")
+    second = _record_by_name("Generated Id")
+
+    assert first.source_id == second.source_id
+    assert first.source_id.startswith("generated-id-test__zwolle__")
+    assert first.source_domain == "generated-id.test"
+
+
+def test_hardening_fixture_with_missing_optional_columns_does_not_break(tmp_path: Path) -> None:
+    csv_path = tmp_path / "minimal-hardening.csv"
+    csv_path.write_text(
+        "office_name,website,gemeente,legal_status\n"
+        "Minimal Hardening,https://minimal-hardening.test,Tilburg,allowed_official_source\n",
+        encoding="utf-8",
+    )
+
+    records = load_legacy_source_records(csv_path)
+
+    assert len(records) == 1
+    assert records[0].access_status == "allowed"
+    assert records[0].source_id.startswith("minimal-hardening-test__tilburg__")

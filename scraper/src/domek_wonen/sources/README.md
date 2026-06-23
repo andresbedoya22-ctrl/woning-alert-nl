@@ -118,6 +118,18 @@ The report includes source-intelligence counts, access-policy summary, delivery-
 top parser-family candidates, manual-review queue, blocked sources, permission-required sources, and
 production parser-ready sources.
 
+## Legacy Adapter Hardening v1
+
+Legacy Adapter Hardening v1 adds offline mapping support for the real `makelaar_sources_master.csv`
+columns `aanbod_url_type`, `confidence_score`, `score`, `source_quality_status`, `needs_review`,
+`review_reason`, `last_seen_at`, `last_audited_at`, `run_id`, and `is_active`.
+
+It normalizes legacy access states such as `allowed_official_source`, `missing`, `missing_website`,
+`needs_manual_review`, and `disabled_legal_review` before Access Policy evaluates them. It also preserves
+`run_id`, timestamps, score/confidence values, and review reasons in `notes` or `evidence` for later
+reporting. The adapter remains offline-only: it does not scrape, make HTTP requests, open websites, use
+Playwright, or validate robots live.
+
 ## Next step
 
 The next focused phase is `Access Policy v1` or a richer `Delivery Mode Fingerprint v2`, not runtime parser expansion.
