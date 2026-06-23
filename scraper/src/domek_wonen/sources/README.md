@@ -30,6 +30,24 @@ This module does not:
 
 This module only prepares deterministic inputs for those later phases.
 
+## Access Policy v1
+
+Access Policy v1 turns a `SourceIntelligenceRecord` into an explicit `AccessPolicyDecision`.
+It decides whether a source can run production extraction, whether a research probe is still allowed,
+which action is required, and which risk flags explain the decision.
+
+It does not make HTTP requests, read `robots.txt` live, use Playwright, scrape pages, implement parser
+families, or change property-discovery runtime behavior. It only evaluates evidence already present in
+Source Intelligence fields.
+
+The policy protects the pipeline by stopping Funda dependencies, Pararius dependencies without permission,
+CAPTCHA, login walls, `403`, disabled sources, and legal-review records before parser-family work begins.
+Allowed and limited sources may proceed only as deterministic policy decisions; unknown or researching
+sources remain manual-review inputs.
+
+Later phases should call this layer before delivery-mode fingerprinting, parser-family selection, and
+source-config execution so blocked or permission-bound sources do not enter operational extraction.
+
 ## CLI usage
 
 ```powershell
