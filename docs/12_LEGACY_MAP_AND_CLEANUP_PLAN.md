@@ -164,3 +164,14 @@ inventory counts.
 The pilot does not add a real HTTP fetcher, Playwright, Selenium, stealth behavior, proxies, CAPTCHA handling,
 bypass behavior, matching, n8n, dashboard work, DB persistence, property-discovery runtime changes, captured HTML,
 or generated outputs. Failed or blocked captures remain `safe_to_compare_removals=false`.
+
+## Controlled Source Selection for Realworks Pilot v1
+
+`scraper/src/domek_wonen/pilots/source_selection.py` adds the offline source-selection layer before the controlled
+capture pilot. It reads local enriched source-intelligence evidence, prefers `production_parser_ready_sources`, and
+selects up to five `realworks_public` rows with allowed or limited access, a source domain, and an explicit listing
+URL.
+
+The selector does not make network requests, call `robots_gate`, fetch HTML, use Playwright or Selenium, modify
+property-discovery runtime, touch matching, or create generated outputs. It keeps Funda, Pararius, blocked,
+permission-required, legal-review, manual-review, missing-domain, and missing-URL sources out of the pilot input.

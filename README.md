@@ -148,6 +148,12 @@ This PR reframes that codebase under a professional architecture without deletin
 
 The pilot does not include a real HTTP fetcher, Playwright, Selenium, stealth automation, proxies, CAPTCHA handling, bypass behavior, persistence, dashboard work, matching, or n8n orchestration. Captured HTML and generated run outputs remain local/generated artifacts and must not be committed.
 
+## Controlled Source Selection for Realworks Pilot v1
+
+`scraper/src/domek_wonen/pilots/source_selection.py` selects up to five `realworks_public` sources from local enriched source-intelligence evidence and converts them into `CapturePilotSource` inputs for the capture pilot.
+
+This selection layer is offline. It does not make network requests, call `robots_gate`, capture HTML, use browser automation, or touch generated capture outputs. It excludes Funda, Pararius, blocked, permission-required, legal-review, manual-review, missing-domain, and missing-URL rows before the capture pilot gets a source list.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
