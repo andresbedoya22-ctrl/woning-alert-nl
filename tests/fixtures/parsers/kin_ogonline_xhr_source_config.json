@@ -1,0 +1,31 @@
+{
+  "source_id": "kinmakelaars.nl__breda",
+  "source_domain": "kinmakelaars.nl",
+  "listing_url": "http://www.kinmakelaars.nl/aanbod/wonen/te-koop",
+  "parser_family": "ogonline_xhr",
+  "delivery_mode": "ogonline_xhr",
+  "api": {
+    "api_base_url": "https://cpl01.ogonline.nl/api/listings",
+    "method": "GET",
+    "page_param": "page",
+    "limit_param": "limit",
+    "start_page": 1,
+    "limit": 24,
+    "max_pages": 2,
+    "items_path": "docs",
+    "total_count_path": "totalDocs",
+    "total_pages_path": "totalPages",
+    "has_next_path": "hasNextPage",
+    "next_page_path": "nextPage",
+    "static_query_params": {
+      "depth": "1",
+      "locale": "nl",
+      "sort": "-id",
+      "where[market][equals]": "consumer",
+      "where[category][equals]": "listing",
+      "where[isSales][equals]": "true",
+      "where[status][not_in]": "sold,rented",
+      "where[account][equals]": "66aa38af0773b21cac8f8da0"
+    }
+  }
+}

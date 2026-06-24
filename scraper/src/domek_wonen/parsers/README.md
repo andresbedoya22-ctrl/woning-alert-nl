@@ -62,3 +62,13 @@ still supports `realworks_public`, stays offline, makes no HTTP requests, and do
 not use browser automation.
 
 Source config handling and a paginated live runner remain later phases.
+
+## KIN OGonline XHR Source Config v1
+
+`source_config.py` defines the first offline source-config layer for KIN as an
+`ogonline_xhr` source. The config records the OGonline API base URL, pagination
+parameters, static query parameters, and JSON items path needed to build deterministic
+API URLs and `ParserInput` objects from caller-provided JSON.
+
+This layer does not make HTTP requests, call robots live, save real JSON, use browser
+automation, or run pagination. A paginated live runner remains a later phase.

@@ -152,6 +152,18 @@ This integration remains offline: no HTTP requests, Playwright, Selenium, robots
 checks, property-discovery runtime changes, matching changes, generated JSON, source
 config runner, or paginated live runner are added in this phase.
 
+## KIN OGonline XHR Source Config v1
+
+`scraper/src/domek_wonen/parsers/source_config.py` adds a small offline source-config
+model for KIN as an `ogonline_xhr` source. It captures the OGonline API base URL,
+pagination parameters, static query parameters, and `items_path`, then builds
+deterministic paginated API URLs and JSON `ParserInput` objects from caller-provided
+content.
+
+The KIN fixture is synthetic config only. This phase does not make HTTP requests,
+call robots live, use Playwright or Selenium, store real JSON, modify
+property-discovery runtime, touch matching, or implement the paginated live runner.
+
 ## Parser Output QA Gate v1
 
 `scraper/src/domek_wonen/qa/parser_output_gate.py` adds the first offline QA layer for parser-family output. It
