@@ -130,6 +130,18 @@ probe robots live, decide Access Policy again, modify property-discovery runtime
 write inventory. Config runner integration, inventory state handling, and QA promotion
 remain later phases.
 
+## KIN OGonline XHR Parser Spike v1
+
+`scraper/src/domek_wonen/parsers/ogonline_xhr_family.py` adds an offline parser spike
+for OGonline XHR JSON responses based on the shape observed for KIN: a top-level
+object with `docs`, pagination metadata, and listing fields such as id, address,
+postcode, city, price, status, rooms, bedrooms, and photos.
+
+The spike uses synthetic fixtures only and does not store real live JSON or HTML. It
+does not make HTTP requests, use Playwright or Selenium, validate robots live, modify
+property-discovery runtime, touch matching, persist inventory, or implement the
+paginated source-config/live runner. Those integration steps remain later phases.
+
 ## Parser Output QA Gate v1
 
 `scraper/src/domek_wonen/qa/parser_output_gate.py` adds the first offline QA layer for parser-family output. It

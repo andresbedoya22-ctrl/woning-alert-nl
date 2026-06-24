@@ -37,3 +37,19 @@ the runner only respects `can_proceed_to_parser_family`, `delivery_mode`, and
 
 Source-config runner integration, inventory state handling, and QA gate promotion are
 later phases.
+
+## KIN OGonline XHR Parser Spike v1
+
+`ogonline_xhr_family.py` is an offline parser spike for JSON responses shaped like
+the OGonline XHR API observed on KIN. It accepts caller-provided JSON through
+`ParserInput` and returns `ParsedListing` rows for docs with stable identity.
+
+The fixtures are synthetic and stored under `tests/fixtures/parsers/`; no real live
+JSON, captured HTML, API output, or generated artifact is committed. The parser does
+not make HTTP requests, import browser tooling, validate robots live, or persist
+inventory.
+
+This spike maps stable detail URLs or fallback URLs, address fields, postcode, city,
+price, sale/rent status, listing status, living area, rooms, bedrooms, property type,
+energy label, bounded evidence, confidence, and review flags. Paginated source config
+and a live runner remain later phases.
