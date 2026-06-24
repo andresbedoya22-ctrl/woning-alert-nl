@@ -139,3 +139,16 @@ rejected buckets.
 This gate does not make network requests, persist inventory, run global dedupe, touch matching, or modify legacy
 property-discovery runtime. It creates an initial deterministic `normalized_key` from canonical URL when available,
 falling back to postcode plus house number, then raw address plus city.
+
+## Inventory Core v1
+
+`scraper/src/domek_wonen/inventory/` adds the first offline inventory core. It consumes only
+`ParserFamilyQAResult.clean_listings`, creates source-scoped `InventorySnapshot` objects, and compares snapshots
+with `diff_inventory_snapshots`.
+
+The core does not persist to a database, make network requests, use browser automation, touch property-discovery
+runtime, or move records into matching. `review_listings` and `rejected_listings` stay outside inventory.
+
+Stale-source behavior is preserved through `safe_to_compare_removals=false`: failed, partial, or stale captures
+must not produce removal events, so prior successful inventory can remain the trusted reference until a later
+successful capture recovers the source.
