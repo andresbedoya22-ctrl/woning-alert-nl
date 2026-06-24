@@ -152,3 +152,15 @@ runtime, or move records into matching. `review_listings` and `rejected_listings
 Stale-source behavior is preserved through `safe_to_compare_removals=false`: failed, partial, or stale captures
 must not produce removal events, so prior successful inventory can remain the trusted reference until a later
 successful capture recovers the source.
+
+## Controlled Realworks Capture Pilot v1
+
+`scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted
+`realworks_public` listing pages. It checks `robots_gate.can_fetch(domain, path)` before invoking an injected
+`fetch_html` callable, runs at most five sources by default, and sends captured HTML through `ParserInput`,
+`ParserFamilyRunner`, the parser output QA gate, and inventory snapshot creation to report parser, QA, and
+inventory counts.
+
+The pilot does not add a real HTTP fetcher, Playwright, Selenium, stealth behavior, proxies, CAPTCHA handling,
+bypass behavior, matching, n8n, dashboard work, DB persistence, property-discovery runtime changes, captured HTML,
+or generated outputs. Failed or blocked captures remain `safe_to_compare_removals=false`.

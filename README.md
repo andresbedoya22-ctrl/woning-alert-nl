@@ -77,6 +77,7 @@ n8n Orchestration
 
 - `scraper/src/domek_wonen/sources/`: source registry, source intelligence, access policy, delivery fingerprinting.
 - `scraper/src/domek_wonen/parsers/`: parser families and domain-level source configs.
+- `scraper/src/domek_wonen/pilots/`: small controlled pilots that connect permitted source capture to parser, QA, and inventory layers.
 - `scraper/src/domek_wonen/inventory/`: normalized listings, snapshots, diffs, stale-source handling.
 - `scraper/src/domek_wonen/qa/`: quality gates, normalization, dedupe, review states.
 - `scraper/src/domek_wonen/matching/`: current and future matching logic.
@@ -140,6 +141,12 @@ As of this architecture reset, the repo already contains:
 - scripts for source master, coverage, fingerprinting, matching, and audits under `scripts/`.
 
 This PR reframes that codebase under a professional architecture without deleting existing functional modules.
+
+## Controlled Realworks Capture Pilot v1
+
+`scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds the first controlled pilot for a small batch of permitted `realworks_public` listing sources. The pilot calls `robots_gate.can_fetch(domain, path)` before any injected fetch function is allowed to run, caps batches at five sources by default, and connects captured HTML through `ParserFamilyRunner`, the parser output QA gate, and `InventorySnapshot` creation.
+
+The pilot does not include a real HTTP fetcher, Playwright, Selenium, stealth automation, proxies, CAPTCHA handling, bypass behavior, persistence, dashboard work, matching, or n8n orchestration. Captured HTML and generated run outputs remain local/generated artifacts and must not be committed.
 
 ## Recommended next PRs
 
