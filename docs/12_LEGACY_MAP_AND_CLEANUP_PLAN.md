@@ -124,11 +124,11 @@ this stabilization step.
 `DeliveryFingerprintResult` to parser families. It operates only on caller-provided
 `ParserInput` content and returns `ParserFamilyResult`.
 
-In v1 the runner supports only `realworks_public`, routing allowed fingerprints to
-`RealworksParserFamily`. It does not make network requests, use browser automation,
-probe robots live, decide Access Policy again, modify property-discovery runtime, or
-write inventory. Config runner integration, inventory state handling, and QA promotion
-remain later phases.
+In v1 the runner supports `realworks_public` and `ogonline_xhr`, routing allowed
+fingerprints to their offline parser-family implementations. It does not make network
+requests, use browser automation, probe robots live, decide Access Policy again,
+modify property-discovery runtime, or write inventory. Config runner integration,
+inventory state handling, and QA promotion remain later phases.
 
 ## KIN OGonline XHR Parser Spike v1
 
@@ -141,6 +141,16 @@ The spike uses synthetic fixtures only and does not store real live JSON or HTML
 does not make HTTP requests, use Playwright or Selenium, validate robots live, modify
 property-discovery runtime, touch matching, persist inventory, or implement the
 paginated source-config/live runner. Those integration steps remain later phases.
+
+## OGonline XHR Runner Integration v1
+
+`ParserFamilyRunner` now accepts a permitted `DeliveryFingerprintResult` with
+`delivery_mode="ogonline_xhr"` and `parser_family_candidate="ogonline_xhr"` and routes
+caller-provided JSON `ParserInput` to `OGonlineXHRParserFamily`.
+
+This integration remains offline: no HTTP requests, Playwright, Selenium, robots live
+checks, property-discovery runtime changes, matching changes, generated JSON, source
+config runner, or paginated live runner are added in this phase.
 
 ## Parser Output QA Gate v1
 

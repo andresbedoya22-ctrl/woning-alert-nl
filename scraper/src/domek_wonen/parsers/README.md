@@ -26,9 +26,9 @@ promotion are later phases.
 ## Parser Family Runner v1
 
 `runner.py` selects a parser family from `DeliveryFingerprintResult` and applies it
-to an already captured `ParserInput`. In v1 the only supported family is
-`realworks_public`, which routes to `RealworksParserFamily` and returns a
-`ParserFamilyResult`.
+to an already captured `ParserInput`. In v1 the supported families are
+`realworks_public` and `ogonline_xhr`, which route to their offline parser-family
+implementations and return a `ParserFamilyResult`.
 
 The runner is offline. It does not fetch pages, open browsers, probe robots live, or
 decide Access Policy again. Access Policy and Delivery Fingerprint remain upstream;
@@ -53,3 +53,12 @@ This spike maps stable detail URLs or fallback URLs, address fields, postcode, c
 price, sale/rent status, listing status, living area, rooms, bedrooms, property type,
 energy label, bounded evidence, confidence, and review flags. Paginated source config
 and a live runner remain later phases.
+
+## OGonline XHR Runner Integration v1
+
+`ParserFamilyRunner` now routes permitted `ogonline_xhr` fingerprints to
+`OGonlineXHRParserFamily` using caller-provided JSON in `ParserInput`. The runner
+still supports `realworks_public`, stays offline, makes no HTTP requests, and does
+not use browser automation.
+
+Source config handling and a paginated live runner remain later phases.

@@ -25,6 +25,20 @@ def _parser_input(content: str | None = None) -> ParserInput:
     )
 
 
+def _ogonline_parser_input(content: str | None = None) -> ParserInput:
+    if content is None:
+        content = (BASE_DIR / "tests" / "fixtures" / "parsers" / "ogonline_xhr_page_1_fixture.json").read_text(
+            encoding="utf-8"
+        )
+    return ParserInput(
+        source_id="kinmakelaars.nl__breda",
+        source_domain="kinmakelaars.nl",
+        source_url="https://cpl01.ogonline.nl/api/listings?page=1&limit=24",
+        content=content,
+        content_type="json",
+    )
+
+
 def _fingerprint(
     *,
     delivery_mode: str = "realworks_public",
@@ -51,6 +65,11 @@ class _ExplodingParserFamily:
         raise AssertionError("parser family should not be executed")
 
 
+class _ExplodingOGonlineParserFamily:
+    def parse_api_response(self, parser_input: ParserInput) -> ParserFamilyResult:
+        raise AssertionError("ogonline parser family should not be executed")
+
+
 def test_runner_executes_realworks_family_when_fingerprint_allows_realworks_public() -> None:
     result = ParserFamilyRunner().run(_fingerprint(), _parser_input())
 
@@ -69,6 +88,51 @@ def test_runner_returns_listings_from_realworks_fixture() -> None:
     ]
 
 
+def test_runner_executes_ogonline_family_when_fingerprint_allows_ogonline_xhr() -> None:
+    result = ParserFamilyRunner().run(
+        _fingerprint(
+            delivery_mode="ogonline_xhr",
+            parser_family_candidate="ogonline_xhr",
+        ),
+        _ogonline_parser_input(),
+    )
+
+    assert isinstance(result, ParserFamilyResult)
+    assert result.parser_family == "ogonline_xhr"
+    assert len(result.listings) == 3
+
+
+def test_runner_returns_listings_from_ogonline_xhr_fixture() -> None:
+    result = ParserFamilyRunner().run(
+        _fingerprint(
+            delivery_mode="ogonline_xhr",
+            parser_family_candidate="ogonline_xhr",
+        ),
+        _ogonline_parser_input(),
+    )
+
+    assert [listing.canonical_url for listing in result.listings] == [
+        "https://kinmakelaars.nl/aanbod/wonen/zonnelaan-12-breda",
+        "https://kinmakelaars.nl/aanbod/wonen/marktstraat-8-tilburg",
+        "https://kinmakelaars.nl/aanbod/wonen/parklaan-21-eindhoven",
+    ]
+
+
+def test_runner_preserves_source_id_and_source_domain_for_ogonline_xhr() -> None:
+    result = ParserFamilyRunner().run(
+        _fingerprint(
+            delivery_mode="ogonline_xhr",
+            parser_family_candidate="ogonline_xhr",
+        ),
+        _ogonline_parser_input(),
+    )
+
+    assert result.source_id == "kinmakelaars.nl__breda"
+    assert result.source_domain == "kinmakelaars.nl"
+    assert {listing.source_id for listing in result.listings} == {"kinmakelaars.nl__breda"}
+    assert {listing.source_domain for listing in result.listings} == {"kinmakelaars.nl"}
+
+
 def test_runner_does_not_execute_parser_when_fingerprint_disallows_parser_family(monkeypatch) -> None:
     monkeypatch.setattr(runner_module, "RealworksParserFamily", _ExplodingParserFamily)
 
@@ -78,6 +142,25 @@ def test_runner_does_not_execute_parser_when_fingerprint_disallows_parser_family
     )
 
     assert result.parser_family == "realworks_public"
+    assert result.listings == ()
+    assert result.rejected_count == 0
+    assert result.warning_count >= 1
+    assert "parser_family_not_allowed" in result.warnings
+
+
+def test_runner_does_not_execute_ogonline_parser_when_fingerprint_disallows_parser_family(monkeypatch) -> None:
+    monkeypatch.setattr(runner_module, "OGonlineXHRParserFamily", _ExplodingOGonlineParserFamily)
+
+    result = ParserFamilyRunner().run(
+        _fingerprint(
+            delivery_mode="ogonline_xhr",
+            parser_family_candidate="ogonline_xhr",
+            can_proceed_to_parser_family=False,
+        ),
+        _ogonline_parser_input(),
+    )
+
+    assert result.parser_family == "ogonline_xhr"
     assert result.listings == ()
     assert result.rejected_count == 0
     assert result.warning_count >= 1
@@ -113,6 +196,24 @@ def test_runner_returns_warning_for_empty_parser_input(monkeypatch) -> None:
     result = ParserFamilyRunner().run(_fingerprint(), _parser_input(content=""))
 
     assert result.parser_family == "realworks_public"
+    assert result.listings == ()
+    assert result.rejected_count == 0
+    assert result.warning_count >= 1
+    assert "empty_parser_input" in result.warnings
+
+
+def test_runner_returns_empty_input_warning_before_ogonline_parser(monkeypatch) -> None:
+    monkeypatch.setattr(runner_module, "OGonlineXHRParserFamily", _ExplodingOGonlineParserFamily)
+
+    result = ParserFamilyRunner().run(
+        _fingerprint(
+            delivery_mode="ogonline_xhr",
+            parser_family_candidate="ogonline_xhr",
+        ),
+        _ogonline_parser_input(content=""),
+    )
+
+    assert result.parser_family == "ogonline_xhr"
     assert result.listings == ()
     assert result.rejected_count == 0
     assert result.warning_count >= 1

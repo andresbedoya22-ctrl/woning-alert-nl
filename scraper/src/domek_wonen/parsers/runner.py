@@ -3,10 +3,11 @@ from __future__ import annotations
 from domek_wonen.sources.delivery_fingerprint import DeliveryFingerprintResult
 
 from .models import ParserFamilyResult, ParserInput
+from .ogonline_xhr_family import OGonlineXHRParserFamily
 from .realworks_family import RealworksParserFamily, can_parse_realworks_source
 
 
-SUPPORTED_PARSER_FAMILIES = frozenset({"realworks_public"})
+SUPPORTED_PARSER_FAMILIES = frozenset({"realworks_public", "ogonline_xhr"})
 
 
 class ParserFamilyRunner:
@@ -41,6 +42,9 @@ class ParserFamilyRunner:
         if can_parse_realworks_source(fingerprint_result):
             return RealworksParserFamily().parse_listing_page(parser_input)
 
+        if _can_parse_ogonline_xhr_source(fingerprint_result):
+            return OGonlineXHRParserFamily().parse_api_response(parser_input)
+
         return _warning_result(
             parser_family=parser_family,
             parser_input=parser_input,
@@ -57,6 +61,14 @@ def run_parser_family(
 
 def _result_parser_family(fingerprint_result: DeliveryFingerprintResult) -> str:
     return fingerprint_result.parser_family_candidate or fingerprint_result.delivery_mode
+
+
+def _can_parse_ogonline_xhr_source(fingerprint_result: DeliveryFingerprintResult) -> bool:
+    return (
+        fingerprint_result.delivery_mode == "ogonline_xhr"
+        and fingerprint_result.parser_family_candidate == "ogonline_xhr"
+        and fingerprint_result.can_proceed_to_parser_family is True
+    )
 
 
 def _warning_result(*, parser_family: str, parser_input: ParserInput, warning: str) -> ParserFamilyResult:
