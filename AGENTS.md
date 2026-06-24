@@ -107,7 +107,8 @@ Browser rendering is allowed only to render an already-permitted public page. Re
 
 ## Validation requirements
 
-- If runtime code changes: run `py -3.12 -m pytest`.
+- If runtime code changes: run `python -m pytest`.
+- Pytest uses repo-local temp/cache paths under `tmp/`.
 - If only docs or structure change: tests are still recommended; if skipped, explain why.
 - Do not report success for tests that did not run.
 - Do not report a task complete if runtime code changed and validation failed, unless the user explicitly accepts that state.

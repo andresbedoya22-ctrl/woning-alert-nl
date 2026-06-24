@@ -110,7 +110,7 @@ n8n Orchestration
 - Prefer small, phase-bounded tasks.
 - Do not broaden scope from docs to runtime code without need.
 - Add or update tests when runtime code changes.
-- Run `py -3.12 -m pytest` after code changes; for docs-only work, run it when practical and report the exact outcome.
+- Run `python -m pytest` after code changes; for docs-only work, run it when practical and report the exact outcome.
 - Report changed files, validation status, branch, and residual risks.
 
 Task template for Codex lives in [docs/09_CODEX_WORKFLOW.md](/C:/Projects/domek-wonen/docs/09_CODEX_WORKFLOW.md).
@@ -124,8 +124,10 @@ py -3.12 -m pip install -r requirements.txt
 ## Run tests
 
 ```powershell
-py -3.12 -m pytest
+python -m pytest
 ```
+
+Pytest is configured to keep its temporary and cache paths under `tmp/` in this repo.
 
 ## Current repo status
 
