@@ -1,0 +1,66 @@
+{
+  "snapshot_id": "day_1",
+  "captured_at": "2026-06-22T08:00:00Z",
+  "listings": [
+    {
+      "source_id": "fixture-portal",
+      "source_domain": "fixture-portal.test",
+      "canonical_url": "https://fixture-portal.test/woning/alpha-1/",
+      "address_raw": "Alpha 1",
+      "city": "Tilburg",
+      "asking_price_eur": 300000,
+      "transaction_type": "koop",
+      "status": "beschikbaar",
+      "living_area_m2": 80,
+      "rooms_count": 3,
+      "bedrooms_count": 2,
+      "confidence_score": 0.9,
+      "first_seen_at": "2026-06-22T08:00:00Z",
+      "last_seen_at": "2026-06-22T08:00:00Z"
+    },
+    {
+      "source_id": "fixture-portal",
+      "source_domain": "fixture-portal.test",
+      "canonical_url": "https://fixture-portal.test/woning/bravo-2/",
+      "address_raw": "Bravo 2",
+      "city": "Tilburg",
+      "asking_price_eur": 325000,
+      "transaction_type": "koop",
+      "status": "beschikbaar",
+      "confidence_score": 0.9
+    },
+    {
+      "source_id": "fixture-portal",
+      "source_domain": "fixture-portal.test",
+      "canonical_url": "https://fixture-portal.test/woning/charlie-3/",
+      "address_raw": "Charlie 3",
+      "city": "Breda",
+      "asking_price_eur": 400000,
+      "transaction_type": "koop",
+      "status": "beschikbaar",
+      "confidence_score": 0.9
+    },
+    {
+      "source_id": "fixture-portal",
+      "source_domain": "fixture-portal.test",
+      "canonical_url": "https://fixture-portal.test/woning/delta-4/",
+      "address_raw": "Delta 4",
+      "city": "Den Bosch",
+      "asking_price_eur": 450000,
+      "transaction_type": "koop",
+      "status": "beschikbaar",
+      "confidence_score": 0.9
+    },
+    {
+      "source_id": "fixture-portal",
+      "source_domain": "fixture-portal.test",
+      "canonical_url": "https://fixture-portal.test/woning/echo-5/",
+      "address_raw": "Echo 5",
+      "city": "Waalwijk",
+      "asking_price_eur": 275000,
+      "transaction_type": "koop",
+      "status": "beschikbaar",
+      "confidence_score": 0.9
+    }
+  ]
+}
