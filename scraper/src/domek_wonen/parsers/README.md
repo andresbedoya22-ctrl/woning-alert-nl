@@ -22,3 +22,18 @@ status, area, rooms, and evidence signals.
 
 Runner integration, source configs, inventory state, stale-source handling, and QA gate
 promotion are later phases.
+
+## Parser Family Runner v1
+
+`runner.py` selects a parser family from `DeliveryFingerprintResult` and applies it
+to an already captured `ParserInput`. In v1 the only supported family is
+`realworks_public`, which routes to `RealworksParserFamily` and returns a
+`ParserFamilyResult`.
+
+The runner is offline. It does not fetch pages, open browsers, probe robots live, or
+decide Access Policy again. Access Policy and Delivery Fingerprint remain upstream;
+the runner only respects `can_proceed_to_parser_family`, `delivery_mode`, and
+`parser_family_candidate`.
+
+Source-config runner integration, inventory state handling, and QA gate promotion are
+later phases.

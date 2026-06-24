@@ -117,3 +117,15 @@ This layer does not fetch, scrape live pages, use browser automation, validate r
 legacy `scraper/src/domek_wonen/properties/platform_parsers/realworks_parser.py` remains intact for the existing
 property-discovery runtime. Integration with a runner, source configs, inventory state, and QA promotion comes after
 this stabilization step.
+
+## Parser Family Runner v1
+
+`scraper/src/domek_wonen/parsers/runner.py` adds the first offline connector from
+`DeliveryFingerprintResult` to parser families. It operates only on caller-provided
+`ParserInput` content and returns `ParserFamilyResult`.
+
+In v1 the runner supports only `realworks_public`, routing allowed fingerprints to
+`RealworksParserFamily`. It does not make network requests, use browser automation,
+probe robots live, decide Access Policy again, modify property-discovery runtime, or
+write inventory. Config runner integration, inventory state handling, and QA promotion
+remain later phases.
