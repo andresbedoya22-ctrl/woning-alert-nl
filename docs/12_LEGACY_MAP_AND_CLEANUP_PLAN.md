@@ -175,3 +175,16 @@ URL.
 The selector does not make network requests, call `robots_gate`, fetch HTML, use Playwright or Selenium, modify
 property-discovery runtime, touch matching, or create generated outputs. It keeps Funda, Pararius, blocked,
 permission-required, legal-review, manual-review, missing-domain, and missing-URL sources out of the pilot input.
+
+## Controlled Realworks Live Fetch v1
+
+`scraper/src/domek_wonen/pilots/live_fetch.py` adds the first explicit HTTP fetch helper for a controlled
+`realworks_public` live pilot. The fetch function uses the standard library only, performs one GET with a required
+timeout and a clear non-stealth User-Agent, accepts only HTML or text content, and raises stable fetch exceptions for
+HTTP status or content-type failures.
+
+Robots compliance remains upstream in the capture pilot: `run_realworks_capture_pilot_for_source` must call
+`robots_gate.can_fetch(domain, path)` successfully before this fetcher is invoked. The live pilot helper defaults to
+`max_sources=3` and provides domain dedupe for the first run so multiple selected city variants from the same domain
+are not fetched together. This phase adds no Playwright, Selenium, proxies, stealth behavior, CAPTCHA handling,
+bypass logic, DB persistence, property-discovery runtime changes, matching, dashboard work, or generated outputs.

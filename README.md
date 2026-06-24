@@ -154,6 +154,12 @@ The pilot does not include a real HTTP fetcher, Playwright, Selenium, stealth au
 
 This selection layer is offline. It does not make network requests, call `robots_gate`, capture HTML, use browser automation, or touch generated capture outputs. It excludes Funda, Pararius, blocked, permission-required, legal-review, manual-review, missing-domain, and missing-URL rows before the capture pilot gets a source list.
 
+## Controlled Realworks Live Fetch v1
+
+`scraper/src/domek_wonen/pilots/live_fetch.py` adds an explicit controlled HTTP fetcher for a small `realworks_public` live pilot. It uses only standard-library HTTP, a clear non-stealth User-Agent, one GET, a required timeout, stable fetch exceptions, and accepts only HTML or text responses.
+
+The fetcher does not call `robots_gate` itself: the capture pilot remains responsible for checking `robots_gate.can_fetch(domain, path)` before invoking any fetch function. The live helper defaults to `max_sources=3`, includes domain dedupe so the first run avoids several variants from the same source domain, and adds no Playwright, Selenium, proxies, stealth behavior, CAPTCHA handling, bypass logic, persistence, or generated outputs.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
