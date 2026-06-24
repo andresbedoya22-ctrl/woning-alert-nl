@@ -129,3 +129,13 @@ In v1 the runner supports only `realworks_public`, routing allowed fingerprints 
 probe robots live, decide Access Policy again, modify property-discovery runtime, or
 write inventory. Config runner integration, inventory state handling, and QA promotion
 remain later phases.
+
+## Parser Output QA Gate v1
+
+`scraper/src/domek_wonen/qa/parser_output_gate.py` adds the first offline QA layer for parser-family output. It
+validates `ParserFamilyResult` before inventory and separates `ParsedListing` records into clean, review, and
+rejected buckets.
+
+This gate does not make network requests, persist inventory, run global dedupe, touch matching, or modify legacy
+property-discovery runtime. It creates an initial deterministic `normalized_key` from canonical URL when available,
+falling back to postcode plus house number, then raw address plus city.
