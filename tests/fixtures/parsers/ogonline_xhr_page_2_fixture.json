@@ -1,0 +1,60 @@
+{
+  "docs": [
+    {
+      "id": "kin-101",
+      "slug": "havenstraat-4-breda",
+      "links": {
+        "detail": "/aanbod/wonen/breda/havenstraat-4/kin-101"
+      },
+      "address": {
+        "street": "Havenstraat",
+        "houseNumber": "4"
+      },
+      "postcode": "4811BB",
+      "location": {
+        "city": "Breda"
+      },
+      "salesPrice": {
+        "amount": 389000
+      },
+      "isSales": true,
+      "status": "reserved",
+      "areaLiving": 96,
+      "rooms": 4,
+      "bedrooms": 3,
+      "propertyType": "house",
+      "energyLabel": "C",
+      "photos": [
+        {
+          "url": "https://example.invalid/photo-101-a.jpg"
+        },
+        {
+          "url": "https://example.invalid/photo-101-b.jpg"
+        }
+      ]
+    },
+    {
+      "id": "kin-102",
+      "slug": "bosrand-19-oosterhout",
+      "detailUrl": "https://example.invalid/aanbod/wonen/oosterhout/bosrand-19/kin-102",
+      "street": "Bosrand",
+      "house_number": "19",
+      "postcode": "4901CC",
+      "city": "Oosterhout",
+      "purchasePrice": 610000,
+      "isSales": true,
+      "status": "available",
+      "living_area": 144,
+      "rooms": 5,
+      "bedrooms": 4,
+      "type": "house",
+      "energyLabel": "A"
+    }
+  ],
+  "hasNextPage": false,
+  "limit": 24,
+  "nextPage": null,
+  "page": 2,
+  "totalDocs": 48,
+  "totalPages": 2
+}
