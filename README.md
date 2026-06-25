@@ -166,6 +166,12 @@ The fetcher does not call `robots_gate` itself: the capture pilot remains respon
 
 This phase does not implement real HTTP, live fetch orchestration, Playwright, Selenium, stealth behavior, proxies, CAPTCHA handling, bypass logic, JSON persistence, property-discovery runtime changes, matching, dashboard work, or n8n orchestration. A real live runner can be added later after this offline config-to-parser path remains stable.
 
+## Controlled OGonline Live Fetch v1
+
+`scraper/src/domek_wonen/pilots/ogonline_xhr_live_fetch.py` adds the controlled standard-library JSON fetch helper for a minimal KIN `ogonline_xhr` live pilot. The fetcher performs one GET with a required timeout and clear non-stealth User-Agent, accepts JSON or text content that parses as JSON, returns the original JSON string, and does not persist responses.
+
+Robots compliance remains upstream in `run_ogonline_xhr_paginated_config`, which checks `robots_gate.can_fetch(api_domain, api_path)` before invoking the fetch function for each API page. The KIN helper caps live execution through `max_pages` and adds no browser automation, retries, parallelism, proxies, stealth behavior, CAPTCHA handling, bypass logic, generated outputs, property-discovery runtime changes, matching, dashboard work, or n8n orchestration.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
