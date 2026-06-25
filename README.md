@@ -172,6 +172,17 @@ This phase does not implement real HTTP, live fetch orchestration, Playwright, S
 
 Robots compliance remains upstream in `run_ogonline_xhr_paginated_config`, which checks `robots_gate.can_fetch(api_domain, api_path)` before invoking the fetch function for each API page. The KIN helper caps live execution through `max_pages` and adds no browser automation, retries, parallelism, proxies, stealth behavior, CAPTCHA handling, bypass logic, generated outputs, property-discovery runtime changes, matching, dashboard work, or n8n orchestration.
 
+## Inventory Eligibility Gate v1
+
+`scraper/src/domek_wonen/inventory/eligibility.py` adds an offline eligibility layer after parser output QA. It consumes
+`ParserFamilyQAResult`, keeps QA review and rejected listings out of active inventory, and separates QA-clean listings
+into active, inactive status, unsupported transaction type, unsupported property type, or review buckets.
+
+The gate does not make HTTP requests, use live fetch, modify matching, relax QA, touch property-discovery runtime, or
+change n8n or dashboard flows. Only `koop + beschikbaar + allowed_property_type` listings enter `active_inventory`.
+`onder_bod`, `verkocht`, `verhuurd`, `unknown` or empty statuses, unsupported or unknown transaction types, and empty or
+unsupported property types stay outside active inventory.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
