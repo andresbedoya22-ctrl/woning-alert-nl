@@ -183,6 +183,18 @@ change n8n or dashboard flows. Only `koop + beschikbaar + allowed_property_type`
 `onder_bod`, `verkocht`, `verhuurd`, `unknown` or empty statuses, unsupported or unknown transaction types, and empty or
 unsupported property types stay outside active inventory.
 
+## KIN OGonline Active Inventory Pilot v1
+
+`scraper/src/domek_wonen/pilots/kin_ogonline_active_inventory_pilot.py` connects the controlled KIN `ogonline_xhr` live
+path to the active inventory gate with `max_pages=2`. It loads the KIN source config, builds deterministic OGonline API
+page URLs, checks `robots_gate.can_fetch(api_domain, api_path)`, fetches JSON through the controlled standard-library
+helper, runs `ParserFamilyRunner`, applies parser output QA, applies inventory eligibility, and builds an inventory
+snapshot from active inventory only.
+
+The pilot does not persist live JSON or HTML, does not touch matching, n8n, dashboard, Funda, Pararius, or `data/raw`,
+and does not add retries, parallelism, browser automation, proxies, stealth behavior, CAPTCHA handling, or bypass logic.
+Only `active_inventory` listings are passed to the snapshot helper.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
