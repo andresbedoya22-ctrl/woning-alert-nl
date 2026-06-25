@@ -165,8 +165,34 @@ def test_status_available_and_beschikbaar_map_to_beschikbaar() -> None:
 
 def test_status_offer_variants_map_to_onder_bod() -> None:
     assert _single_doc_listing(_minimal_doc(status="reserved")).status == "onder_bod"
+    assert _single_doc_listing(_minimal_doc(status="under_bid")).status == "onder_bod"
     assert _single_doc_listing(_minimal_doc(status="under_offer")).status == "onder_bod"
     assert _single_doc_listing(_minimal_doc(status="verkocht_onder_voorbehoud")).status == "onder_bod"
+
+
+def test_status_sold_ur_remains_unknown() -> None:
+    assert _single_doc_listing(_minimal_doc(status="sold_ur")).status == "unknown"
+
+
+def test_complete_sold_ur_listing_stays_review_with_unknown_status() -> None:
+    result = parse_ogonline_xhr_api_response(_parser_input(json.dumps({"docs": [_minimal_doc(status="sold_ur")]})))
+    qa_result = qa_parser_family_result(result)
+
+    assert qa_result.clean_count == 0
+    assert qa_result.review_count == 1
+    assert qa_result.rejected_count == 0
+    assert qa_result.review_listings[0].listing.status == "unknown"
+    assert qa_result.review_listings[0].issues == ("unknown_status",)
+
+
+def test_complete_under_bid_listing_passes_without_unknown_status_review() -> None:
+    result = parse_ogonline_xhr_api_response(_parser_input(json.dumps({"docs": [_minimal_doc(status="under_bid")]})))
+    qa_result = qa_parser_family_result(result)
+
+    assert qa_result.clean_count == 1
+    assert qa_result.review_count == 0
+    assert qa_result.rejected_count == 0
+    assert qa_result.clean_listings[0].listing.status == "onder_bod"
 
 
 def test_complete_live_shape_doc_passes_qa_clean() -> None:
