@@ -164,6 +164,22 @@ The KIN fixture is synthetic config only. This phase does not make HTTP requests
 call robots live, use Playwright or Selenium, store real JSON, modify
 property-discovery runtime, touch matching, or implement the paginated live runner.
 
+## KIN OGonline XHR Paginated Runner v1
+
+`scraper/src/domek_wonen/pilots/ogonline_xhr_paginated_runner.py` adds the controlled
+source-config runner for KIN-style `ogonline_xhr` pages. It accepts only
+`ParserSourceConfig` inputs with `parser_family="ogonline_xhr"` and
+`delivery_mode="ogonline_xhr"`, builds each page URL with `build_paginated_api_url`,
+checks `robots_gate.can_fetch(api_domain, api_path)` before invoking the injected
+`fetch_json`, and converts caller-provided JSON into `ParserInput`.
+
+The runner then uses `ParserFamilyRunner` and `qa_parser_family_result` to report
+per-page parser, clean, review, and rejected counts plus aggregate totals. This phase
+does not add real HTTP, live fetch execution, Playwright, Selenium, proxies, stealth
+behavior, CAPTCHA handling, bypass logic, JSON persistence, property-discovery runtime
+changes, matching, n8n, dashboard work, or generated outputs. A real live runner remains
+a later phase.
+
 ## Parser Output QA Gate v1
 
 `scraper/src/domek_wonen/qa/parser_output_gate.py` adds the first offline QA layer for parser-family output. It

@@ -160,6 +160,12 @@ This selection layer is offline. It does not make network requests, call `robots
 
 The fetcher does not call `robots_gate` itself: the capture pilot remains responsible for checking `robots_gate.can_fetch(domain, path)` before invoking any fetch function. The live helper defaults to `max_sources=3`, includes domain dedupe so the first run avoids several variants from the same source domain, and adds no Playwright, Selenium, proxies, stealth behavior, CAPTCHA handling, bypass logic, persistence, or generated outputs.
 
+## KIN OGonline XHR Paginated Runner v1
+
+`scraper/src/domek_wonen/pilots/ogonline_xhr_paginated_runner.py` adds a controlled paginated runner for `ogonline_xhr` source configs, starting with the KIN fixture. It builds deterministic API URLs with `build_paginated_api_url`, checks `robots_gate.can_fetch(api_domain, api_path)` before each injected `fetch_json` call, then sends caller-provided JSON through `build_parser_input_from_api_json`, `ParserFamilyRunner`, and the parser output QA gate.
+
+This phase does not implement real HTTP, live fetch orchestration, Playwright, Selenium, stealth behavior, proxies, CAPTCHA handling, bypass logic, JSON persistence, property-discovery runtime changes, matching, dashboard work, or n8n orchestration. A real live runner can be added later after this offline config-to-parser path remains stable.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`

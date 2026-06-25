@@ -13,6 +13,11 @@ from .live_fetch import (
     keep_first_source_per_domain,
     run_selected_realworks_live_pilot,
 )
+from .ogonline_xhr_paginated_runner import (
+    PaginatedPageResult,
+    PaginatedRunResult,
+    run_ogonline_xhr_paginated_config,
+)
 from .source_selection import (
     SourceSelectionCandidate,
     SourceSelectionResult,
@@ -27,6 +32,8 @@ __all__ = [
     "ControlledFetchContentTypeError",
     "ControlledFetchError",
     "ControlledFetchStatusError",
+    "PaginatedPageResult",
+    "PaginatedRunResult",
     "SourceSelectionCandidate",
     "SourceSelectionResult",
     "candidate_from_report_row",
@@ -36,6 +43,7 @@ __all__ = [
     "keep_first_source_per_domain",
     "run_realworks_capture_pilot",
     "run_realworks_capture_pilot_for_source",
+    "run_ogonline_xhr_paginated_config",
     "run_selected_realworks_live_pilot",
     "select_realworks_pilot_sources_from_report",
 ]
