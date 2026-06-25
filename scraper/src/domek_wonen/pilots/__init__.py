@@ -18,6 +18,14 @@ from .ogonline_xhr_paginated_runner import (
     PaginatedRunResult,
     run_ogonline_xhr_paginated_config,
 )
+from .ogonline_xhr_live_fetch import (
+    ControlledJSONFetchContentTypeError,
+    ControlledJSONFetchError,
+    ControlledJSONFetchParseError,
+    ControlledJSONFetchStatusError,
+    controlled_http_fetch_json,
+    run_kin_ogonline_live_paginated_pilot,
+)
 from .source_selection import (
     SourceSelectionCandidate,
     SourceSelectionResult,
@@ -32,6 +40,10 @@ __all__ = [
     "ControlledFetchContentTypeError",
     "ControlledFetchError",
     "ControlledFetchStatusError",
+    "ControlledJSONFetchContentTypeError",
+    "ControlledJSONFetchError",
+    "ControlledJSONFetchParseError",
+    "ControlledJSONFetchStatusError",
     "PaginatedPageResult",
     "PaginatedRunResult",
     "SourceSelectionCandidate",
@@ -40,10 +52,12 @@ __all__ = [
     "candidate_to_capture_pilot_source",
     "can_capture_source",
     "controlled_http_fetch_html",
+    "controlled_http_fetch_json",
     "keep_first_source_per_domain",
     "run_realworks_capture_pilot",
     "run_realworks_capture_pilot_for_source",
     "run_ogonline_xhr_paginated_config",
+    "run_kin_ogonline_live_paginated_pilot",
     "run_selected_realworks_live_pilot",
     "select_realworks_pilot_sources_from_report",
 ]

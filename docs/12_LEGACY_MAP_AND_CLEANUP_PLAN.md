@@ -180,6 +180,21 @@ behavior, CAPTCHA handling, bypass logic, JSON persistence, property-discovery r
 changes, matching, n8n, dashboard work, or generated outputs. A real live runner remains
 a later phase.
 
+## Controlled OGonline Live Fetch v1
+
+`scraper/src/domek_wonen/pilots/ogonline_xhr_live_fetch.py` adds the explicit
+standard-library JSON fetch helper for a bounded KIN `ogonline_xhr` live pilot. It makes
+one GET with a required timeout and clear non-stealth User-Agent, accepts JSON or text
+responses only when the body parses as JSON, returns the original JSON string, and does
+not write live JSON or HTML to disk.
+
+Robots compliance remains upstream in `run_ogonline_xhr_paginated_config`, which checks
+`robots_gate.can_fetch(api_domain, api_path)` before each injected fetch call. The KIN
+helper loads a source config and delegates to the paginated runner with a caller-provided
+`max_pages` cap. This phase adds no Playwright, Selenium, proxies, stealth behavior,
+CAPTCHA handling, bypass logic, retries, parallelism, property-discovery runtime changes,
+matching, n8n, dashboard work, or generated outputs.
+
 ## Parser Output QA Gate v1
 
 `scraper/src/domek_wonen/qa/parser_output_gate.py` adds the first offline QA layer for parser-family output. It
