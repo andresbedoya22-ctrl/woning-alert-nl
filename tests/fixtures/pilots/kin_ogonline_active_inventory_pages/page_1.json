@@ -1,0 +1,46 @@
+{
+  "docs": [
+    {
+      "id": "kin-active-1",
+      "slug": "zonnelaan-12-breda",
+      "street": "Zonnelaan",
+      "houseNumber": "12",
+      "postcode": "4811AA",
+      "city": "Breda",
+      "askingPrice": 425000,
+      "isSales": true,
+      "status": "available",
+      "type": "house",
+      "livingArea": 118,
+      "rooms": 5
+    },
+    {
+      "id": "kin-under-bid",
+      "slug": "markendaalseweg-7-breda",
+      "street": "Markendaalseweg",
+      "houseNumber": "7",
+      "postcode": "4811KA",
+      "city": "Breda",
+      "askingPrice": 350000,
+      "isSales": true,
+      "status": "under_bid",
+      "type": "apartment",
+      "livingArea": 82,
+      "rooms": 3
+    },
+    {
+      "id": "kin-sold-ur",
+      "slug": "singel-2-breda",
+      "street": "Singel",
+      "houseNumber": "2",
+      "postcode": "4811AB",
+      "city": "Breda",
+      "askingPrice": 515000,
+      "isSales": true,
+      "status": "sold_ur",
+      "type": "house",
+      "livingArea": 132,
+      "rooms": 6
+    }
+  ]
+}

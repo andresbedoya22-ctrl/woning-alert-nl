@@ -13,6 +13,10 @@ from .live_fetch import (
     keep_first_source_per_domain,
     run_selected_realworks_live_pilot,
 )
+from .kin_ogonline_active_inventory_pilot import (
+    ActiveInventoryPilotResult,
+    run_kin_ogonline_active_inventory_pilot,
+)
 from .ogonline_xhr_paginated_runner import (
     PaginatedPageResult,
     PaginatedRunResult,
@@ -44,6 +48,7 @@ __all__ = [
     "ControlledJSONFetchError",
     "ControlledJSONFetchParseError",
     "ControlledJSONFetchStatusError",
+    "ActiveInventoryPilotResult",
     "PaginatedPageResult",
     "PaginatedRunResult",
     "SourceSelectionCandidate",
@@ -58,6 +63,7 @@ __all__ = [
     "run_realworks_capture_pilot_for_source",
     "run_ogonline_xhr_paginated_config",
     "run_kin_ogonline_live_paginated_pilot",
+    "run_kin_ogonline_active_inventory_pilot",
     "run_selected_realworks_live_pilot",
     "select_realworks_pilot_sources_from_report",
 ]

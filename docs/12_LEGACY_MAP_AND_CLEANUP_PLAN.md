@@ -230,6 +230,16 @@ property-discovery runtime, or change n8n or dashboard flows. Only `koop + besch
 eligible for active inventory. `onder_bod`, `verkocht`, `verhuurd`, `unknown` or empty status, unsupported or unknown
 transaction type, and empty or unsupported property type stay outside active inventory.
 
+## KIN OGonline Active Inventory Pilot v1
+
+`scraper/src/domek_wonen/pilots/kin_ogonline_active_inventory_pilot.py` adds the controlled live KIN `ogonline_xhr`
+pilot for active inventory. It caps execution at `max_pages=2`, builds page URLs from the KIN source config, checks
+`robots_gate.can_fetch` for each API URL, fetches JSON through the controlled live helper, runs parser family output
+through QA, applies inventory eligibility, and builds an `InventorySnapshot` from active inventory only.
+
+The pilot does not persist live JSON or HTML, does not touch `data/raw`, matching, n8n, dashboard, Funda, or Pararius,
+and does not add browser automation, retries, parallelism, proxies, stealth behavior, CAPTCHA handling, or bypass logic.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted

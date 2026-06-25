@@ -1,0 +1,32 @@
+{
+  "docs": [
+    {
+      "id": "kin-active-2",
+      "slug": "havenstraat-44-tilburg",
+      "street": "Havenstraat",
+      "houseNumber": "44",
+      "postcode": "5017AA",
+      "city": "Tilburg",
+      "askingPrice": 395000,
+      "isSales": true,
+      "status": "available",
+      "type": "maisonette",
+      "livingArea": 101,
+      "rooms": 4
+    },
+    {
+      "id": "kin-office",
+      "slug": "kantoorlaan-1-breda",
+      "street": "Kantoorlaan",
+      "houseNumber": "1",
+      "postcode": "4811BB",
+      "city": "Breda",
+      "askingPrice": 275000,
+      "isSales": true,
+      "status": "available",
+      "type": "kantoor",
+      "livingArea": 75,
+      "rooms": 2
+    }
+  ]
+}
