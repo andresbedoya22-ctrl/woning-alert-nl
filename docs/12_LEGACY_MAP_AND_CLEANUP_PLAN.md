@@ -218,6 +218,18 @@ Stale-source behavior is preserved through `safe_to_compare_removals=false`: fai
 must not produce removal events, so prior successful inventory can remain the trusted reference until a later
 successful capture recovers the source.
 
+## Inventory Eligibility Gate v1
+
+`scraper/src/domek_wonen/inventory/eligibility.py` adds the offline gate between parser QA and active inventory. It
+consumes `ParserFamilyQAResult`, keeps QA review and rejected listings out of active inventory, and classifies QA-clean
+listings into `active_inventory`, `inactive_status`, `unsupported_transaction_type`, `unsupported_property_type`, or
+`review`.
+
+The gate does not make HTTP requests, run live fetch, use browser automation, relax QA, modify matching, touch
+property-discovery runtime, or change n8n or dashboard flows. Only `koop + beschikbaar + allowed_property_type` is
+eligible for active inventory. `onder_bod`, `verkocht`, `verhuurd`, `unknown` or empty status, unsupported or unknown
+transaction type, and empty or unsupported property type stay outside active inventory.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted
