@@ -1,0 +1,93 @@
+{
+  "docs": [
+    {
+      "id": "kin-live-shape-001",
+      "slug": "examplelaan-10-oosterhout",
+      "address": {
+        "street": "Examplelaan",
+        "houseNumber": "10",
+        "postcode": "4904LT",
+        "city": "Oosterhout"
+      },
+      "location": {
+        "city": "Oosterhout",
+        "place": "Oosterhout"
+      },
+      "price": {
+        "amount": 375000,
+        "currency": "EUR"
+      },
+      "status": "available",
+      "isSales": true,
+      "rooms": 5,
+      "bedrooms": 4
+    },
+    {
+      "id": "kin-live-shape-002",
+      "detailUrl": "/aanbod/wonen/breda/examplehof-22/kin-live-shape-002",
+      "street": "Examplehof",
+      "houseNumber": "22",
+      "postcode": "4811AB",
+      "location": {
+        "city": "Breda"
+      },
+      "askingPrice": "EUR 425.000 k.k.",
+      "status": "reserved",
+      "isSales": true,
+      "rooms": 4,
+      "bedrooms": 3
+    },
+    {
+      "id": "kin-live-shape-003",
+      "slug": "samplepad-3-tilburg",
+      "street": "Samplepad",
+      "houseNumber": "3",
+      "postcode": "5038AA",
+      "place": {
+        "name": "Tilburg"
+      },
+      "purchasePrice": 515000.0,
+      "status": "under_offer",
+      "isSales": true,
+      "rooms": 6,
+      "bedrooms": 4
+    },
+    {
+      "id": "kin-live-shape-004",
+      "slug": "demostraat-44-eindhoven",
+      "street": "Demostraat",
+      "houseNumber": "44",
+      "postcode": "5611AB",
+      "municipality": {
+        "name": "Eindhoven"
+      },
+      "financial": {
+        "askingPrice": {
+          "value": "EUR 610.000"
+        }
+      },
+      "status": "beschikbaar",
+      "isSales": true,
+      "rooms": 5,
+      "bedrooms": 3
+    },
+    {
+      "id": "kin-live-shape-005",
+      "slug": "zonderprijs-5-breda",
+      "street": "Zonderprijs",
+      "houseNumber": "5",
+      "postcode": "4812CD",
+      "city": "Breda",
+      "status": "verkocht_onder_voorbehoud",
+      "isSales": true,
+      "rooms": 3,
+      "bedrooms": 2
+    }
+  ],
+  "hasNextPage": false,
+  "limit": 24,
+  "nextPage": null,
+  "page": 1,
+  "totalDocs": 5,
+  "totalPages": 1
+}
