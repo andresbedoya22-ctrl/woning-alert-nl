@@ -245,6 +245,7 @@ def _normalize_ogonline_status(raw_status: Any) -> str:
         return "beschikbaar"
     if normalized in {
         "reserved",
+        "under_bid",
         "under_offer",
         "onder_bod",
         "under_option",
