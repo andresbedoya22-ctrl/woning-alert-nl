@@ -1,5 +1,7 @@
 from pathlib import Path
 import ast
+from collections import Counter
+import json
 import sys
 
 
@@ -27,6 +29,28 @@ def _parser_input(content: str | None = None) -> ParserInput:
         content=content or _fixture("ogonline_xhr_page_1_fixture.json"),
         content_type="json",
     )
+
+
+def _single_doc_listing(doc: dict[str, object]):
+    result = parse_ogonline_xhr_api_response(_parser_input(json.dumps({"docs": [doc]})))
+    assert len(result.listings) == 1
+    return result.listings[0]
+
+
+def _minimal_doc(**overrides: object) -> dict[str, object]:
+    doc: dict[str, object] = {
+        "id": "kin-shape-test",
+        "slug": "examplelaan-10-breda",
+        "street": "Examplelaan",
+        "houseNumber": "10",
+        "postcode": "4811AA",
+        "city": "Breda",
+        "askingPrice": 375000,
+        "isSales": True,
+        "status": "available",
+    }
+    doc.update(overrides)
+    return doc
 
 
 def test_parse_page_1_fixture_returns_ogonline_result() -> None:
@@ -78,6 +102,110 @@ def test_under_offer_maps_to_onder_bod() -> None:
 
     assert result.listings[2].status == "onder_bod"
     assert result.listings[2].transaction_type == "koop"
+
+
+def test_extracts_city_from_address_city() -> None:
+    listing = _single_doc_listing(_minimal_doc(city="", address={"city": "Oosterhout"}))
+
+    assert listing.city == "Oosterhout"
+
+
+def test_extracts_city_from_address_settlement() -> None:
+    listing = _single_doc_listing(_minimal_doc(city="", address={"settlement": "Kaatsheuvel"}))
+
+    assert listing.city == "Kaatsheuvel"
+
+
+def test_extracts_city_from_location_city() -> None:
+    listing = _single_doc_listing(_minimal_doc(city="", location={"city": "Tilburg"}))
+
+    assert listing.city == "Tilburg"
+
+
+def test_extracts_city_from_place_name() -> None:
+    listing = _single_doc_listing(_minimal_doc(city="", place={"name": "Eindhoven"}))
+
+    assert listing.city == "Eindhoven"
+
+
+def test_extracts_city_from_municipality_name() -> None:
+    listing = _single_doc_listing(_minimal_doc(city="", municipality={"name": "Breda"}))
+
+    assert listing.city == "Breda"
+
+
+def test_extracts_price_from_price_amount() -> None:
+    listing = _single_doc_listing(_minimal_doc(askingPrice=None, price={"amount": 425000}))
+
+    assert listing.asking_price_eur == 425000
+
+
+def test_extracts_price_from_asking_price() -> None:
+    listing = _single_doc_listing(_minimal_doc(askingPrice=389000))
+
+    assert listing.asking_price_eur == 389000
+
+
+def test_extracts_price_from_purchase_price() -> None:
+    listing = _single_doc_listing(_minimal_doc(askingPrice=None, purchasePrice=515000.0))
+
+    assert listing.asking_price_eur == 515000
+
+
+def test_extracts_price_from_euro_string() -> None:
+    listing = _single_doc_listing(_minimal_doc(askingPrice="\u20ac 375.000 k.k."))
+
+    assert listing.asking_price_eur == 375000
+
+
+def test_status_available_and_beschikbaar_map_to_beschikbaar() -> None:
+    assert _single_doc_listing(_minimal_doc(status="available")).status == "beschikbaar"
+    assert _single_doc_listing(_minimal_doc(status="beschikbaar")).status == "beschikbaar"
+
+
+def test_status_offer_variants_map_to_onder_bod() -> None:
+    assert _single_doc_listing(_minimal_doc(status="reserved")).status == "onder_bod"
+    assert _single_doc_listing(_minimal_doc(status="under_offer")).status == "onder_bod"
+    assert _single_doc_listing(_minimal_doc(status="verkocht_onder_voorbehoud")).status == "onder_bod"
+
+
+def test_complete_live_shape_doc_passes_qa_clean() -> None:
+    result = parse_ogonline_xhr_api_response(_parser_input(_fixture("ogonline_xhr_live_shape_fixture.json")))
+    qa_result = qa_parser_family_result(result)
+
+    assert qa_result.clean_count >= 3
+    assert qa_result.clean_listings[0].listing.city == "Oosterhout"
+    assert qa_result.clean_listings[0].listing.asking_price_eur == 375000
+
+
+def test_live_shape_doc_without_price_stays_review_with_missing_price() -> None:
+    result = parse_ogonline_xhr_api_response(_parser_input(_fixture("ogonline_xhr_live_shape_fixture.json")))
+    qa_result = qa_parser_family_result(result)
+
+    review_by_id = {
+        signal: qa_listing
+        for qa_listing in qa_result.review_listings
+        for signal in qa_listing.listing.evidence
+        if signal == "doc_id:kin-live-shape-005"
+    }
+
+    assert qa_result.review_count >= 1
+    assert review_by_id["doc_id:kin-live-shape-005"].issues == (
+        "listing_marked_needs_review",
+        "missing_price",
+    )
+
+
+def test_live_shape_fixture_preserves_global_qa_gate() -> None:
+    result = parse_ogonline_xhr_api_response(_parser_input(_fixture("ogonline_xhr_live_shape_fixture.json")))
+    qa_result = qa_parser_family_result(result)
+    issue_counts = Counter(issue for row in qa_result.review_listings for issue in row.issues)
+
+    assert qa_result.clean_count >= 3
+    assert qa_result.review_count >= 1
+    assert qa_result.rejected_count == 0
+    assert issue_counts["missing_city"] == 0
+    assert issue_counts["missing_price"] == 1
 
 
 def test_page_2_fixture_returns_distinct_ids_and_listings() -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from typing import Any
 
 from .models import ParsedListing, ParserFamilyResult, ParserInput
@@ -75,10 +76,10 @@ def _parse_doc(parser_input: ParserInput, doc: dict[str, Any]) -> ParsedListing 
     house_number = _text(_first_nested(doc, ("house_number", "houseNumber", "number", "housenumber")))
     address_raw = _address_raw(doc, street, house_number)
     postcode = _text(_first_nested(doc, ("postcode", "postal_code", "postalCode", "zip"))).replace(" ", "").upper()
-    city = _text(_first_nested(doc, ("city", "place", "plaats", "locality")))
-    asking_price_eur = _price(doc)
+    city = _extract_city(doc)
+    asking_price_eur = _extract_asking_price_eur(doc)
     transaction_type = _transaction_type(doc)
-    status = _status(doc)
+    status = _normalize_ogonline_status(_first_nested(doc, ("status", "availability", "saleStatus", "sale_status")))
     living_area_m2 = _int_value(_first_nested(doc, ("livingArea", "living_area", "areaLiving", "area_living")))
     rooms_count = _int_value(_first_nested(doc, ("rooms", "room_count", "numberOfRooms", "aantalKamers")))
     bedrooms_count = _int_value(_first_nested(doc, ("bedrooms", "bedroom_count", "numberOfBedrooms", "aantalSlaapkamers")))
@@ -191,11 +192,70 @@ def _address_raw(doc: dict[str, Any], street: str, house_number: str) -> str:
     return _collapse_whitespace(" ".join(part for part in (street, house_number) if part))
 
 
-def _price(doc: dict[str, Any]) -> int | None:
-    value = _first_nested(doc, ("price", "askingPrice", "asking_price", "purchasePrice", "amount", "value"))
-    if value is None:
-        value = _first_nested(doc, ("salesPrice",))
-    return _int_value(value)
+def _extract_city(doc: Mapping[str, Any]) -> str:
+    for path in (
+        ("city",),
+        ("place",),
+        ("address", "city"),
+        ("address", "settlement"),
+        ("location", "city"),
+        ("location", "place"),
+        ("place", "name"),
+        ("municipality", "name"),
+        ("address", "place"),
+        ("plaats",),
+        ("locality",),
+    ):
+        value = _path_value(doc, path)
+        if isinstance(value, Mapping):
+            value = _first_mapping_value(value, ("name", "city", "place", "plaats"))
+        text = _text(value)
+        if text:
+            return text
+    return ""
+
+
+def _extract_asking_price_eur(doc: Mapping[str, Any]) -> int | None:
+    for path in (
+        ("asking_price_eur",),
+        ("askingPrice",),
+        ("purchasePrice",),
+        ("price",),
+        ("price", "amount"),
+        ("price", "value"),
+        ("financial", "price"),
+        ("financial", "askingPrice"),
+        ("salesPrice",),
+        ("salesPrice", "amount"),
+        ("salesPrice", "value"),
+    ):
+        value = _path_value(doc, path)
+        parent_value = _path_value(doc, path[:-1]) if len(path) > 1 else None
+        if _looks_like_rent_price(path, value) or _looks_like_rent_price(path[:-1], parent_value):
+            continue
+        parsed = _int_value(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _normalize_ogonline_status(raw_status: Any) -> str:
+    normalized = _text(raw_status).casefold().replace("-", "_").replace(" ", "_")
+    if normalized in {"available", "beschikbaar", "active", "for_sale"}:
+        return "beschikbaar"
+    if normalized in {
+        "reserved",
+        "under_offer",
+        "onder_bod",
+        "under_option",
+        "verkocht_onder_voorbehoud",
+    }:
+        return "onder_bod"
+    if normalized in {"sold", "verkocht"}:
+        return "verkocht"
+    if normalized in {"rented", "verhuurd"}:
+        return "verhuurd"
+    return "unknown"
 
 
 def _transaction_type(doc: dict[str, Any]) -> str:
@@ -209,17 +269,6 @@ def _transaction_type(doc: dict[str, Any]) -> str:
         return "koop"
     if any(signal in normalized for signal in ("rent", "rental", "huur")):
         return "huur"
-    return "unknown"
-
-
-def _status(doc: dict[str, Any]) -> str:
-    normalized = _text(_first_nested(doc, ("status", "availability", "saleStatus", "sale_status"))).casefold()
-    if normalized in {"available", "beschikbaar", "active", "for_sale"}:
-        return "beschikbaar"
-    if normalized in {"under_offer", "under offer", "reserved", "onder_bod", "onder bod", "under_option"}:
-        return "onder_bod"
-    if normalized in {"sold", "verkocht"}:
-        return "verkocht"
     return "unknown"
 
 
@@ -310,6 +359,35 @@ def _int_value(value: Any) -> int | None:
         digits = re.sub(r"[^\d]", "", value)
         return int(digits) if digits else None
     return None
+
+
+def _path_value(value: Mapping[str, Any], path: tuple[str, ...]) -> Any:
+    current: Any = value
+    for key in path:
+        if not isinstance(current, Mapping) or key not in current:
+            return None
+        current = current[key]
+    return current
+
+
+def _first_mapping_value(value: Mapping[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        if key in value:
+            return value[key]
+    return None
+
+
+def _looks_like_rent_price(path: tuple[str, ...], value: Any) -> bool:
+    path_text = ".".join(path).casefold()
+    if any(signal in path_text for signal in ("rent", "huur")):
+        return True
+    if not isinstance(value, Mapping):
+        return False
+    combined = " ".join(
+        _text(value.get(key)).casefold()
+        for key in ("type", "transactionType", "transaction", "period", "frequency", "unit")
+    )
+    return any(signal in combined for signal in ("rent", "rental", "huur", "month", "maand"))
 
 
 def _text(value: Any) -> str:
