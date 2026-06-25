@@ -1,0 +1,152 @@
+# Sources Module
+
+## What Source Intelligence does
+
+Source Intelligence is the deterministic conversion layer between legacy source data and future parser work.
+
+In this phase it:
+
+- loads CSV-based source evidence;
+- normalizes domains, booleans, IDs, and basic counts;
+- classifies conservative delivery-mode and parser-family candidates;
+- builds measurable reports for prioritization and manual review.
+
+## What it does not do
+
+This module does not:
+
+- make HTTP requests;
+- probe robots live;
+- scrape listing pages;
+- implement parser families;
+- change property-discovery runtime;
+- decide final access policy runtime enforcement.
+
+## Relationship to nearby phases
+
+- `source_intelligence` turns existing evidence into a stable record set.
+- `access_policy` will later formalize operational use decisions.
+- `delivery_mode_fingerprint` will later improve evidence collection and confidence.
+
+This module only prepares deterministic inputs for those later phases.
+
+## Access Policy v1
+
+Access Policy v1 turns a `SourceIntelligenceRecord` into an explicit `AccessPolicyDecision`.
+It decides whether a source can run production extraction, whether a research probe is still allowed,
+which action is required, and which risk flags explain the decision.
+
+It does not make HTTP requests, read `robots.txt` live, use Playwright, scrape pages, implement parser
+families, or change property-discovery runtime behavior. It only evaluates evidence already present in
+Source Intelligence fields.
+
+The policy protects the pipeline by stopping Funda dependencies, Pararius dependencies without permission,
+CAPTCHA, login walls, `403`, disabled sources, and legal-review records before parser-family work begins.
+Allowed and limited sources may proceed only as deterministic policy decisions; unknown or researching
+sources remain manual-review inputs.
+
+Later phases should call this layer before delivery-mode fingerprinting, parser-family selection, and
+source-config execution so blocked or permission-bound sources do not enter operational extraction.
+
+## Delivery Mode Fingerprint v2
+
+Delivery Mode Fingerprint v2 turns a `SourceIntelligenceRecord` into an explicit
+`DeliveryFingerprintResult`. It calls Access Policy first, then classifies the delivery mode from
+existing source-intelligence evidence such as platform hints, visible cards, JSON-LD, sitemap flags,
+WordPress REST signals, iframe dependencies, CAPTCHA, login, and `403` markers.
+
+This layer does not make network requests, read `robots.txt` live, use Playwright, scrape pages, or
+execute parser families. Its output is a deterministic offline decision with confidence,
+evidence signals, blocking signals, a recommended action, and a boolean that says whether the source
+may proceed to parser-family work.
+
+If Access Policy blocks production extraction, Delivery Mode Fingerprint v2 always sets
+`can_proceed_to_parser_family` to `False`, even when technical parser-family signals are present.
+
+## CLI usage
+
+```powershell
+py -3.12 scripts/run_source_intelligence_report.py --input tests/fixtures/sources/source_intelligence_seed.csv
+py -3.12 scripts/run_source_intelligence_report.py --input tests/fixtures/sources/source_intelligence_seed.csv --output tmp/source-intelligence-report.json
+```
+
+## Reports produced
+
+The JSON report includes:
+
+- `total_sources`
+- `unique_domains`
+- counts by `aanbod_url_status`, `access_status`, `detected_platform`, `delivery_mode`, `parser_family_candidate`, and `recommended_action`
+- `manual_review_queue`
+- `parser_family_priority`
+
+The CLI also prints a compact stdout summary with top delivery modes, top parser families, and manual-review volume.
+
+## Legacy Source Intelligence Adapter v1
+
+`legacy_source_adapter.py` converts existing offline legacy source artifacts into `SourceIntelligenceRecord`
+objects. It is intended for local CSVs such as source masters, discovery outputs, source coverage files, and
+platform fingerprint artifacts.
+
+Supported legacy columns include `source_id`, `office_name`, `makelaar_name`, `source_name`, `root_domain`,
+`domain`, `source_domain`, `website`, `homepage_url`, `website_url`, `aanbod_url`, `koopaanbod_url`,
+`gemeente`, `city`, `province`, `legal_status`, `source_status`, `aanbod_url_quality`, `detected_platform`,
+`platform`, `source_quality_status`, `source_quality_reason`, `source_origin`, `evidence`, and `notes`.
+Missing columns are allowed.
+
+The adapter does not make HTTP requests, probe robots live, open websites, use Playwright, scrape pages, or
+change property-discovery runtime behavior. It only reads local CSV data.
+
+The combined report flow is:
+
+```text
+legacy source CSV
+-> SourceIntelligenceRecord
+-> AccessPolicyDecision
+-> DeliveryFingerprintResult
+-> combined source intelligence report
+```
+
+Run it with:
+
+```powershell
+py -3.12 scripts/run_legacy_source_intelligence_report.py --input tests/fixtures/sources/legacy_source_master_seed.csv
+py -3.12 scripts/run_legacy_source_intelligence_report.py --input data/discovery/runs/20260614T122022Z/makelaar_sources_master.csv --output tmp/legacy-source-intelligence-report.json
+```
+
+The report includes source-intelligence counts, access-policy summary, delivery-fingerprint summary,
+top parser-family candidates, manual-review queue, blocked sources, permission-required sources, and
+production parser-ready sources.
+
+## Legacy Adapter Hardening v1
+
+Legacy Adapter Hardening v1 adds offline mapping support for the real `makelaar_sources_master.csv`
+columns `aanbod_url_type`, `confidence_score`, `score`, `source_quality_status`, `needs_review`,
+`review_reason`, `last_seen_at`, `last_audited_at`, `run_id`, and `is_active`.
+
+It normalizes legacy access states such as `allowed_official_source`, `missing`, `missing_website`,
+`needs_manual_review`, and `disabled_legal_review` before Access Policy evaluates them. It also preserves
+`run_id`, timestamps, score/confidence values, and review reasons in `notes` or `evidence` for later
+reporting. The adapter remains offline-only: it does not scrape, make HTTP requests, open websites, use
+Playwright, or validate robots live.
+
+## Delivery Mode Evidence Enrichment v1
+
+`evidence_enrichment.py` joins a legacy source master with local CSV evidence artifacts such as platform
+fingerprint inventories, source coverage inventories, and delivery-mode diagnostics. The join uses normalized
+domains from source, root, website, homepage, and aanbod URL fields. It does not make network requests, open
+websites, use Playwright, validate robots live, scrape pages, or change property-discovery runtime behavior.
+
+The enrichment layer can reduce `unknown_manual_review` when local evidence contains platform, delivery-mode,
+boolean signal, iframe, JSON-LD, sitemap, WordPress, visible-card, or blocker fields. It is a prioritization
+step before parser-family implementation; it does not implement parser families.
+
+Run it with:
+
+```powershell
+py -3.12 scripts/run_enriched_legacy_source_report.py --source-master data/discovery/runs/20260614T122022Z/makelaar_sources_master.csv --evidence data/discovery/platform_fingerprint/platform_fingerprint_results.csv --output tmp/enriched-legacy-source-report.json
+```
+
+## Next step
+
+The next focused phase is `Access Policy v1` or a richer `Delivery Mode Fingerprint v2`, not runtime parser expansion.

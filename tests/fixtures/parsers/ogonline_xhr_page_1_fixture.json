@@ -1,0 +1,63 @@
+{
+  "docs": [
+    {
+      "id": "kin-001",
+      "slug": "zonnelaan-12-breda",
+      "street": "Zonnelaan",
+      "house_number": "12",
+      "postcode": "4811AA",
+      "city": "Breda",
+      "price": 425000,
+      "isSales": true,
+      "status": "available",
+      "livingArea": 118,
+      "rooms": 5,
+      "bedrooms": 3,
+      "objectType": "house",
+      "energyLabel": "A",
+      "photos": [
+        {
+          "url": "https://example.invalid/photo-001.jpg"
+        }
+      ]
+    },
+    {
+      "id": "kin-002",
+      "slug": "marktstraat-8-tilburg",
+      "street": "Marktstraat",
+      "houseNumber": "8",
+      "postcode": "5038AA",
+      "place": "Tilburg",
+      "isSales": true,
+      "status": "available",
+      "livingArea": 82,
+      "rooms": 3,
+      "bedrooms": 2,
+      "objectType": "apartment",
+      "energyLabel": "B",
+      "photos": []
+    },
+    {
+      "id": "kin-003",
+      "slug": "parklaan-21-eindhoven",
+      "street": "Parklaan",
+      "house_number": "21",
+      "postcode": "5611AB",
+      "city": "Eindhoven",
+      "askingPrice": 515000,
+      "isSales": true,
+      "status": "under_offer",
+      "livingArea": 132,
+      "rooms": 6,
+      "bedrooms": 4,
+      "objectType": "house",
+      "energyLabel": "A"
+    }
+  ],
+  "hasNextPage": true,
+  "limit": 24,
+  "nextPage": 2,
+  "page": 1,
+  "totalDocs": 48,
+  "totalPages": 2
+}
