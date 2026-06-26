@@ -253,6 +253,18 @@ it explicitly with `enrich_detail_property_type=True`, while the default remains
 persisted. Eligibility remains the downstream authority for active, inactive, unsupported property type, or review
 classification. `Open huis` stays a badge/event and is not mapped into property type or status.
 
+## KIN OGonline 5-page Validation Audit v1
+
+`scraper/src/domek_wonen/pilots/kin_ogonline_validation_audit.py` adds a separate audit path for validating whether
+the KIN OGonline listing API, base parser, QA gate, detail property-type enrichment, eligibility gate, and active-only
+snapshot scale from the two-page pilot to at most five API pages.
+
+This audit does not change the base `ogonline_xhr` parser family or the two-page active inventory pilot. It uses the
+detail property-type enrichment layer only as an explicit audit step, caps API pagination at five pages, caps detail
+enrichment at 120 pages, does not persist HTML or JSON, and does not run full KIN. Matching, n8n, dashboard,
+`data/raw`, Funda, and Pararius remain outside this phase. The audit reports parser, QA, enrichment, eligibility,
+snapshot, status, decision, property-type, and warning metrics.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted

@@ -208,6 +208,17 @@ before each detail fetch, caps detail pages through `max_detail_enrichment`, ext
 and does not persist HTML or JSON. Eligibility still decides active, inactive, unsupported, or review outcomes after
 enrichment. `Open huis` remains a badge/event signal, not a property type or availability status.
 
+## KIN OGonline 5-page Validation Audit v1
+
+`scraper/src/domek_wonen/pilots/kin_ogonline_validation_audit.py` adds a separate validation audit for the KIN
+OGonline flow. It measures the listing API, base `ogonline_xhr` parser, parser QA, detail property-type enrichment,
+inventory eligibility, and active-only inventory snapshot across at most five API pages.
+
+The audit is separate from the two-page active inventory pilot and does not change its default behavior. It can enrich
+QA-clean eligible listings from permitted detail pages, but caps detail enrichment at 120 pages, does not persist live
+HTML or JSON, and does not run full KIN. It does not touch matching, n8n, dashboard, Funda, Pararius, or `data/raw`.
+The result reports parser, QA, enrichment, eligibility, snapshot, status, decision, property-type, and warning metrics.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
