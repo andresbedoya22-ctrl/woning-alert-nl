@@ -22,6 +22,11 @@ from .kin_ogonline_validation_audit import (
     run_kin_ogonline_5_page_validation_audit,
     run_kin_ogonline_validation_audit_config,
 )
+from .kin_ogonline_full_validation_audit import (
+    KINOGonlineFullValidationAuditResult,
+    run_kin_ogonline_full_validation_audit,
+    run_kin_ogonline_full_validation_audit_config,
+)
 from .ogonline_detail_property_type_enrichment import (
     DetailPropertyTypeEnrichmentItem,
     DetailPropertyTypeEnrichmentResult,
@@ -62,6 +67,7 @@ __all__ = [
     "DetailPropertyTypeEnrichmentItem",
     "DetailPropertyTypeEnrichmentResult",
     "KINOGonlineValidationAuditResult",
+    "KINOGonlineFullValidationAuditResult",
     "ActiveInventoryPilotResult",
     "PaginatedPageResult",
     "PaginatedRunResult",
@@ -81,6 +87,8 @@ __all__ = [
     "run_kin_ogonline_live_paginated_pilot",
     "run_kin_ogonline_active_inventory_pilot",
     "run_kin_ogonline_5_page_validation_audit",
+    "run_kin_ogonline_full_validation_audit",
+    "run_kin_ogonline_full_validation_audit_config",
     "run_kin_ogonline_validation_audit_config",
     "run_selected_realworks_live_pilot",
     "select_realworks_pilot_sources_from_report",
