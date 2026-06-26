@@ -219,6 +219,19 @@ QA-clean eligible listings from permitted detail pages, but caps detail enrichme
 HTML or JSON, and does not run full KIN. It does not touch matching, n8n, dashboard, Funda, Pararius, or `data/raw`.
 The result reports parser, QA, enrichment, eligibility, snapshot, status, decision, property-type, and warning metrics.
 
+## KIN Full OGonline Validation Audit v1
+
+`scraper/src/domek_wonen/pilots/kin_ogonline_full_validation_audit.py` adds a controlled full-source validation audit
+for the explicit KIN OGonline source config. It is separate from the two-page active inventory pilot and the five-page
+validation audit, and measures the listing API, base `ogonline_xhr` parser, parser QA, detail property-type enrichment,
+inventory eligibility, and active-only inventory snapshot across the available KIN API inventory.
+
+Full does not mean unlimited: API pagination is capped at 25 pages and detail enrichment is capped at 300 detail pages.
+The audit may use reported `totalPages`, `totalDocs`, or `hasNextPage` metadata to decide how many pages to attempt
+within that cap. It does not implement new mappings, change parser or eligibility behavior, persist live HTML or JSON,
+touch matching, n8n, dashboard, Funda, Pararius, or `data/raw`, or run a generic crawler. Its output is intended to
+decide whether KIN is sufficiently validated before a later OGonline Coverage Audit.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`

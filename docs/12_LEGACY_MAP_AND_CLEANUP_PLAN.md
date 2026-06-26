@@ -265,6 +265,19 @@ enrichment at 120 pages, does not persist HTML or JSON, and does not run full KI
 `data/raw`, Funda, and Pararius remain outside this phase. The audit reports parser, QA, enrichment, eligibility,
 snapshot, status, decision, property-type, and warning metrics.
 
+## KIN Full OGonline Validation Audit v1
+
+`scraper/src/domek_wonen/pilots/kin_ogonline_full_validation_audit.py` adds a separate full-source validation audit for
+the explicit KIN OGonline source config. It remains separate from the two-page active inventory pilot and the five-page
+validation audit while reusing the same base parser, parser QA, detail property-type enrichment, inventory eligibility,
+and active-only snapshot path.
+
+The audit is bounded, not a generic crawler: API pagination is capped at 25 pages and detail enrichment is capped at
+300 detail pages. It can use OGonline pagination metadata such as `totalPages`, `totalDocs`, and `hasNextPage` to decide
+how many KIN pages to attempt within those limits. This phase does not implement new mappings, relax QA, change
+eligibility, persist live HTML or JSON, touch matching, n8n, dashboard, `data/raw`, Funda, or Pararius. Its purpose is
+to decide whether KIN is sufficiently validated before moving to a later OGonline Coverage Audit.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted
