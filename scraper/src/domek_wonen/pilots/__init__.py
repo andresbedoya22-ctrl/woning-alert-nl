@@ -17,6 +17,12 @@ from .kin_ogonline_active_inventory_pilot import (
     ActiveInventoryPilotResult,
     run_kin_ogonline_active_inventory_pilot,
 )
+from .ogonline_detail_property_type_enrichment import (
+    DetailPropertyTypeEnrichmentItem,
+    DetailPropertyTypeEnrichmentResult,
+    enrich_listings_with_detail_property_type,
+    map_ogonline_detail_property_type,
+)
 from .ogonline_xhr_paginated_runner import (
     PaginatedPageResult,
     PaginatedRunResult,
@@ -48,6 +54,8 @@ __all__ = [
     "ControlledJSONFetchError",
     "ControlledJSONFetchParseError",
     "ControlledJSONFetchStatusError",
+    "DetailPropertyTypeEnrichmentItem",
+    "DetailPropertyTypeEnrichmentResult",
     "ActiveInventoryPilotResult",
     "PaginatedPageResult",
     "PaginatedRunResult",
@@ -58,7 +66,9 @@ __all__ = [
     "can_capture_source",
     "controlled_http_fetch_html",
     "controlled_http_fetch_json",
+    "enrich_listings_with_detail_property_type",
     "keep_first_source_per_domain",
+    "map_ogonline_detail_property_type",
     "run_realworks_capture_pilot",
     "run_realworks_capture_pilot_for_source",
     "run_ogonline_xhr_paginated_config",

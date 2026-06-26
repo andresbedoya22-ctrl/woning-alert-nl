@@ -195,6 +195,19 @@ The pilot does not persist live JSON or HTML, does not touch matching, n8n, dash
 and does not add retries, parallelism, browser automation, proxies, stealth behavior, CAPTCHA handling, or bypass logic.
 Only `active_inventory` listings are passed to the snapshot helper.
 
+## OGonline Detail Property Type Enrichment v1
+
+`scraper/src/domek_wonen/pilots/ogonline_detail_property_type_enrichment.py` adds a bounded enrichment step for the KIN
+OGonline active inventory pilot. The OGonline listing API does not expose a useful residential `property_type` for the
+current KIN live shape, while the permitted detail page embedded state can expose conservative values such as
+`Tussenwoning`, `Vrijstaande woning`, and `Appartement`.
+
+The enrichment is separate from the base `ogonline_xhr` parser family and is disabled by default in
+`run_kin_ogonline_active_inventory_pilot`. When explicitly enabled, it checks `robots_gate.can_fetch(domain, path)`
+before each detail fetch, caps detail pages through `max_detail_enrichment`, extracts only property-type candidates,
+and does not persist HTML or JSON. Eligibility still decides active, inactive, unsupported, or review outcomes after
+enrichment. `Open huis` remains a badge/event signal, not a property type or availability status.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`

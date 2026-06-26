@@ -240,6 +240,19 @@ through QA, applies inventory eligibility, and builds an `InventorySnapshot` fro
 The pilot does not persist live JSON or HTML, does not touch `data/raw`, matching, n8n, dashboard, Funda, or Pararius,
 and does not add browser automation, retries, parallelism, proxies, stealth behavior, CAPTCHA handling, or bypass logic.
 
+## OGonline Detail Property Type Enrichment v1
+
+`scraper/src/domek_wonen/pilots/ogonline_detail_property_type_enrichment.py` adds a controlled detail-page enrichment
+layer for OGonline-backed KIN listings whose listing API payload has no useful `property_type`. It uses the existing
+detail candidate extraction logic to read embedded-state property type signals, maps only conservative known values,
+and leaves ambiguous or unknown candidates unchanged.
+
+This enrichment remains separate from the base `ogonline_xhr` parser family. The KIN active inventory pilot can enable
+it explicitly with `enrich_detail_property_type=True`, while the default remains disabled. Detail fetches are capped by
+`max_detail_enrichment`, each detail URL must pass `robots_gate.can_fetch(domain, path)`, and no HTML or JSON is
+persisted. Eligibility remains the downstream authority for active, inactive, unsupported property type, or review
+classification. `Open huis` stays a badge/event and is not mapped into property type or status.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted

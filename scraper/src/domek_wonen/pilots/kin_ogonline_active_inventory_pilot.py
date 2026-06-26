@@ -11,6 +11,7 @@ from domek_wonen.inventory import (
     evaluate_inventory_eligibility,
 )
 from domek_wonen.parsers import ParserFamilyRunner
+from domek_wonen.parsers.models import ParsedListing
 from domek_wonen.parsers.source_config import (
     ParserSourceConfig,
     build_paginated_api_url,
@@ -18,8 +19,14 @@ from domek_wonen.parsers.source_config import (
     load_parser_source_config,
 )
 from domek_wonen.qa import ParserFamilyQAResult, qa_parser_family_result
+from domek_wonen.qa.parser_output_gate import ParserListingQAResult
 from domek_wonen.sources.delivery_fingerprint import DeliveryFingerprintResult
 
+from .live_fetch import controlled_http_fetch_html
+from .ogonline_detail_property_type_enrichment import (
+    DetailPropertyTypeEnrichmentResult,
+    enrich_listings_with_detail_property_type,
+)
 from .ogonline_xhr_live_fetch import controlled_http_fetch_json
 
 
@@ -42,6 +49,10 @@ class ActiveInventoryPilotResult:
     unsupported_property_type_count: int
     eligibility_review_count: int
     snapshot_listing_count: int
+    detail_enrichment_attempted_count: int = 0
+    detail_enrichment_succeeded_count: int = 0
+    detail_enriched_count: int = 0
+    detail_enrichment_warnings: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
 
 
@@ -58,12 +69,17 @@ def run_kin_ogonline_active_inventory_pilot(
     *,
     config_path,
     max_pages: int = MAX_KIN_OGONLINE_ACTIVE_INVENTORY_PAGES,
+    enrich_detail_property_type: bool = False,
+    max_detail_enrichment: int = 5,
 ) -> ActiveInventoryPilotResult:
     config = load_parser_source_config(config_path)
     return _run_kin_ogonline_active_inventory_config(
         config,
         fetch_json=controlled_http_fetch_json,
+        fetch_html=controlled_http_fetch_html,
         max_pages=max_pages,
+        enrich_detail_property_type=enrich_detail_property_type,
+        max_detail_enrichment=max_detail_enrichment,
     )
 
 
@@ -71,7 +87,10 @@ def _run_kin_ogonline_active_inventory_config(
     config: ParserSourceConfig,
     *,
     fetch_json: Callable[[str], str],
+    fetch_html: Callable[[str], str] | None = None,
     max_pages: int = MAX_KIN_OGONLINE_ACTIVE_INVENTORY_PAGES,
+    enrich_detail_property_type: bool = False,
+    max_detail_enrichment: int = 5,
 ) -> ActiveInventoryPilotResult:
     _validate_ogonline_config(config)
     if max_pages <= 0:
@@ -90,6 +109,10 @@ def _run_kin_ogonline_active_inventory_config(
             unsupported_property_type_count=0,
             eligibility_review_count=0,
             snapshot_listing_count=0,
+            detail_enrichment_attempted_count=0,
+            detail_enrichment_succeeded_count=0,
+            detail_enriched_count=0,
+            detail_enrichment_warnings=(),
             warnings=("max_pages_must_be_positive",),
         )
 
@@ -106,9 +129,21 @@ def _run_kin_ogonline_active_inventory_config(
         config,
         (qa_result for qa_result in (result.qa_result for result in page_results) if qa_result is not None),
     )
+    enrichment_result: DetailPropertyTypeEnrichmentResult | None = None
+    if enrich_detail_property_type:
+        if fetch_html is None:
+            fetch_html = controlled_http_fetch_html
+        enrichment_result = enrich_listings_with_detail_property_type(
+            (qa_listing.listing for qa_listing in qa_result.clean_listings),
+            fetch_html=fetch_html,
+            max_details=max_detail_enrichment,
+        )
+        qa_result = _qa_result_with_enriched_clean_listings(qa_result, enrichment_result.enriched_listings)
+
     eligibility_result = evaluate_inventory_eligibility(qa_result)
     active_qa_result = build_active_inventory_qa_result(qa_result)
     capture_status = _capture_status(page_results)
+    detail_enrichment_warnings = () if enrichment_result is None else enrichment_result.warnings
     snapshot = build_inventory_snapshot_from_qa(
         active_qa_result,
         _utc_timestamp(),
@@ -131,14 +166,47 @@ def _run_kin_ogonline_active_inventory_config(
         unsupported_property_type_count=eligibility_result.unsupported_property_type_count,
         eligibility_review_count=eligibility_result.review_count,
         snapshot_listing_count=len(snapshot.listings),
+        detail_enrichment_attempted_count=0 if enrichment_result is None else enrichment_result.attempted_count,
+        detail_enrichment_succeeded_count=0 if enrichment_result is None else enrichment_result.succeeded_count,
+        detail_enriched_count=0 if enrichment_result is None else enrichment_result.enriched_count,
+        detail_enrichment_warnings=detail_enrichment_warnings,
         warnings=_dedupe_warnings(
             (
                 *qa_result.warnings,
+                *detail_enrichment_warnings,
                 *snapshot.warnings,
                 *(warning for result in page_results for warning in result.warnings),
                 *(() if max_pages <= MAX_KIN_OGONLINE_ACTIVE_INVENTORY_PAGES else ("max_pages_capped_at_2",)),
             )
         ),
+    )
+
+
+def _qa_result_with_enriched_clean_listings(
+    qa_result: ParserFamilyQAResult,
+    enriched_listings: tuple[ParsedListing, ...],
+) -> ParserFamilyQAResult:
+    enriched_clean = tuple(
+        ParserListingQAResult(
+            listing=enriched_listing,
+            qa_status=qa_listing.qa_status,
+            issues=qa_listing.issues,
+            normalized_key=qa_listing.normalized_key,
+        )
+        for qa_listing, enriched_listing in zip(qa_result.clean_listings, enriched_listings, strict=True)
+    )
+    return ParserFamilyQAResult(
+        parser_family=qa_result.parser_family,
+        source_id=qa_result.source_id,
+        source_domain=qa_result.source_domain,
+        clean_listings=enriched_clean,
+        review_listings=qa_result.review_listings,
+        rejected_listings=qa_result.rejected_listings,
+        total_count=qa_result.total_count,
+        clean_count=qa_result.clean_count,
+        review_count=qa_result.review_count,
+        rejected_count=qa_result.rejected_count,
+        warnings=qa_result.warnings,
     )
 
 
