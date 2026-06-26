@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
@@ -33,7 +34,9 @@ from .kin_ogonline_active_inventory_pilot import (
 )
 from .live_fetch import controlled_http_fetch_html
 from .ogonline_detail_property_type_enrichment import (
-    enrich_listings_with_detail_property_type,
+    DetailPropertyTypeEnrichmentResult,
+    _eligible_listing_indexes,
+    _enrich_listing,
 )
 from .ogonline_xhr_live_fetch import controlled_http_fetch_json
 
@@ -91,6 +94,8 @@ def run_kin_ogonline_full_validation_audit(
     config_path: Path,
     max_api_pages: int = MAX_FULL_KIN_API_PAGES,
     max_detail_enrichment: int = MAX_FULL_KIN_DETAIL_ENRICHMENT,
+    max_runtime_seconds: float | None = None,
+    max_detail_runtime_seconds: float | None = None,
 ) -> KINOGonlineFullValidationAuditResult:
     config = load_parser_source_config(config_path)
     return run_kin_ogonline_full_validation_audit_config(
@@ -99,6 +104,8 @@ def run_kin_ogonline_full_validation_audit(
         fetch_html=controlled_http_fetch_html,
         max_api_pages=max_api_pages,
         max_detail_enrichment=max_detail_enrichment,
+        max_runtime_seconds=max_runtime_seconds,
+        max_detail_runtime_seconds=max_detail_runtime_seconds,
     )
 
 
@@ -109,16 +116,27 @@ def run_kin_ogonline_full_validation_audit_config(
     fetch_html: Callable[[str], str],
     max_api_pages: int = MAX_FULL_KIN_API_PAGES,
     max_detail_enrichment: int = MAX_FULL_KIN_DETAIL_ENRICHMENT,
+    max_runtime_seconds: float | None = None,
+    max_detail_runtime_seconds: float | None = None,
 ) -> KINOGonlineFullValidationAuditResult:
     _validate_full_kin_config(config)
     if max_api_pages <= 0:
         return _empty_result(config, pages_requested=0, warnings=("max_api_pages_must_be_positive",))
 
+    started_at = time.monotonic()
+    runtime_deadline = _deadline(started_at, max_runtime_seconds)
     api_page_limit = min(max_api_pages, MAX_FULL_KIN_API_PAGES)
     warnings = [] if max_api_pages <= MAX_FULL_KIN_API_PAGES else ["full_audit_api_pages_capped"]
     audit_config = _config_with_full_page_limit(config, api_page_limit)
 
-    page_results = _run_full_pages(audit_config, fetch_json=fetch_json, page_limit=api_page_limit)
+    page_results = _run_full_pages(
+        audit_config,
+        fetch_json=fetch_json,
+        page_limit=api_page_limit,
+        runtime_deadline=runtime_deadline,
+    )
+    if _deadline_exhausted(runtime_deadline):
+        _append_warning(warnings, "full_audit_runtime_budget_exhausted")
     total_pages_reported = _first_int(result.total_pages_reported for result in page_results)
     total_docs_reported = _first_int(result.total_docs_reported for result in page_results)
     if total_pages_reported is not None and total_pages_reported > api_page_limit:
@@ -131,12 +149,16 @@ def run_kin_ogonline_full_validation_audit_config(
     parser_status_counts = _parser_status_counts(qa_result)
 
     detail_limit, detail_limit_warnings = _detail_enrichment_limit(qa_result.clean_count, max_detail_enrichment)
-    warnings.extend(detail_limit_warnings)
-    enrichment_result = enrich_listings_with_detail_property_type(
+    _extend_warnings(warnings, detail_limit_warnings)
+    detail_deadline = _deadline(time.monotonic(), max_detail_runtime_seconds)
+    enrichment_result, enrichment_runtime_warnings = _enrich_listings_with_runtime_budget(
         (qa_listing.listing for qa_listing in qa_result.clean_listings),
         fetch_html=fetch_html,
         max_details=detail_limit,
+        detail_deadline=detail_deadline,
+        runtime_deadline=runtime_deadline,
     )
+    _extend_warnings(warnings, enrichment_runtime_warnings)
     qa_result = _qa_result_with_enriched_clean_listings(qa_result, enrichment_result.enriched_listings)
 
     eligibility_result = evaluate_inventory_eligibility(qa_result)
@@ -149,12 +171,12 @@ def run_kin_ogonline_full_validation_audit_config(
         safe_to_compare_removals=capture_status == "success",
     )
     if len(snapshot.listings) != eligibility_result.active_count:
-        warnings.append("snapshot_active_inventory_count_mismatch")
+        _append_warning(warnings, "snapshot_active_inventory_count_mismatch")
 
     raw_warnings = (
         *warnings,
         *qa_result.warnings,
-        *enrichment_result.warnings,
+        *_enrichment_warning_events(enrichment_result),
         *snapshot.warnings,
         *(warning for result in page_results for warning in result.warnings),
     )
@@ -210,6 +232,7 @@ def _run_full_pages(
     *,
     fetch_json: Callable[[str], str],
     page_limit: int,
+    runtime_deadline: float | None,
 ) -> tuple[_FullPageResult, ...]:
     api = config.api
     if api is None:  # pragma: no cover - guarded by _validate_full_kin_config
@@ -218,6 +241,8 @@ def _run_full_pages(
     page_results: list[_FullPageResult] = []
     page = api.start_page
     while len(page_results) < page_limit:
+        if _deadline_exhausted(runtime_deadline):
+            break
         result = _run_full_page(config, page, fetch_json)
         page_results.append(result)
 
@@ -231,6 +256,77 @@ def _run_full_pages(
         page += 1
 
     return tuple(page_results)
+
+
+def _enrich_listings_with_runtime_budget(
+    listings: Iterable[ParsedListing],
+    *,
+    fetch_html: Callable[[str], str],
+    max_details: int,
+    detail_deadline: float | None,
+    runtime_deadline: float | None,
+) -> tuple[DetailPropertyTypeEnrichmentResult, tuple[str, ...]]:
+    original_listings = tuple(listings)
+    if max_details <= 0:
+        return (
+            DetailPropertyTypeEnrichmentResult(
+                enriched_listings=original_listings,
+                items=(),
+                attempted_count=0,
+                succeeded_count=0,
+                enriched_count=0,
+                unchanged_count=0,
+                blocked_count=0,
+                failed_count=0,
+                warnings=("max_details_must_be_positive",),
+            ),
+            (),
+        )
+
+    warnings: list[str] = []
+    enriched_by_index: dict[int, ParsedListing] = {}
+    items = []
+    for index in _eligible_listing_indexes(original_listings)[:max_details]:
+        if _deadline_exhausted(runtime_deadline):
+            warnings.append("full_audit_runtime_budget_exhausted")
+            break
+        if _deadline_exhausted(detail_deadline):
+            warnings.append("full_audit_detail_runtime_budget_exhausted")
+            break
+
+        listing = original_listings[index]
+        item = _enrich_listing(listing, fetch_html=fetch_html)
+        items.append(item)
+        if item.enriched_listing is not listing:
+            enriched_by_index[index] = item.enriched_listing
+
+    if len(items) < min(max_details, len(_eligible_listing_indexes(original_listings))):
+        if _deadline_exhausted(runtime_deadline) and "full_audit_runtime_budget_exhausted" not in warnings:
+            warnings.append("full_audit_runtime_budget_exhausted")
+        elif _deadline_exhausted(detail_deadline) and "full_audit_detail_runtime_budget_exhausted" not in warnings:
+            warnings.append("full_audit_detail_runtime_budget_exhausted")
+
+    enriched_listings = tuple(enriched_by_index.get(index, listing) for index, listing in enumerate(original_listings))
+    succeeded_count = sum(1 for item in items if item.fetch_status == "success")
+    enriched_count = sum(1 for item in items if item.mapped_property_type)
+    blocked_count = sum(1 for item in items if item.fetch_status == "blocked_by_robots")
+    failed_count = sum(1 for item in items if item.fetch_status == "fetch_exception")
+    item_warnings = tuple(warning for item in items for warning in item.warnings)
+
+    return (
+        DetailPropertyTypeEnrichmentResult(
+            enriched_listings=enriched_listings,
+            items=tuple(items),
+            attempted_count=len(items),
+            succeeded_count=succeeded_count,
+            enriched_count=enriched_count,
+            unchanged_count=len(items) - enriched_count,
+            blocked_count=blocked_count,
+            failed_count=failed_count,
+            warnings=_dedupe_warnings((*item_warnings, *warnings)),
+        ),
+        tuple(warnings),
+    )
 
 
 def _run_full_page(
@@ -441,6 +537,47 @@ def _first_int(values: Iterable[int | None]) -> int | None:
         if value is not None:
             return value
     return None
+
+
+def _deadline(started_at: float, budget_seconds: float | None) -> float | None:
+    if budget_seconds is None:
+        return None
+    if budget_seconds <= 0:
+        return started_at
+    return started_at + budget_seconds
+
+
+def _deadline_exhausted(deadline: float | None) -> bool:
+    return deadline is not None and time.monotonic() >= deadline
+
+
+def _extend_warnings(warnings: list[str], new_warnings: Iterable[str]) -> None:
+    for warning in new_warnings:
+        _append_warning(warnings, warning)
+
+
+def _append_warning(warnings: list[str], warning: str) -> None:
+    if warning and warning not in warnings:
+        warnings.append(warning)
+
+
+def _enrichment_warning_events(enrichment_result: DetailPropertyTypeEnrichmentResult) -> tuple[str, ...]:
+    budget_warnings = {
+        "full_audit_runtime_budget_exhausted",
+        "full_audit_detail_runtime_budget_exhausted",
+    }
+    item_warnings = tuple(
+        warning
+        for item in enrichment_result.items
+        for warning in item.warnings
+    )
+    item_warning_types = set(item_warnings)
+    result_only_warnings = tuple(
+        warning
+        for warning in enrichment_result.warnings
+        if warning not in item_warning_types and warning not in budget_warnings
+    )
+    return (*item_warnings, *result_only_warnings)
 
 
 def _parser_status_counts(qa_result: ParserFamilyQAResult) -> tuple[tuple[str, int], ...]:

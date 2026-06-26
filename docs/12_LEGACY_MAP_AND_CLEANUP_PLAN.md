@@ -278,6 +278,12 @@ how many KIN pages to attempt within those limits. This phase does not implement
 eligibility, persist live HTML or JSON, touch matching, n8n, dashboard, `data/raw`, Funda, or Pararius. Its purpose is
 to decide whether KIN is sufficiently validated before moving to a later OGonline Coverage Audit.
 
+Runtime hardening keeps the full audit useful when detail enrichment is slow. The audit can accept a whole-run budget
+and a detail-enrichment budget; when either budget is exhausted, it stops cleanly and returns partial metrics instead
+of relying on an external timeout. These partial results preserve completed API, parser, QA, enrichment, eligibility,
+and snapshot counts. The full audit remains diagnostic and bounded, and KIN should be run with an explicit runtime
+budget before it is considered as any later gate.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted

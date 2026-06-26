@@ -232,6 +232,11 @@ within that cap. It does not implement new mappings, change parser or eligibilit
 touch matching, n8n, dashboard, Funda, Pararius, or `data/raw`, or run a generic crawler. Its output is intended to
 decide whether KIN is sufficiently validated before a later OGonline Coverage Audit.
 
+The full audit can also run with explicit runtime budgets for the whole audit and for detail enrichment. If a budget is
+exhausted, it returns a partial result with the parser, QA, enrichment, eligibility, and snapshot counts completed so
+far, plus stable budget warnings. For KIN full validation, use a runtime budget before treating this as any operational
+gate; the audit remains diagnostic and bounded, not an operational crawler.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`

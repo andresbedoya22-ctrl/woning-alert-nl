@@ -347,6 +347,93 @@ def test_warning_counts_aggregate_expected_warnings(monkeypatch) -> None:
     assert ("fetch_exception", 1) in result.warning_counts
 
 
+def test_max_detail_runtime_seconds_returns_partial_detail_result(monkeypatch) -> None:
+    monkeypatch.setattr(robots_gate, "can_fetch", lambda domain, path: True)
+    tick = {"value": 0.0}
+
+    def monotonic() -> float:
+        value = tick["value"]
+        tick["value"] += 1.0
+        return value
+
+    monkeypatch.setattr(full_audit.time, "monotonic", monotonic)
+    fetched_details: list[str] = []
+
+    result = full_audit.run_kin_ogonline_full_validation_audit_config(
+        _config(),
+        fetch_json=lambda url: _api_payload(_minimal_doc(1), _minimal_doc(2), _minimal_doc(3), total_pages=1),
+        fetch_html=lambda url: fetched_details.append(url) or _detail_html("Tussenwoning"),
+        max_detail_runtime_seconds=3.0,
+    )
+
+    assert 0 < len(fetched_details) < 3
+    assert result.detail_enrichment_attempted_count == len(fetched_details)
+    assert result.detail_enriched_count == len(fetched_details)
+    assert result.qa_clean_count == 3
+    assert result.parser_listing_count == 3
+    assert result.snapshot_listing_count == result.active_inventory_count
+    assert "full_audit_detail_runtime_budget_exhausted" in result.warnings
+    assert ("full_audit_detail_runtime_budget_exhausted", 1) in result.warning_counts
+
+
+def test_max_runtime_seconds_returns_partial_audit_result(monkeypatch) -> None:
+    monkeypatch.setattr(robots_gate, "can_fetch", lambda domain, path: True)
+    tick = {"value": 0.0}
+
+    def monotonic() -> float:
+        value = tick["value"]
+        tick["value"] += 1.0
+        return value
+
+    monkeypatch.setattr(full_audit.time, "monotonic", monotonic)
+    fetched_pages: list[int] = []
+
+    def fetch_json(api_url: str) -> str:
+        page = _page_number(api_url)
+        fetched_pages.append(page)
+        return _api_payload(_minimal_doc(page), total_pages=3, total_docs=3, has_next=page < 3)
+
+    result = full_audit.run_kin_ogonline_full_validation_audit_config(
+        _config(),
+        fetch_json=fetch_json,
+        fetch_html=lambda url: _detail_html("Tussenwoning"),
+        max_runtime_seconds=2.0,
+    )
+
+    assert fetched_pages == [1]
+    assert result.pages_attempted == 1
+    assert result.pages_succeeded == 1
+    assert result.parser_listing_count == 1
+    assert result.qa_clean_count == 1
+    assert result.detail_enrichment_attempted_count == 0
+    assert result.snapshot_listing_count == result.active_inventory_count
+    assert "full_audit_runtime_budget_exhausted" in result.warnings
+    assert ("full_audit_runtime_budget_exhausted", 1) in result.warning_counts
+
+
+def test_max_detail_runtime_seconds_does_not_affect_api_phase(monkeypatch) -> None:
+    monkeypatch.setattr(robots_gate, "can_fetch", lambda domain, path: True)
+    fetched_pages: list[int] = []
+
+    def fetch_json(api_url: str) -> str:
+        page = _page_number(api_url)
+        fetched_pages.append(page)
+        return _api_payload(_minimal_doc(page), total_pages=3, total_docs=3, has_next=page < 3)
+
+    result = full_audit.run_kin_ogonline_full_validation_audit_config(
+        _config(),
+        fetch_json=fetch_json,
+        fetch_html=lambda url: _detail_html("Appartement"),
+        max_detail_runtime_seconds=0.0,
+    )
+
+    assert fetched_pages == [1, 2, 3]
+    assert result.pages_attempted == 3
+    assert result.pages_succeeded == 3
+    assert result.detail_enrichment_attempted_count == 0
+    assert "full_audit_detail_runtime_budget_exhausted" in result.warnings
+
+
 def test_no_real_network_in_tests(monkeypatch) -> None:
     monkeypatch.setattr(robots_gate, "can_fetch", lambda domain, path: True)
     fetched_urls: list[str] = []
