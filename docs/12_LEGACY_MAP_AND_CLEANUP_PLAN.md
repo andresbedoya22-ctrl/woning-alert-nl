@@ -310,6 +310,23 @@ raw web JSON persistence, image downloads, long-description storage, LLM summari
 parser changes, eligibility changes, Funda, Pararius, or `data/raw` changes. Cache files are generated/local artifacts
 only and are written only when a caller provides an explicit cache path.
 
+## OGonline Normalized Facts Extractor v1
+
+`scraper/src/domek_wonen/facts/ogonline_extractor.py` converts permitted OGonline detail HTML held in memory into
+`PropertyFactsRecord` values using the existing facts contract and JSONL cache. The pure extractor handles normalized
+signals for property type, asking price, areas, room counts, energy label, ownership, VvE, heating, outdoor space,
+parking, availability, Open huis/event, and description length bucket without copying long descriptions.
+
+The controlled KIN batch path uses the OGonline listing API, parser-family QA-clean listings, `robots_gate.can_fetch`
+before API/detail fetches, and `PropertyFactsCache` for explicit-path cache hit, stale, and `force_refresh` behavior.
+It remains sequential and bounded by API page, detail, and runtime caps. This phase does not persist raw HTML or raw web
+JSON, download images, call an LLM, change the base `ogonline_xhr` parser, relax QA, change eligibility, touch matching,
+n8n, dashboard, Funda, Pararius, or `data/raw`. It prepares a later `Client-ready Property Summary v1`.
+
+Quality hardening remains inside the facts layer: normalized-equivalent candidates dedupe without conflict, high-priority
+structured facts can beat weak HTML candidates, real conflicts require two strong normalized sources, and ambiguous or
+implausible count candidates stay review-only. This does not promote the facts layer to client-ready summaries.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted

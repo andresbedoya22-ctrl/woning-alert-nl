@@ -10,6 +10,13 @@ from .models import (
     record_from_dict,
     record_to_dict,
 )
+from .ogonline_extractor import (
+    OGonlineFactsBatchResult,
+    OGonlineFactsExtractionResult,
+    extract_ogonline_property_facts_from_html,
+    run_kin_ogonline_normalized_facts_extraction_batch,
+    run_kin_ogonline_normalized_facts_extraction_batch_config,
+)
 from .normalization import (
     normalize_area_m2,
     normalize_boolean_signal,
@@ -29,8 +36,11 @@ __all__ = [
     "PropertyFactValue",
     "PropertyFactsCache",
     "PropertyFactsRecord",
+    "OGonlineFactsBatchResult",
+    "OGonlineFactsExtractionResult",
     "build_property_fact_value",
     "build_property_facts_record",
+    "extract_ogonline_property_facts_from_html",
     "normalize_area_m2",
     "normalize_boolean_signal",
     "normalize_count",
@@ -44,4 +54,6 @@ __all__ = [
     "property_facts_record_from_probe_sample",
     "record_from_dict",
     "record_to_dict",
+    "run_kin_ogonline_normalized_facts_extraction_batch",
+    "run_kin_ogonline_normalized_facts_extraction_batch_config",
 ]

@@ -82,17 +82,21 @@ PROPERTY_FACT_FIELDS = (
 _PROPERTY_FACT_FIELD_SET = frozenset(PROPERTY_FACT_FIELDS)
 _STRUCTURED_SOURCES = frozenset({"metadata", "json_ld", "embedded_state"})
 _SOURCE_PRIORITY = {
+    "json_ld": 4,
+    "embedded_state": 4,
     "metadata": 3,
-    "json_ld": 3,
-    "embedded_state": 2,
+    "listing_fallback": 3,
     "html_text_signal": 1,
 }
 _SOURCE_CONFIDENCE = {
     "metadata": 1.0,
     "json_ld": 1.0,
     "embedded_state": 0.8,
+    "listing_fallback": 0.8,
     "html_text_signal": 0.6,
 }
+_HIGH_CONFIDENCE_SOURCES = frozenset({"json_ld", "embedded_state", "metadata", "listing_fallback"})
+_NON_CONFLICT_FIELDS = frozenset({"description_length_bucket"})
 _PROBE_FIELD_ALIASES = {
     "possible_key_selling_points_source": "key_selling_points_candidate",
     "possible_attention_points_source": "attention_points_candidate",
@@ -358,10 +362,10 @@ def _dedupe_facts(facts: tuple[PropertyFactValue, ...]) -> tuple[tuple[PropertyF
             fact
             for fact in candidates
             if fact is not choice
-            and fact.normalized_value != choice.normalized_value
-            and abs(fact.confidence - choice.confidence) <= 0.1
+            and _is_material_conflict(choice, fact)
         ]
         if conflicts:
+            conflict_warnings = tuple(warning for fact in (choice, *conflicts) for warning in fact.warnings)
             choice = PropertyFactValue(
                 field=choice.field,
                 value=choice.value,
@@ -371,7 +375,7 @@ def _dedupe_facts(facts: tuple[PropertyFactValue, ...]) -> tuple[tuple[PropertyF
                 confidence=choice.confidence,
                 status=FACT_STATUS_REVIEW,
                 evidence_preview=choice.evidence_preview,
-                warnings=(*choice.warnings, "conflicting_fact_values"),
+                warnings=(*conflict_warnings, "conflicting_fact_values"),
             )
             warnings.append("conflicting_fact_values")
         selected.append(choice)
@@ -381,6 +385,20 @@ def _dedupe_facts(facts: tuple[PropertyFactValue, ...]) -> tuple[tuple[PropertyF
 def _fact_rank(fact: PropertyFactValue) -> tuple[float, int, int]:
     status_rank = 1 if fact.status == FACT_STATUS_USABLE else 0
     return (fact.confidence, status_rank, _SOURCE_PRIORITY.get(fact.source, 0))
+
+
+def _is_material_conflict(left: PropertyFactValue, right: PropertyFactValue) -> bool:
+    return (
+        left.field not in _NON_CONFLICT_FIELDS
+        and left.normalized_value is not None
+        and right.normalized_value is not None
+        and left.normalized_value != right.normalized_value
+        and left.source != right.source
+        and left.source in _HIGH_CONFIDENCE_SOURCES
+        and right.source in _HIGH_CONFIDENCE_SOURCES
+        and left.confidence >= 0.75
+        and right.confidence >= 0.75
+    )
 
 
 def _normalize_field_value(field: str, value: object) -> str | int | float | bool | None:
