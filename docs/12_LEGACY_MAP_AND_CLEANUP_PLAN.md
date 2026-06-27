@@ -352,6 +352,23 @@ Funda or Pararius, modify the base `ogonline_xhr` parser, or change inventory el
 separate because future client matching depends on explicit address, postcode, and city quality before sending rows
 downstream.
 
+## KIN Full Coverage Completion + Field Gap Audit v1
+
+`scraper/src/domek_wonen/pilots/kin_full_coverage_audit.py` adds the next KIN audit layer without creating Excel. It
+wraps the full property readiness runner, requires an explicit generated/local facts cache path, preserves partial
+runtime-budget behavior, and supports progressive reruns by counting cached records while continuing toward uncached
+QA-clean listings.
+
+The result reports coverage rate as `rows_built / qa_clean_count`, completed versus partial state, cache and detail
+fetch counters, location completeness, export readiness, quality status buckets, field completion counts, missing key
+fields, attention points, warning counts, field gaps, top blockers, and compact problem-row samples. Field gaps cover
+key property facts and location fields before the later Excel phase; missing latitude/longitude remains visible as a
+known gap but does not override usable address/postcode/city readiness.
+
+This audit does not send email, run matching, touch n8n, build a dashboard, modify `data/raw`, persist raw HTML or raw
+web JSON, call an LLM, download images, scrape Funda or Pararius, change the base OGonline parser, or change inventory
+eligibility.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted

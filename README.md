@@ -303,6 +303,20 @@ scrape Funda or Pararius, call an LLM, persist raw HTML or raw web JSON, downloa
 parser, or change inventory eligibility. Location is explicit because future client matching needs at least a usable or
 reviewable address/city/postcode signal before a row can be exported safely.
 
+## KIN Full Coverage Completion + Field Gap Audit v1
+
+`scraper/src/domek_wonen/pilots/kin_full_coverage_audit.py` adds a completion/audit layer on top of the KIN full
+property readiness runner. It requires an explicit facts `cache_path`, reuses cache hits between bounded runs, and
+raises the effective detail limit enough that cached rows do not prevent later uncached QA-clean listings from being
+attempted. The audit reports total QA-clean coverage, partial/completed state, cache and detail-fetch counters, export
+readiness counts, quality status counts, field gaps, top blockers, and compact problem-row samples.
+
+The audit computes gaps before any Excel phase. It checks usable, review, and missing counts for key property facts
+plus location fields, including latitude and longitude as known completeness gaps rather than hard blockers when
+address, postcode, and city are usable. It does not create Excel, send email, run matching, touch n8n, build a
+dashboard, persist raw HTML or raw web JSON, call an LLM, download images, scrape Funda or Pararius, modify
+`data/raw`, change the base OGonline parser, or change inventory eligibility.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
