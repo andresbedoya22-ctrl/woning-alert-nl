@@ -284,6 +284,20 @@ of relying on an external timeout. These partial results preserve completed API,
 and snapshot counts. The full audit remains diagnostic and bounded, and KIN should be run with an explicit runtime
 budget before it is considered as any later gate.
 
+## OGonline Detail Facts Probe v1
+
+`scraper/src/domek_wonen/pilots/ogonline_detail_facts_probe.py` adds a bounded diagnostic probe for OGonline/KIN detail
+pages. It records which property-fact sources appear to be available, including property type, price, areas, rooms,
+energy label, ownership, VvE, heating, outdoor space, parking, availability, Open huis/event hints, and whether a short
+description source exists.
+
+This layer is not an extractor, cache, matching input, dashboard feed, or n8n job. It checks `robots_gate.can_fetch`
+before each API and detail fetch, uses the existing controlled fetch helpers, caps samples, keeps HTML/JSON only in
+memory, and reports compact field previews rather than raw documents. Long descriptions are not copied; the probe only
+records availability, a length bucket, and at most a 120-character preview. Its purpose is to inform later
+`OGonline Detail Facts Cache v1` and `Property Facts Extractor v1` design without changing the base OGonline parser or
+eligibility behavior.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted

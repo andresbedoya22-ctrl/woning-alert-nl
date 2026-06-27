@@ -33,6 +33,13 @@ from .ogonline_detail_property_type_enrichment import (
     enrich_listings_with_detail_property_type,
     map_ogonline_detail_property_type,
 )
+from .ogonline_detail_facts_probe import (
+    OGonlineDetailFactsProbeResult,
+    OGonlineDetailFactsProbeSample,
+    run_kin_ogonline_detail_facts_probe,
+    run_kin_ogonline_detail_facts_probe_config,
+    run_ogonline_detail_facts_probe,
+)
 from .ogonline_xhr_paginated_runner import (
     PaginatedPageResult,
     PaginatedRunResult,
@@ -68,6 +75,8 @@ __all__ = [
     "DetailPropertyTypeEnrichmentResult",
     "KINOGonlineValidationAuditResult",
     "KINOGonlineFullValidationAuditResult",
+    "OGonlineDetailFactsProbeResult",
+    "OGonlineDetailFactsProbeSample",
     "ActiveInventoryPilotResult",
     "PaginatedPageResult",
     "PaginatedRunResult",
@@ -89,7 +98,10 @@ __all__ = [
     "run_kin_ogonline_5_page_validation_audit",
     "run_kin_ogonline_full_validation_audit",
     "run_kin_ogonline_full_validation_audit_config",
+    "run_kin_ogonline_detail_facts_probe",
+    "run_kin_ogonline_detail_facts_probe_config",
     "run_kin_ogonline_validation_audit_config",
+    "run_ogonline_detail_facts_probe",
     "run_selected_realworks_live_pilot",
     "select_realworks_pilot_sources_from_report",
 ]
