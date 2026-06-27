@@ -229,9 +229,71 @@ def test_structured_source_wins_over_html_text_signal() -> None:
     assert _facts(_extract(html))["asking_price"].normalized_value == 425000
 
 
-def test_conflict_generates_review_warning() -> None:
+def test_equivalent_normalized_values_do_not_create_conflict() -> None:
     html = """
     <script>{"askingPrice": 425000}</script>
+    <p>Vraagprijs EUR 425.000 k.k.</p>
+    """
+    result = _extract(html)
+
+    assert _facts(result)["asking_price"].status == "usable"
+    assert "conflicting_fact_values" not in result.record.warnings
+
+
+def test_structured_source_beats_weak_html_signal_without_review() -> None:
+    html = """
+    <script>{"bedrooms": 3}</script>
+    <p>Ruime woning in postcode 4811 met vraagprijs 425000 en bouwjaar 1998.</p>
+    <p>3 slaapkamers volgens de kenmerken.</p>
+    """
+    result = _extract(html)
+    fact = _facts(result)["bedrooms"]
+
+    assert fact.normalized_value == 3
+    assert fact.status == "usable"
+    assert "ambiguous_fact_candidate" not in result.warnings
+
+
+def test_real_high_confidence_mismatch_creates_conflict() -> None:
+    html = """
+    <script type="application/ld+json">{"offers":{"price":425000}}</script>
+    <script>{"askingPrice":430000}</script>
+    """
+    result = _extract(html)
+
+    assert _facts(result)["asking_price"].status == "review"
+    assert "conflicting_fact_values" in result.record.warnings
+
+
+def test_energy_label_duplicate_equivalent_stays_usable() -> None:
+    html = """
+    <script>{"energyLabel":"A++"}</script>
+    <p>Energielabel A++</p>
+    """
+    result = _extract(html)
+    fact = _facts(result)["energy_label"]
+
+    assert fact.normalized_value == "A++"
+    assert fact.status == "usable"
+    assert "conflicting_fact_values" not in result.record.warnings
+
+
+def test_asking_price_equivalent_raw_formats_stay_usable() -> None:
+    html = """
+    <script>{"askingPrice":"425000"}</script>
+    <p>Koopprijs EUR 425.000 k.k.</p>
+    """
+    result = _extract(html)
+    fact = _facts(result)["asking_price"]
+
+    assert fact.normalized_value == 425000
+    assert fact.status == "usable"
+    assert "conflicting_fact_values" not in result.record.warnings
+
+
+def test_conflict_generates_review_warning() -> None:
+    html = """
+    <script type="application/ld+json">{"offers":{"price":425000}}</script>
     <script>{"price":{"amount":430000}}</script>
     """
     result = _extract(html)
@@ -246,9 +308,79 @@ def test_does_not_store_long_description_only_bucket() -> None:
     serialized = json.dumps(record_to_dict(result.record)).casefold()
 
     assert facts["description_length_bucket"].normalized_value == "long"
+    assert facts["description_length_bucket"].status == "usable"
     assert "short_description_summary_candidate" not in facts
     assert "ruime woning met licht en tuin" not in serialized
     assert "description_not_stored" in result.warnings
+
+
+def test_clear_description_length_bucket_is_usable() -> None:
+    result = _extract("<meta name='description' content='Omschrijving korte woningtekst.'>")
+    fact = _facts(result)["description_length_bucket"]
+
+    assert fact.normalized_value == "short"
+    assert fact.status == "usable"
+
+
+def test_description_not_stored_remains_warning_without_long_text() -> None:
+    result = _extract()
+    serialized = json.dumps(record_to_dict(result.record)).casefold()
+
+    assert "description_not_stored" in result.warnings
+    assert "ruime woning met licht en tuin" not in serialized
+
+
+def test_bedrooms_from_structured_key_is_usable() -> None:
+    result = _extract("<script>{\"bedrooms\": 4}</script>")
+    fact = _facts(result)["bedrooms"]
+
+    assert fact.normalized_value == 4
+    assert fact.status == "usable"
+
+
+def test_bedrooms_from_unrelated_broad_text_number_is_ignored() -> None:
+    html = "<p>Postcode 4811, vraagprijs 425000, bouwjaar 1998, servicekosten 125.</p>"
+    result = _extract(html)
+
+    assert "bedrooms" not in _facts(result)
+
+
+def test_implausible_bedrooms_from_html_text_signal_is_ignored() -> None:
+    result = _extract("<p>21 slaapkamers nabij vraagprijs 425000.</p>")
+
+    assert "bedrooms" not in _facts(result)
+    assert "implausible_count" not in result.warnings
+
+
+def test_implausible_bedrooms_count_becomes_review() -> None:
+    result = _extract("<script>{\"bedrooms\": 16}</script>")
+    fact = _facts(result)["bedrooms"]
+
+    assert fact.status == "review"
+    assert "implausible_count" in fact.warnings
+
+
+def test_ambiguous_candidate_is_not_propagated_if_final_fact_is_usable() -> None:
+    html = """
+    <script>{"energyLabel":"A++"}</script>
+    <p>Energielabel A</p>
+    """
+    result = _extract(html)
+
+    assert _facts(result)["energy_label"].status == "usable"
+    assert "ambiguous_fact_candidate" not in result.warnings
+
+
+def test_ambiguous_candidate_remains_if_final_field_is_review() -> None:
+    html = """
+    <script>{"bathrooms": 11}</script>
+    <script>{"bathrooms": 12}</script>
+    """
+    result = _extract(html)
+    fact = _facts(result)["bathrooms"]
+
+    assert fact.status == "review"
+    assert "ambiguous_fact_candidate" in result.warnings
 
 
 def test_evidence_previews_are_capped_at_contract_limit() -> None:

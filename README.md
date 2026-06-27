@@ -275,6 +275,11 @@ extractor does not persist raw HTML, raw web JSON, images, or long descriptions,
 not touch matching, n8n, dashboard, Funda, Pararius, the base OGonline parser, eligibility, or `data/raw`. This prepares
 a later `Client-ready Property Summary v1` without implementing that summary yet.
 
+Quality hardening keeps the extractor conservative: equivalent normalized values no longer create false conflicts,
+structured sources outrank weak text signals, count fields reject implausible values, and ambiguous candidates are
+reported only when the final field remains in review. Live warnings still need to be reviewed before using these facts
+for client-ready summaries.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`

@@ -103,6 +103,7 @@ _SOURCE_CONFIDENCE = {
     "listing_fallback": 0.85,
     "html_text_signal": 0.65,
 }
+_AMBIGUOUS_FACT_WARNING = "ambiguous_fact_candidate"
 
 
 @dataclass(frozen=True, slots=True)
@@ -365,8 +366,9 @@ def _fact_from_candidate(
 ) -> PropertyFactValue | None:
     normalized = _normalize(field, value)
     confidence = _SOURCE_CONFIDENCE.get(source, 0.40)
-    status = FACT_STATUS_USABLE if normalized is not None and confidence >= 0.65 and not warning else FACT_STATUS_REVIEW
-    fact_warnings = (warning,) if warning else ()
+    warning_forces_review = bool(warning and warning != _AMBIGUOUS_FACT_WARNING)
+    status = FACT_STATUS_USABLE if normalized is not None and confidence >= 0.65 and not warning_forces_review else FACT_STATUS_REVIEW
+    fact_warnings = (warning,) if warning and warning != _AMBIGUOUS_FACT_WARNING else ()
     if normalized is None:
         if field in {"erfpacht_details", "heating_type", "outdoor_space", "garden", "balcony", "storage", "garage", "parking", "availability_date", "open_huis_badge_or_event"}:
             normalized = str(value)
@@ -374,8 +376,12 @@ def _fact_from_candidate(
             status = FACT_STATUS_REVIEW
             fact_warnings = _dedupe((*fact_warnings, "normalization_failed"))
     if _is_implausible_count(field, normalized):
+        if source == "html_text_signal":
+            return None
         status = FACT_STATUS_REVIEW
         fact_warnings = _dedupe((*fact_warnings, "implausible_count"))
+    if warning == _AMBIGUOUS_FACT_WARNING and status == FACT_STATUS_REVIEW:
+        fact_warnings = _dedupe((*fact_warnings, warning))
     return build_property_fact_value(
         field=field,
         value=value if isinstance(value, (str, int, float, bool)) else str(value),
@@ -400,11 +406,11 @@ def _is_implausible_count(field: str, value: object) -> bool:
     if not isinstance(value, int):
         return False
     if field == "bedrooms":
-        return value < 0 or value > 10
+        return value < 0 or value > 15
     if field == "bathrooms":
-        return value < 0 or value > 8
+        return value < 0 or value > 10
     if field == "rooms":
-        return value < 0 or value > 30
+        return value < 1 or value > 30
     return False
 
 
