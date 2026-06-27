@@ -339,6 +339,19 @@ requests, run live fetch, write cache files, call an LLM, store raw HTML or raw 
 download images, modify matching, email, n8n, dashboard, Funda, Pararius, `data/raw`, the base OGonline parser, or
 inventory eligibility.
 
+## KIN Full Facts + Location Readiness v1
+
+`scraper/src/domek_wonen/pilots/kin_full_property_readiness.py` adds the KIN-specific full-source readiness layer for
+the OGonline laboratory. It reuses the listing API, parser-family runner, parser QA gate, normalized facts extractor,
+explicit facts cache, and client-ready summary builder, then adds location readiness so each in-memory row can later be
+written to Excel without inventing missing location fields.
+
+This remains a pilot/audit layer, not an operational app surface. It does not create Excel, send email, run matching,
+touch n8n, build a dashboard, persist raw HTML or raw web JSON, call an LLM, download images, touch `data/raw`, scrape
+Funda or Pararius, modify the base `ogonline_xhr` parser, or change inventory eligibility. Location readiness is kept
+separate because future client matching depends on explicit address, postcode, and city quality before sending rows
+downstream.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted

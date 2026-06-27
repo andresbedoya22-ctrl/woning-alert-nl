@@ -291,6 +291,18 @@ and missing key fields are reported explicitly instead of being invented. This l
 fetches, write cache files, store raw HTML or raw web JSON, copy long descriptions, download images, touch matching,
 n8n, dashboard, Funda, Pararius, `data/raw`, the base OGonline parser, or inventory eligibility.
 
+## KIN Full Facts + Location Readiness v1
+
+`scraper/src/domek_wonen/pilots/kin_full_property_readiness.py` adds a controlled full-source readiness runner for KIN
+as the OGonline laboratory. It combines KIN listing API capture, parser QA-clean listings, normalized detail facts, the
+facts cache, `ClientReadyPropertySummary`, and location readiness into in-memory rows that are ready for a later Excel
+export phase.
+
+This phase does not create Excel files, send email, run matching, touch n8n, build a dashboard, modify `data/raw`,
+scrape Funda or Pararius, call an LLM, persist raw HTML or raw web JSON, download images, change the base OGonline
+parser, or change inventory eligibility. Location is explicit because future client matching needs at least a usable or
+reviewable address/city/postcode signal before a row can be exported safely.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
