@@ -37,6 +37,13 @@ from .kin_full_property_readiness import (
     run_kin_full_property_readiness,
     run_kin_full_property_readiness_config,
 )
+from .kin_full_coverage_audit import (
+    KINCoverageCompletionResult,
+    KINFieldGap,
+    KINProblemRow,
+    build_kin_full_coverage_completion_result,
+    run_kin_full_coverage_completion_audit,
+)
 from .ogonline_detail_property_type_enrichment import (
     DetailPropertyTypeEnrichmentItem,
     DetailPropertyTypeEnrichmentResult,
@@ -86,7 +93,10 @@ __all__ = [
     "KINOGonlineValidationAuditResult",
     "KINOGonlineFullValidationAuditResult",
     "KINFullPropertyReadinessResult",
+    "KINCoverageCompletionResult",
+    "KINFieldGap",
     "KINPropertyReadinessRow",
+    "KINProblemRow",
     "OGonlineDetailFactsProbeResult",
     "OGonlineDetailFactsProbeSample",
     "PropertyLocationReadiness",
@@ -115,7 +125,9 @@ __all__ = [
     "run_kin_ogonline_full_validation_audit",
     "run_kin_ogonline_full_validation_audit_config",
     "run_kin_full_property_readiness",
+    "run_kin_full_coverage_completion_audit",
     "run_kin_full_property_readiness_config",
+    "build_kin_full_coverage_completion_result",
     "run_kin_ogonline_detail_facts_probe",
     "run_kin_ogonline_detail_facts_probe_config",
     "run_kin_ogonline_validation_audit_config",

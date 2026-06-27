@@ -132,6 +132,7 @@ class KINFullPropertyReadinessResult:
     attention_point_counts: tuple[tuple[str, int], ...]
     warning_counts: tuple[tuple[str, int], ...]
     sample_rows: tuple[KINPropertyReadinessRow, ...]
+    rows: tuple[KINPropertyReadinessRow, ...] = ()
     warnings: tuple[str, ...] = ()
 
 
@@ -546,6 +547,7 @@ def _result_from_rows(
         attention_point_counts=_counter_pairs(point for row in rows for point in row.attention_points),
         warning_counts=_counter_pairs(all_warnings),
         sample_rows=tuple(rows[:MAX_SAMPLE_ROWS]),
+        rows=rows,
         warnings=all_warnings,
     )
 
