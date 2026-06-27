@@ -29,15 +29,25 @@ from .normalization import (
     normalize_property_type,
     normalize_vve_monthly_cost,
 )
+from .summary import (
+    SUMMARY_SCHEMA_VERSION,
+    ClientReadyPropertySummary,
+    build_client_ready_property_summary,
+    summary_from_dict,
+    summary_to_dict,
+)
 
 __all__ = [
     "FACT_SCHEMA_VERSION",
     "PROPERTY_FACT_FIELDS",
+    "SUMMARY_SCHEMA_VERSION",
+    "ClientReadyPropertySummary",
     "PropertyFactValue",
     "PropertyFactsCache",
     "PropertyFactsRecord",
     "OGonlineFactsBatchResult",
     "OGonlineFactsExtractionResult",
+    "build_client_ready_property_summary",
     "build_property_fact_value",
     "build_property_facts_record",
     "extract_ogonline_property_facts_from_html",
@@ -56,4 +66,6 @@ __all__ = [
     "record_to_dict",
     "run_kin_ogonline_normalized_facts_extraction_batch",
     "run_kin_ogonline_normalized_facts_extraction_batch_config",
+    "summary_from_dict",
+    "summary_to_dict",
 ]
