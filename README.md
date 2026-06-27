@@ -249,6 +249,18 @@ copy long descriptions, download images, modify the base `ogonline_xhr` parser, 
 dashboard, Funda, Pararius, or `data/raw`. Description handling is limited to source availability, a length bucket,
 and an optional preview capped at 120 characters.
 
+## OGonline Property Facts Contract + Cache v1
+
+`scraper/src/domek_wonen/facts/` defines the offline, normalized property-facts contract that a later
+`OGonline Normalized Facts Extractor v1` can populate. The contract stores allowlisted fact fields with normalized
+values, confidence, status, source, compact evidence previews, schema version, source identity, canonical URL,
+fetch timestamps, expiry, and stable warnings.
+
+This is not a live extractor and does not make HTTP requests, run Playwright or Selenium, use proxies, call an LLM,
+modify matching, n8n, dashboard, the base OGonline parser, eligibility, Funda, Pararius, or `data/raw`. The cache is
+a local/generated JSONL artifact that writes only when callers pass an explicit path. It stores normalized facts and
+minimum evidence previews only; it must not store raw HTML, raw web JSON, images, or long descriptions.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
