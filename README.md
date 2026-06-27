@@ -261,6 +261,20 @@ modify matching, n8n, dashboard, the base OGonline parser, eligibility, Funda, P
 a local/generated JSONL artifact that writes only when callers pass an explicit path. It stores normalized facts and
 minimum evidence previews only; it must not store raw HTML, raw web JSON, images, or long descriptions.
 
+## OGonline Normalized Facts Extractor v1
+
+`scraper/src/domek_wonen/facts/ogonline_extractor.py` adds the controlled extractor for permitted OGonline detail
+pages. It converts in-memory detail HTML plus listing metadata into the existing `PropertyFactsRecord` contract,
+normalizing property type, price, areas, rooms, bedrooms, bathrooms, energy label, ownership, VvE, heating, outdoor,
+parking, availability, Open huis/event, and description length bucket signals.
+
+The extractor uses `PropertyFactsCache` only when callers pass an explicit cache path. Fresh cache hits skip repeated
+detail fetches; stale records or `force_refresh=True` cause a new permitted detail fetch. Cache files remain
+local/generated artifacts and store only normalized facts, compact evidence previews, timestamps, and warnings. The
+extractor does not persist raw HTML, raw web JSON, images, or long descriptions, does not create LLM summaries, and does
+not touch matching, n8n, dashboard, Funda, Pararius, the base OGonline parser, eligibility, or `data/raw`. This prepares
+a later `Client-ready Property Summary v1` without implementing that summary yet.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
