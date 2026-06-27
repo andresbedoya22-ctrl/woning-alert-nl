@@ -38,6 +38,9 @@ _FIELD_GAP_FIELDS = (
 )
 _LOCATION_GAP_FIELDS = ("postcode", "city", "address_raw", "latitude", "longitude")
 _PROBLEM_ROW_LIMIT = 10
+_KEY_MATCHING_FIELDS = ("bedrooms", "living_area_m2", "property_type", "energy_label")
+_KEY_MATCHING_DIAGNOSTIC_LIMIT = 10
+_EVIDENCE_PREVIEW_LIMIT = 120
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +67,20 @@ class KINProblemRow:
     missing_key_fields: tuple[str, ...]
     attention_points: tuple[str, ...]
     warnings: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class KINKeyMatchingFieldGapSummary:
+    canonical_url: str
+    address_raw: str | None
+    city: str | None
+    missing_key_fields: tuple[str, ...]
+    attention_points: tuple[str, ...]
+    warnings: tuple[str, ...]
+    available_fact_fields: tuple[str, ...]
+    review_fact_fields: tuple[str, ...]
+    evidence_preview: tuple[tuple[str, str], ...]
+    source_labels: tuple[tuple[str, str], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,6 +209,32 @@ def build_kin_full_coverage_completion_result(
     )
 
 
+def summarize_key_matching_field_gaps(
+    rows: Iterable[KINPropertyReadinessRow],
+    *,
+    limit: int = _KEY_MATCHING_DIAGNOSTIC_LIMIT,
+) -> tuple[KINKeyMatchingFieldGapSummary, ...]:
+    summaries: list[KINKeyMatchingFieldGapSummary] = []
+    for row in rows:
+        missing = tuple(field for field in row.missing_key_fields if field in _KEY_MATCHING_FIELDS)
+        review_fields = tuple(
+            fact.field
+            for fact in row.facts_record.facts
+            if fact.field in _KEY_MATCHING_FIELDS and fact.status == "review"
+        )
+        conflict_points = tuple(
+            point
+            for point in row.attention_points
+            if any(field in point for field in ("property_type", "energy_label"))
+        )
+        if not missing and not review_fields and not conflict_points:
+            continue
+        summaries.append(_key_matching_gap_summary(row, missing))
+        if len(summaries) >= max(0, limit):
+            break
+    return tuple(summaries)
+
+
 def _effective_resume_detail_limit(*, cache_path: Path, max_details: int, force_refresh: bool) -> int:
     if max_details <= 0:
         return 0
@@ -300,6 +343,39 @@ def _problem_snapshot(row: KINPropertyReadinessRow) -> KINProblemRow:
         attention_points=row.attention_points,
         warnings=row.warnings,
     )
+
+
+def _key_matching_gap_summary(
+    row: KINPropertyReadinessRow,
+    missing: tuple[str, ...],
+) -> KINKeyMatchingFieldGapSummary:
+    key_facts = tuple(fact for fact in row.facts_record.facts if fact.field in _KEY_MATCHING_FIELDS)
+    return KINKeyMatchingFieldGapSummary(
+        canonical_url=row.canonical_url,
+        address_raw=row.address_raw,
+        city=row.city,
+        missing_key_fields=missing,
+        attention_points=tuple(point for point in row.attention_points if any(field in point for field in _KEY_MATCHING_FIELDS)),
+        warnings=row.warnings,
+        available_fact_fields=tuple(fact.field for fact in key_facts if fact.status == "usable"),
+        review_fact_fields=tuple(fact.field for fact in key_facts if fact.status == "review"),
+        evidence_preview=tuple(
+            (fact.field, _safe_preview(fact.evidence_preview))
+            for fact in key_facts
+            if fact.evidence_preview
+        ),
+        source_labels=tuple((fact.field, fact.source) for fact in key_facts if fact.source),
+    )
+
+
+def _safe_preview(value: object) -> str:
+    text = " ".join(str(value or "").split())
+    lowered = text.casefold()
+    if any(marker in lowered for marker in ("<html", "<script", "</", '{"', "{'", '"docs"', "window.__")):
+        return ""
+    if len(text) <= _EVIDENCE_PREVIEW_LIMIT:
+        return text
+    return text[:_EVIDENCE_PREVIEW_LIMIT].rstrip()
 
 
 def _rate(numerator: int, denominator: int) -> float:

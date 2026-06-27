@@ -20,6 +20,8 @@ _PROPERTY_TYPE_MAPPING = {
     "benedenwoning": "benedenwoning",
     "bovenwoning": "bovenwoning",
     "maisonette": "maisonette",
+    "bungalow": "bungalow",
+    "studio": "studio",
     "bouwgrond": "bouwgrond",
     "woonhuis": "woonhuis",
     "eengezinswoning": "woonhuis",

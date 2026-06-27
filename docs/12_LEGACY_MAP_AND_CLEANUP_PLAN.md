@@ -369,6 +369,17 @@ This audit does not send email, run matching, touch n8n, build a dashboard, modi
 web JSON, call an LLM, download images, scrape Funda or Pararius, change the base OGonline parser, or change inventory
 eligibility.
 
+## KIN Key Matching Fields Hardening v1
+
+The OGonline facts layer now hardens future matching fields without changing matching itself. It accepts bedrooms only
+from structured state or strong slaapkamer labels, accepts living area only from specific woonoppervlakte or
+gebruiksoppervlakte wonen evidence, keeps property type structured-first while ignoring weak event/badge signals such
+as Open huis, and normalizes energy-label spacing/casing variants before conflict detection.
+
+This remains a parser-family improvement, not a KIN-specific parser or parser-per-makelaar path. It does not infer
+bedrooms from rooms, use an LLM, persist raw HTML or raw web JSON, create Excel, send email, run matching, touch n8n,
+build a dashboard, modify `data/raw`, scrape Funda or Pararius, or change inventory eligibility.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted
