@@ -327,6 +327,18 @@ Quality hardening remains inside the facts layer: normalized-equivalent candidat
 structured facts can beat weak HTML candidates, real conflicts require two strong normalized sources, and ambiguous or
 implausible count candidates stay review-only. This does not promote the facts layer to client-ready summaries.
 
+## Client-ready Property Summary v1
+
+`scraper/src/domek_wonen/facts/summary.py` adds the first offline client-ready summary layer on top of
+`PropertyFactsRecord`. It creates a compact card with headline, fact, financial, outdoor, energy, attention,
+missing-key-field, and warning sections for advisor/client review.
+
+Only normalized facts with `status="usable"` are rendered as confirmed values. Facts with `status="review"` become
+attention points, and missing key fields remain explicit instead of being inferred. This layer does not make HTTP
+requests, run live fetch, write cache files, call an LLM, store raw HTML or raw web JSON, copy long descriptions,
+download images, modify matching, email, n8n, dashboard, Funda, Pararius, `data/raw`, the base OGonline parser, or
+inventory eligibility.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted

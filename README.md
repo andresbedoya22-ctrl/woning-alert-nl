@@ -280,6 +280,17 @@ structured sources outrank weak text signals, count fields reject implausible va
 reported only when the final field remains in review. Live warnings still need to be reviewed before using these facts
 for client-ready summaries.
 
+## Client-ready Property Summary v1
+
+`scraper/src/domek_wonen/facts/summary.py` adds an offline compact property card for advisor and client review. It
+converts an existing `PropertyFactsRecord` into a deterministic `ClientReadyPropertySummary` with headline,
+facts, financial, outdoor, energy, attention, missing-key-field, and warning sections.
+
+The summary uses only normalized facts that are already marked `usable`. Facts marked `review` become attention points,
+and missing key fields are reported explicitly instead of being invented. This layer does not call an LLM, perform live
+fetches, write cache files, store raw HTML or raw web JSON, copy long descriptions, download images, touch matching,
+n8n, dashboard, Funda, Pararius, `data/raw`, the base OGonline parser, or inventory eligibility.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
