@@ -298,6 +298,18 @@ records availability, a length bucket, and at most a 120-character preview. Its 
 `OGonline Detail Facts Cache v1` and `Property Facts Extractor v1` design without changing the base OGonline parser or
 eligibility behavior.
 
+## OGonline Property Facts Contract + Cache v1
+
+`scraper/src/domek_wonen/facts/` adds the reusable, offline contract for normalized property facts plus a configurable
+local JSONL cache. The layer defines allowed fact fields, fact-level confidence/status/source metadata, stable record
+serialization, pure normalization helpers, and an explicit bridge from `OGonlineDetailFactsProbeSample` into
+`PropertyFactsRecord` for tests and diagnostics.
+
+This phase is not an operational HTML extractor and does not add live fetch, browser automation, raw HTML persistence,
+raw web JSON persistence, image downloads, long-description storage, LLM summaries, matching, n8n, dashboard work,
+parser changes, eligibility changes, Funda, Pararius, or `data/raw` changes. Cache files are generated/local artifacts
+only and are written only when a caller provides an explicit cache path.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted
