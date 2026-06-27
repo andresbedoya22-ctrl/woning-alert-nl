@@ -237,6 +237,18 @@ exhausted, it returns a partial result with the parser, QA, enrichment, eligibil
 far, plus stable budget warnings. For KIN full validation, use a runtime budget before treating this as any operational
 gate; the audit remains diagnostic and bounded, not an operational crawler.
 
+## OGonline Detail Facts Probe v1
+
+`scraper/src/domek_wonen/pilots/ogonline_detail_facts_probe.py` adds a controlled probe for discovering which property
+facts are available on permitted OGonline/KIN detail pages. It is a diagnostic layer for designing later
+`OGonline Detail Facts Cache v1` and `Property Facts Extractor v1`, not an operational extractor.
+
+The probe checks `robots_gate.can_fetch(domain, path)` before API and detail fetches, caps KIN API sampling at five
+pages and detail samples at twenty, and keeps live responses in memory only. It does not cache, persist HTML or JSON,
+copy long descriptions, download images, modify the base `ogonline_xhr` parser, relax QA, touch matching, n8n,
+dashboard, Funda, Pararius, or `data/raw`. Description handling is limited to source availability, a length bucket,
+and an optional preview capped at 120 characters.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
