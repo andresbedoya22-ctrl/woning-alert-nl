@@ -12,6 +12,7 @@ from domek_wonen.facts.normalization import (
     normalize_description_length_bucket,
     normalize_eigendomssituatie,
     normalize_energy_label,
+    normalize_heating_system,
     normalize_price,
     normalize_property_type,
     normalize_vve_monthly_cost,
@@ -32,6 +33,9 @@ def test_normalize_count_from_bedroom_text() -> None:
 
 def test_normalize_energy_label() -> None:
     assert normalize_energy_label("A++") == "A++"
+    assert normalize_energy_label("Energielabel C") == "C"
+    assert normalize_energy_label("Energielabel") is None
+    assert normalize_energy_label("Energielabel A ++") == "A++"
 
 
 def test_normalize_property_type_known_values() -> None:
@@ -46,6 +50,11 @@ def test_normalize_vve_monthly_cost() -> None:
 def test_normalize_cv_ketel_ownership() -> None:
     assert normalize_cv_ketel_ownership("CV-ketel eigendom") == "eigendom"
     assert normalize_cv_ketel_ownership("huurketel") == "huur"
+
+
+def test_normalize_heating_system_suppresses_rawish_values() -> None:
+    assert normalize_heating_system("Cv ketel") == "cv_ketel"
+    assert normalize_heating_system('heating":{"heating":[{"id":"10"}]}') is None
 
 
 def test_normalize_eigendomssituatie() -> None:

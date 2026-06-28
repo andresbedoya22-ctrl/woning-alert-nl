@@ -40,19 +40,26 @@ FACT_FIELDS = (
     "rooms",
     "bedrooms",
     "bathrooms",
+    "floors",
+    "volume_m3",
     "energy_label",
+    "insulation",
     "eigendomssituatie",
     "erfpacht_details",
     "vve_monthly_cost",
     "vve_active",
     "heating_type",
+    "hot_water",
     "cv_ketel_present",
+    "cv_ketel_brand",
     "cv_ketel_ownership",
     "outdoor_space",
     "garden",
+    "main_garden_area_m2",
     "balcony",
     "storage",
     "garage",
+    "garage_count",
     "parking",
     "availability_date",
     "open_huis_badge_or_event",
@@ -84,19 +91,34 @@ _PRICE_PATTERN = re.compile(r"(?:vraagprijs|koopprijs|askingPrice|salesPrice|pri
 _INT_FIELD_PATTERNS: Mapping[str, tuple[re.Pattern[str], ...]] = {
     "living_area_m2": (
         re.compile(r"(?:woonoppervlakte|gebruiksoppervlakte\s+wonen)[^0-9]{0,40}([0-9]{2,4})\s*(?:m2|m²)", re.IGNORECASE),
+        re.compile(r"(?:woonoppervlakte|gebruiksoppervlakte\s+wonen)[^0-9]{0,40}([0-9]{2,4})\s*(?:m2|m²)", re.IGNORECASE),
     ),
     "plot_area_m2": (
         re.compile(r"(?:perceeloppervlakte|\bperceel\b)[^0-9]{0,40}([0-9]{2,6})\s*(?:m2|m²)", re.IGNORECASE),
+        re.compile(r"(?:perceeloppervlakte|\bperceel\b)[^0-9]{0,40}([0-9]{2,6})\s*(?:m2|m²)", re.IGNORECASE),
     ),
     "rooms": (
-        re.compile(r"(?:aantal kamers|\bkamers\b)[^0-9]{0,30}([0-9]{1,2})", re.IGNORECASE),
+        re.compile(r"(?:aantal kamers|\bkamers\b)[^0-9]{0,20}([0-9]{1,2})\s*kamers?\b", re.IGNORECASE),
+    ),
+    "volume_m3": (
+        re.compile(r"(?:\binhoud\b)[^0-9]{0,40}([0-9]{2,6})\s*(?:m3|m³)", re.IGNORECASE),
+        re.compile(r"(?:\binhoud\b)[^0-9]{0,40}([0-9]{2,6})\s*(?:m3|mÂ³)", re.IGNORECASE),
+    ),
+    "main_garden_area_m2": (
+        re.compile(r"(?:oppervlakte\s+hoofdtuin)[^0-9]{0,40}([0-9]{1,5})\s*(?:m2|m²)", re.IGNORECASE),
+        re.compile(r"(?:oppervlakte\s+hoofdtuin)[^0-9]{0,40}([0-9]{1,5})\s*(?:m2|mÂ²)", re.IGNORECASE),
     ),
     "bedrooms": (
-        re.compile(r"(?:aantal\s+slaapkamers|slaapkamer(?:\(s\)|s)?)[^0-9]{0,30}([0-9]{1,2})", re.IGNORECASE),
-        re.compile(r"([0-9]{1,2})\s+slaapkamer(?:\(s\)|s)?", re.IGNORECASE),
+        re.compile(r"(?:aantal\s+slaapkamers|slaapkamers)[^0-9]{0,20}([0-9]{1,2})\s*slaapkamers?\b", re.IGNORECASE),
     ),
     "bathrooms": (
-        re.compile(r"(?:badkamers|aantal badkamers)[^0-9]{0,30}([0-9]{1,2})", re.IGNORECASE),
+        re.compile(r"(?:badkamers|aantal badkamers)[^0-9]{0,20}([0-9]{1,2})\s*badkamers?\b", re.IGNORECASE),
+    ),
+    "floors": (
+        re.compile(r"(?:verdiepingen)[^0-9]{0,20}([0-9]{1,2})\s*verdiepingen?\b", re.IGNORECASE),
+    ),
+    "garage_count": (
+        re.compile(r"(?:aantal garages)[^0-9]{0,20}([0-9]{1,2})\b", re.IGNORECASE),
     ),
 }
 _ENERGY_LABEL_PATTERN = re.compile(r"(?:energielabel|energyLabel)\s*[:\-]?\s*(A(?:\s*\+){0,4}|[B-G])", re.IGNORECASE)
@@ -104,6 +126,9 @@ _VVE_COST_PATTERN = re.compile(r"(?:vve|vereniging van eigenaars|servicekosten|b
 _AVAILABILITY_PATTERN = re.compile(r"(?:aanvaarding|beschikbaar(?:heid)?|availability)[^0-9a-z]{0,30}([0-9]{1,2}[-/ ][0-9]{1,2}[-/ ][0-9]{2,4}|in overleg|per direct)", re.IGNORECASE)
 _HEATING_PATTERN = re.compile(r"(?:verwarming|heating)[^.;,\n]{0,80}", re.IGNORECASE)
 _CV_PATTERN = re.compile(r"cv[-\s]?ketel[^.;,\n]{0,80}", re.IGNORECASE)
+_DL_PAIR_PATTERN = re.compile(r"<dt[^>]*>(?P<label>.*?)</dt>\s*<dd[^>]*>(?P<value>.*?)</dd>", re.IGNORECASE | re.DOTALL)
+_TABLE_PAIR_PATTERN = re.compile(r"<tr[^>]*>\s*<t[hd][^>]*>(?P<label>.*?)</t[hd]>\s*<t[hd][^>]*>(?P<value>.*?)</t[hd]>", re.IGNORECASE | re.DOTALL)
+_BOLD_LABEL_PATTERN = re.compile(r"<b(?:\s[^>]*)?>(?P<value>.*?)</b>\s*(?P<label>[A-Za-zÀ-ÿ][^<]{1,60})", re.IGNORECASE | re.DOTALL)
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,6 +280,7 @@ def extract_detail_fact_candidates(html: str) -> tuple[_FactCandidate, ...]:
     sections = _html_sections(html)
     candidates: list[_FactCandidate] = []
 
+    _append_html_label_value_candidates(candidates, html)
     for source, text in sections:
         _append_text_candidates(candidates, source, text)
 
@@ -356,6 +382,78 @@ def _fetch_qa_clean_listings(
     return tuple(listings), _dedupe(warnings)
 
 
+def _append_html_label_value_candidates(candidates: list[_FactCandidate], html: str) -> None:
+    for pattern in (_DL_PAIR_PATTERN, _TABLE_PAIR_PATTERN):
+        for match in pattern.finditer(html or ""):
+            label = _normalize_label(_strip_tags(match.group("label")))
+            value = _normalize_text(_strip_tags(match.group("value")))
+            if not label or not value:
+                continue
+            _append_label_value_candidate(candidates, label, value)
+    for match in _BOLD_LABEL_PATTERN.finditer(html or ""):
+        label = _normalize_label(_strip_tags(match.group("label")))
+        value = _normalize_text(_strip_tags(match.group("value")))
+        if not label or not value:
+            continue
+        _append_label_value_candidate(candidates, label, value)
+
+
+def _append_label_value_candidate(candidates: list[_FactCandidate], label: str, value: str) -> None:
+    source = "html_text_signal"
+    if label in {"vraagprijs", "koopprijs"}:
+        candidates.append(_FactCandidate("asking_price", _preview_number(value), source))
+    elif label in {"adres"}:
+        return
+    elif label in {"woonoppervlakte", "gebruiksoppervlakte wonen"}:
+        candidates.append(_FactCandidate("living_area_m2", _preview_first_number(value), source))
+    elif label in {"perceeloppervlakte", "perceel"}:
+        candidates.append(_FactCandidate("plot_area_m2", _preview_first_number(value), source))
+    elif label == "inhoud":
+        candidates.append(_FactCandidate("volume_m3", _preview_first_number(value), source))
+    elif label in {"kamers", "aantal kamers"}:
+        candidates.append(_FactCandidate("rooms", _preview_first_number(value), source))
+    elif label in {"slaapkamers", "aantal slaapkamers"}:
+        candidates.append(_FactCandidate("bedrooms", _preview_first_number(value), source))
+    elif label in {"badkamers", "aantal badkamers"}:
+        candidates.append(_FactCandidate("bathrooms", _preview_first_number(value), source))
+    elif label == "verdiepingen":
+        candidates.append(_FactCandidate("floors", _preview_first_number(value), source))
+    elif label == "energielabel":
+        energy = _first_pattern_value(re.compile(r"^\s*(A(?:\s*\+){0,4}|[B-G])\s*$", re.IGNORECASE), value)
+        if energy:
+            candidates.append(_FactCandidate("energy_label", energy.upper().replace(" ", ""), source))
+    elif label in {"isolatie"}:
+        candidates.append(_FactCandidate("insulation", _cap_preview(value), source))
+    elif label in {"verwarming"}:
+        candidates.append(_FactCandidate("heating_type", _cap_preview(value), source))
+        if _contains_any(value, ("cv ketel", "cv-ketel", "cvketel")):
+            candidates.append(_FactCandidate("cv_ketel_present", "true", source))
+    elif label in {"water", "warm water", "warmwater"}:
+        candidates.append(_FactCandidate("hot_water", _cap_preview(value), source))
+    elif label == "ketelmerk":
+        brand, ownership = _parse_cv_brand_ownership(value)
+        if brand:
+            candidates.append(_FactCandidate("cv_ketel_brand", brand, source))
+        if ownership:
+            candidates.append(_FactCandidate("cv_ketel_ownership", ownership, source))
+        candidates.append(_FactCandidate("cv_ketel_present", "true", source))
+    elif label in {"tuintypes", "hoofdtuin type"}:
+        candidates.append(_FactCandidate("garden", _cap_preview(value), source))
+    elif label == "oppervlakte hoofdtuin":
+        candidates.append(_FactCandidate("main_garden_area_m2", _preview_first_number(value), source))
+    elif label in {"parkeertypes", "parkeren", "parkeerplaats"}:
+        candidates.append(_FactCandidate("parking", _cap_preview(value), source))
+    elif label == "garagetypes":
+        candidates.append(_FactCandidate("garage", _normalize_token(value), source))
+    elif label == "aantal garages":
+        candidates.append(_FactCandidate("garage_count", _preview_first_number(value), source))
+    elif label == "eigendomssituatie":
+        candidates.append(_FactCandidate("eigendomssituatie", _cap_preview(value), source))
+    elif label == "erfpacht":
+        if "erfpacht" in value.casefold() and "geen erfpacht" not in value.casefold():
+            candidates.append(_FactCandidate("erfpacht_details", "source_available", source))
+
+
 def _append_text_candidates(candidates: list[_FactCandidate], source: str, text: str) -> None:
     normalized = _normalize_text(text)
     if not normalized:
@@ -375,14 +473,15 @@ def _append_text_candidates(candidates: list[_FactCandidate], source: str, text:
             if value:
                 candidates.append(_FactCandidate(field, _preview_number(value), source))
                 break
+    _append_escaped_state_candidates(candidates, source, normalized)
 
     energy_label = _first_pattern_value(_ENERGY_LABEL_PATTERN, normalized)
     if energy_label:
         candidates.append(_FactCandidate("energy_label", energy_label.upper(), source))
 
-    if _contains_any(normalized, ("volle eigendom", "eigen grond", "erfpacht")):
+    if _contains_any(normalized, ("eigendomssituatie volle eigendom", "eigendomssituatie eigen grond", "eigendomssituatie erfpacht")):
         candidates.append(_FactCandidate("eigendomssituatie", _context_preview(normalized, ("volle eigendom", "eigen grond", "erfpacht")), source))
-    if _contains_any(normalized, ("erfpacht", "canon")):
+    if _contains_any(normalized, ("eigendomssituatie erfpacht", "erfpachtcanon", "canon erfpacht")) and "geen erfpacht" not in normalized.casefold():
         candidates.append(_FactCandidate("erfpacht_details", "source_available", source))
 
     vve_cost = _first_pattern_value(_VVE_COST_PATTERN, normalized)
@@ -392,7 +491,7 @@ def _append_text_candidates(candidates: list[_FactCandidate], source: str, text:
         candidates.append(_FactCandidate("vve_active", "source_available", source))
 
     heating = _first_match_text(_HEATING_PATTERN, normalized)
-    if heating:
+    if heating and not _rawish(heating):
         candidates.append(_FactCandidate("heating_type", _cap_preview(heating), source))
     cv = _first_match_text(_CV_PATTERN, normalized)
     if cv:
@@ -436,6 +535,42 @@ def _append_text_candidates(candidates: list[_FactCandidate], source: str, text:
             )
 
 
+def _append_escaped_state_candidates(candidates: list[_FactCandidate], source: str, text: str) -> None:
+    escaped_int_fields = {
+        "floors": "floors",
+        "rooms": "rooms",
+        "bedrooms": "bedrooms",
+        "bathrooms": "bathrooms",
+        "livingSurface": "living_area_m2",
+        "plotSurface": "plot_area_m2",
+        "volume": "volume_m3",
+    }
+    for key, field in escaped_int_fields.items():
+        value = _escaped_json_int(text, key)
+        if value:
+            candidates.append(_FactCandidate(field, value, source))
+
+    brand = _escaped_json_string(text, "furnaceBrand")
+    if brand:
+        candidates.append(_FactCandidate("cv_ketel_brand", brand, source))
+        candidates.append(_FactCandidate("cv_ketel_present", "true", source))
+    ownership = _escaped_json_string(text, "furnaceOwnership")
+    if ownership:
+        candidates.append(_FactCandidate("cv_ketel_ownership", ownership, source))
+    heating_titles = _escaped_json_titles_for_path(text, "heating")
+    water_titles = _escaped_json_titles_for_path(text, "water")
+    if heating_titles:
+        candidates.append(_FactCandidate("heating_type", heating_titles[0], source))
+    if water_titles:
+        candidates.append(_FactCandidate("hot_water", water_titles[0], source))
+    parking_titles = _escaped_json_titles_for_path(text, "parking.types")
+    if parking_titles:
+        candidates.append(_FactCandidate("parking", ", ".join(parking_titles), source))
+    garage_titles = _escaped_json_titles_for_path(text, "garage.types")
+    if garage_titles:
+        candidates.append(_FactCandidate("garage", _normalize_token(garage_titles[0]), source))
+
+
 def _append_mapping_candidates(candidates: list[_FactCandidate], source: str, payload: Mapping[str, Any]) -> None:
     flat = tuple(_flatten_mapping(payload))
     for path, value in flat:
@@ -447,7 +582,8 @@ def _append_mapping_candidates(candidates: list[_FactCandidate], source: str, pa
         field = _field_from_path(path_text)
         if field:
             preview = _preview_for_field(field, text)
-            candidates.append(_FactCandidate(field, preview, source))
+            if preview:
+                candidates.append(_FactCandidate(field, preview, source))
             continue
 
         lower_text = text.casefold()
@@ -456,23 +592,37 @@ def _append_mapping_candidates(candidates: list[_FactCandidate], source: str, pa
 
 
 def _field_from_path(path_text: str) -> str:
-    checks = (
+    compact = path_text.replace("_", "").replace("-", "")
+    exact_checks = (
+        ("bedrooms", ("bedrooms", "slaapkamers", "aantalslaapkamers", "numberofbedrooms")),
+        ("bathrooms", ("bathrooms", "badkamers", "aantalbadkamers", "numberofbathrooms")),
+        ("rooms", ("rooms", "aantalkamers", "numberofrooms")),
+        ("floors", ("floors", "verdiepingen", "aantalverdiepingen")),
+        ("garage_count", ("aantalgarages", "garagecount")),
+        ("energy_label", ("energylabel", "energielabel")),
+        ("cv_ketel_brand", ("ketelmerk", "boilerbrand", "furnacebrand")),
+        ("cv_ketel_ownership", ("ketelownership", "ketelhuur", "keteleigendom", "furnaceownership")),
+        ("hot_water", ("hotwater", "warmwater", "water")),
+    )
+    last = compact.rsplit(".", 1)[-1]
+    for field, tokens in exact_checks:
+        if last in tokens or compact in tokens:
+            return field
+
+    contains_checks = (
         ("property_type", ("subtype", "propertytype", "woningtype", "typewoning", "soortwoonhuis", "objecttype", "housetype")),
         ("asking_price", ("askingprice", "salesprice", "purchaseprice", "vraagprijs", "price.amount", "price.value")),
         ("living_area_m2", ("livingarea", "living_area", "woonoppervlakte", "gebruiksoppervlaktewonen", "area_living")),
         ("plot_area_m2", ("plotarea", "plot_area", "perceeloppervlakte")),
-        ("bedrooms", ("bedrooms", "slaapkamers", "aantalslaapkamers", "numberofbedrooms")),
-        ("bathrooms", ("bathrooms", "badkamers", "numberofbathrooms")),
-        ("rooms", ("rooms", "aantalkamers", "numberofrooms")),
-        ("energy_label", ("energylabel", "energielabel")),
         ("eigendomssituatie", ("eigendom", "ownership")),
         ("erfpacht_details", ("erfpacht", "leasehold")),
         ("vve_monthly_cost", ("vvecost", "servicekosten", "servicecost")),
         ("vve_active", ("vve",)),
-        ("heating_type", ("heating", "verwarming")),
+        ("heating_type", ("heatingtype", "verwarming")),
         ("cv_ketel_present", ("cvketel", "cv_ketel")),
         ("outdoor_space", ("outdoorspace", "buitenruimte", "terrace")),
         ("garden", ("garden", "tuin")),
+        ("main_garden_area_m2", ("oppervlaktehoofdtuin", "maingardenarea")),
         ("balcony", ("balcony", "balkon")),
         ("storage", ("storage", "berging")),
         ("garage", ("garage",)),
@@ -481,8 +631,7 @@ def _field_from_path(path_text: str) -> str:
         ("open_huis_badge_or_event", ("openhouse", "open_huis", "viewing")),
         ("short_description_source_available", ("description", "omschrijving", "summary")),
     )
-    compact = path_text.replace("_", "").replace("-", "")
-    for field, tokens in checks:
+    for field, tokens in contains_checks:
         if any(token.replace("_", "").replace("-", "") in compact for token in tokens):
             return field
     return ""
@@ -493,6 +642,8 @@ def _preview_for_field(field: str, value: str) -> str:
         return "true"
     if field in {"possible_key_selling_points_source", "possible_attention_points_source"}:
         return "source_available"
+    if field in {"heating_type", "hot_water"} and _rawish(value):
+        return ""
     return _cap_preview(value)
 
 
@@ -766,6 +917,56 @@ def _value_text(value: Any) -> str:
     return ""
 
 
+def _normalize_label(value: str) -> str:
+    text = _normalize_text(value).casefold()
+    return re.sub(r"\s+", " ", text).strip(" :")
+
+
+def _normalize_token(value: str) -> str:
+    text = _normalize_text(value).casefold()
+    text = re.sub(r"[^a-z0-9]+", "_", text)
+    return text.strip("_")
+
+
+def _parse_cv_brand_ownership(value: str) -> tuple[str, str]:
+    text = _normalize_text(value)
+    brand = re.sub(r"\([^)]*\)", "", text).strip()
+    ownership = ""
+    lowered = text.casefold()
+    if "huur" in lowered:
+        ownership = "huur"
+    elif "eigendom" in lowered:
+        ownership = "eigendom"
+    elif "lease" in lowered:
+        ownership = "lease"
+    return brand, ownership
+
+
+def _escaped_json_int(text: str, key: str) -> str:
+    match = re.search(rf'\\?"{re.escape(key)}\\?"\s*:\s*([0-9]+)', text)
+    return match.group(1) if match else ""
+
+
+def _escaped_json_string(text: str, key: str) -> str:
+    match = re.search(rf'\\?"{re.escape(key)}\\?"\s*:\s*\\?"([^"\\]+)\\?"', text)
+    return _normalize_text(match.group(1)) if match else ""
+
+
+def _escaped_json_titles_for_path(text: str, path: str) -> tuple[str, ...]:
+    titles: list[str] = []
+    for match in re.finditer(r'\\?"title\\?"\s*:\s*\\?"([^"\\]+)\\?"[^{}]{0,220}\\?"path\\?"\s*:\s*\\?"([^"\\]+)\\?"', text):
+        title = _normalize_text(match.group(1))
+        match_path = _normalize_text(match.group(2))
+        if title and match_path == path:
+            titles.append(title)
+    return _dedupe(titles)
+
+
+def _rawish(value: str) -> bool:
+    text = str(value or "").casefold()
+    return any(marker in text for marker in ('{"', "{'", '":', "\\\"", "[{", "}]"))
+
+
 def _contains_phrase(text: str, phrase: str) -> bool:
     escaped = re.escape(phrase).replace(r"\ ", r"\s+").replace(r"\-", r"[-\s]+")
     return re.search(rf"(?<!\w){escaped}(?!\w)", text, re.IGNORECASE) is not None
@@ -788,6 +989,13 @@ def _first_match_text(pattern: re.Pattern[str], text: str) -> str:
 
 def _preview_number(value: str) -> str:
     return re.sub(r"[^\d]", "", value) or _cap_preview(value)
+
+
+def _preview_first_number(value: str) -> str:
+    match = re.search(r"\d[\d\., ]*", value or "")
+    if not match:
+        return _cap_preview(value)
+    return re.sub(r"\D", "", match.group(0)) or _cap_preview(value)
 
 
 def _context_preview(text: str, phrases: Iterable[str]) -> str:
