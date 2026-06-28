@@ -172,6 +172,14 @@ Validation on the live Oldenkotte listing page improved from `36 total / 0 clean
 
 This is not a normalized facts extractor, cache, readiness runner, Excel export, matching input, email flow, n8n job, dashboard, or parser per makelaar. It does not persist raw HTML or JSON, copy long descriptions, download images, call an LLM, touch eligibility, scrape Funda or Pararius, or modify `data/raw`.
 
+## Realworks Property Facts Extractor v1
+
+`scraper/src/domek_wonen/facts/realworks_extractor.py` converts permitted Realworks detail HTML held in memory into the existing `PropertyFactsRecord` contract using reusable `kenmerkName` / `kenmerkValue` blocks.
+
+The extractor is family-level, not Oldenkotte-specific, and does not create a parser per makelaar. It stores normalized facts plus statuses, evidence previews, and warnings, while keeping descriptions to a length bucket only. `scraper/src/domek_wonen/pilots/realworks_property_facts_validation.py` provides a bounded validation helper with robots checks before listing and detail fetches.
+
+This phase does not add cache, readiness rows, Excel, matching, email, n8n, dashboard, eligibility changes, Funda/Pararius work, browser automation, Playwright, Selenium, proxies, stealth behavior, CAPTCHA solving, bypass logic, raw HTML/JSON persistence, long-description storage, image downloads, or LLM extraction.
+
 ## KIN OGonline XHR Paginated Runner v1
 
 `scraper/src/domek_wonen/pilots/ogonline_xhr_paginated_runner.py` adds a controlled paginated runner for `ogonline_xhr` source configs, starting with the KIN fixture. It builds deterministic API URLs with `build_paginated_api_url`, checks `robots_gate.can_fetch(api_domain, api_path)` before each injected `fetch_json` call, then sends caller-provided JSON through `build_parser_input_from_api_json`, `ParserFamilyRunner`, and the parser output QA gate.
