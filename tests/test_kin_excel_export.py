@@ -111,6 +111,31 @@ def _full_record(index: int = 1):
     )
 
 
+def _akkerstraat_record(index: int = 1):
+    return _record(
+        index,
+        _fact("asking_price", 450000),
+        _fact("property_type", "Eengezinswoning", normalized_value="woonhuis"),
+        _fact("living_area_m2", 130),
+        _fact("plot_area_m2", 218),
+        _fact("rooms", 4),
+        _fact("bedrooms", 3),
+        _fact("bathrooms", 1),
+        _fact("floors", 3),
+        _fact("volume_m3", 497),
+        _fact("energy_label", "C"),
+        _fact("heating_type", "Cv ketel", normalized_value="cv_ketel"),
+        _fact("hot_water", "Cv ketel", normalized_value="cv_ketel"),
+        _fact("cv_ketel_brand", "Remeha"),
+        _fact("cv_ketel_ownership", "Huur", normalized_value="huur"),
+        _fact("garden", "Achtertuin"),
+        _fact("main_garden_area_m2", 63),
+        _fact("parking", "Parkeervergunningen, Op eigen terrein"),
+        _fact("garage", "vrijstaand_hout"),
+        _fact("garage_count", 1),
+    )
+
+
 def _row(index: int = 1, record=None, **listing_overrides: object):
     return build_kin_property_readiness_row(_listing(index, **listing_overrides), record or _full_record(index))
 
@@ -226,6 +251,31 @@ def test_no_raw_html_json_or_image_urls_are_exported(tmp_path: Path) -> None:
     assert "<html" not in text
     assert '"docs"' not in text
     assert "photo.jpg" not in text
+
+
+def test_akkerstraat_synthetic_row_exports_correct_critical_facts(tmp_path: Path) -> None:
+    row = _row(
+        1,
+        _akkerstraat_record(1),
+        canonical_url="https://www.kinmakelaars.nl/aanbod/wonen/6a3e86c10b3069e4614b02c1",
+        address_raw="Akkerstraat 69",
+        postcode="5025MG",
+        city="Tilburg",
+    )
+    _, workbook = _export(tmp_path, row)
+    worksheet = workbook["KIN Properties"]
+    headers = _headers(worksheet)
+    text = _all_workbook_text(workbook).casefold()
+
+    assert worksheet.cell(2, _col(headers, "bedrooms")).value == 3
+    assert worksheet.cell(2, _col(headers, "energy_label")).value == "C"
+    assert worksheet.cell(2, _col(headers, "heating_type")).value == "cv_ketel"
+    assert worksheet.cell(2, _col(headers, "cv_ketel_ownership")).value == "huur"
+    assert worksheet.cell(2, _col(headers, "eigendomssituatie")).value in (None, "")
+    assert worksheet.cell(2, _col(headers, "property_link")).hyperlink.target == row.canonical_url
+    assert "heating\":{\"heating\"" not in text
+    assert "10 slaapkamers" not in text
+    assert "erfpacht" not in text
 
 
 def test_summary_counts_match_input_rows(tmp_path: Path) -> None:

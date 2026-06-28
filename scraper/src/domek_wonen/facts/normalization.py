@@ -45,13 +45,36 @@ def normalize_count(value: object) -> int | None:
     return _first_int(value)
 
 
+def normalize_small_count(value: object, *, minimum: int, maximum: int) -> int | None:
+    number = _first_int(value)
+    if number is None or number < minimum or number > maximum:
+        return None
+    return number
+
+
 def normalize_energy_label(value: object) -> str | None:
     text = _clean_text(value).upper().replace(" ", "")
     if not text:
         return None
+    text = text.replace("ENERGIELABEL", "")
     for label in _ENERGY_LABELS:
-        if label in text:
+        if text == label or re.search(rf"(^|[^A-Z]){re.escape(label)}([^A-Z+]|$)", text):
             return label
+    return None
+
+
+def normalize_heating_system(value: object) -> str | None:
+    text = _clean_text(value)
+    if not text or _is_rawish_text(text):
+        return None
+    if "cv ketel" in text or "cv-ketel" in text or "cvketel" in text:
+        return "cv_ketel"
+    if "warmtepomp" in text:
+        return "warmtepomp"
+    if "stadsverwarming" in text:
+        return "stadsverwarming"
+    if "vloerverwarming" in text:
+        return "vloerverwarming"
     return None
 
 
@@ -89,9 +112,9 @@ def normalize_cv_ketel_ownership(value: object) -> str | None:
     text = _clean_text(value)
     if not text:
         return None
-    if "eigendom" in text or "owned" in text:
+    if "eigendom" in text or "owned" in text or text == "owner":
         return "eigendom"
-    if "huur" in text or "gehuurd" in text:
+    if "huur" in text or "gehuurd" in text or text in {"rent", "rented"}:
         return "huur"
     if "lease" in text:
         return "lease"
@@ -157,3 +180,7 @@ def _clean_text(value: Any) -> str:
 
 def _normalize_token_text(value: str) -> str:
     return _WHITESPACE_PATTERN.sub(" ", value.replace("_", " ").strip().casefold())
+
+
+def _is_rawish_text(value: str) -> bool:
+    return any(marker in value for marker in ('{"', "{'", '":', "\\\"", "[{", "}]"))
