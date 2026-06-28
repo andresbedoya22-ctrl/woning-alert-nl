@@ -445,3 +445,14 @@ review / 0 rejected`.
 This remains parser-family work only. No parser per makelaar, matching, advisor email, n8n, dashboard, Excel,
 eligibility change, Funda/Pararius extraction, browser automation, LLM extraction, or raw HTML/JSON persistence was
 added.
+
+## Realworks Detail Facts Probe v1
+
+`scraper/src/domek_wonen/pilots/realworks_detail_facts_probe.py` adds a bounded diagnostic layer for Realworks detail
+pages after QA-clean listing capture. It extracts compact field availability from in-memory detail HTML using
+family-level Realworks `kenmerkName` / `kenmerkValue` structures and reports explicit available, review, and missing
+states for candidate property facts.
+
+This probe is research-only. It does not create a facts cache, normalized extractor, readiness runner, Excel export,
+matching input, advisor email, n8n flow, dashboard, eligibility change, parser per makelaar, Funda/Pararius path,
+browser automation, raw HTML/JSON persistence, image download, long-description storage, or `data/raw` change.
