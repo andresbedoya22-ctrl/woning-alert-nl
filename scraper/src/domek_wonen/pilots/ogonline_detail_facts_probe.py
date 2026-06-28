@@ -83,7 +83,7 @@ _DESCRIPTION_KEY_PATTERN = re.compile(r"(description|omschrijving|aanbiedingstek
 _PRICE_PATTERN = re.compile(r"(?:vraagprijs|koopprijs|askingPrice|salesPrice|price)[^0-9]{0,40}([0-9][0-9\., ]{4,})", re.IGNORECASE)
 _INT_FIELD_PATTERNS: Mapping[str, tuple[re.Pattern[str], ...]] = {
     "living_area_m2": (
-        re.compile(r"(?:woonoppervlakte|gebruiksoppervlakte wonen|\bwonen\b)[^0-9]{0,40}([0-9]{2,4})\s*(?:m2|m²)", re.IGNORECASE),
+        re.compile(r"(?:woonoppervlakte|gebruiksoppervlakte\s+wonen)[^0-9]{0,40}([0-9]{2,4})\s*(?:m2|m²)", re.IGNORECASE),
     ),
     "plot_area_m2": (
         re.compile(r"(?:perceeloppervlakte|\bperceel\b)[^0-9]{0,40}([0-9]{2,6})\s*(?:m2|m²)", re.IGNORECASE),
@@ -92,14 +92,14 @@ _INT_FIELD_PATTERNS: Mapping[str, tuple[re.Pattern[str], ...]] = {
         re.compile(r"(?:aantal kamers|\bkamers\b)[^0-9]{0,30}([0-9]{1,2})", re.IGNORECASE),
     ),
     "bedrooms": (
-        re.compile(r"(?:slaapkamers|aantal slaapkamers)[^0-9]{0,30}([0-9]{1,2})", re.IGNORECASE),
-        re.compile(r"([0-9]{1,2})\s+slaapkamers", re.IGNORECASE),
+        re.compile(r"(?:aantal\s+slaapkamers|slaapkamer(?:\(s\)|s)?)[^0-9]{0,30}([0-9]{1,2})", re.IGNORECASE),
+        re.compile(r"([0-9]{1,2})\s+slaapkamer(?:\(s\)|s)?", re.IGNORECASE),
     ),
     "bathrooms": (
         re.compile(r"(?:badkamers|aantal badkamers)[^0-9]{0,30}([0-9]{1,2})", re.IGNORECASE),
     ),
 }
-_ENERGY_LABEL_PATTERN = re.compile(r"(?:energielabel|energyLabel)[^A-G]{0,40}(A\+{0,4}|[B-G])", re.IGNORECASE)
+_ENERGY_LABEL_PATTERN = re.compile(r"(?:energielabel|energyLabel)\s*[:\-]?\s*(A(?:\s*\+){0,4}|[B-G])", re.IGNORECASE)
 _VVE_COST_PATTERN = re.compile(r"(?:vve|vereniging van eigenaars|servicekosten|bijdrage)[^0-9]{0,50}([0-9][0-9\., ]*)", re.IGNORECASE)
 _AVAILABILITY_PATTERN = re.compile(r"(?:aanvaarding|beschikbaar(?:heid)?|availability)[^0-9a-z]{0,30}([0-9]{1,2}[-/ ][0-9]{1,2}[-/ ][0-9]{2,4}|in overleg|per direct)", re.IGNORECASE)
 _HEATING_PATTERN = re.compile(r"(?:verwarming|heating)[^.;,\n]{0,80}", re.IGNORECASE)
@@ -457,11 +457,11 @@ def _append_mapping_candidates(candidates: list[_FactCandidate], source: str, pa
 
 def _field_from_path(path_text: str) -> str:
     checks = (
-        ("property_type", ("subtype", "propertytype", "woningtype", "objecttype", "housetype")),
+        ("property_type", ("subtype", "propertytype", "woningtype", "typewoning", "soortwoonhuis", "objecttype", "housetype")),
         ("asking_price", ("askingprice", "salesprice", "purchaseprice", "vraagprijs", "price.amount", "price.value")),
-        ("living_area_m2", ("livingarea", "living_area", "woonoppervlakte", "area_living")),
+        ("living_area_m2", ("livingarea", "living_area", "woonoppervlakte", "gebruiksoppervlaktewonen", "area_living")),
         ("plot_area_m2", ("plotarea", "plot_area", "perceeloppervlakte")),
-        ("bedrooms", ("bedrooms", "slaapkamers", "numberofbedrooms")),
+        ("bedrooms", ("bedrooms", "slaapkamers", "aantalslaapkamers", "numberofbedrooms")),
         ("bathrooms", ("bathrooms", "badkamers", "numberofbathrooms")),
         ("rooms", ("rooms", "aantalkamers", "numberofrooms")),
         ("energy_label", ("energylabel", "energielabel")),

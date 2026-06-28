@@ -32,6 +32,8 @@ _PROPERTY_TYPE_LABELS = {
     "benedenwoning": "benedenwoning",
     "bovenwoning": "bovenwoning",
     "maisonette": "maisonette",
+    "bungalow": "bungalow",
+    "studio": "studio",
     "bouwgrond": "bouwgrond",
     "woonhuis": "woonhuis",
     "garage": "garage",
@@ -55,6 +57,7 @@ _WARNING_LABELS = {
     "conflicting_fact_values": "heeft conflicterende signalen",
     "normalization_failed": "kon niet betrouwbaar worden genormaliseerd",
     "implausible_count": "heeft een onwaarschijnlijke waarde",
+    "implausible_area": "heeft een onwaarschijnlijke oppervlakte",
     "ambiguous_fact_candidate": "heeft een ambigue bronwaarde",
 }
 

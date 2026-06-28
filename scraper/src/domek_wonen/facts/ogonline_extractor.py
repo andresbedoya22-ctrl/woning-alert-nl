@@ -380,6 +380,11 @@ def _fact_from_candidate(
             return None
         status = FACT_STATUS_REVIEW
         fact_warnings = _dedupe((*fact_warnings, "implausible_count"))
+    if _is_implausible_area(field, normalized):
+        if source == "html_text_signal":
+            return None
+        status = FACT_STATUS_REVIEW
+        fact_warnings = _dedupe((*fact_warnings, "implausible_area"))
     if warning == _AMBIGUOUS_FACT_WARNING and status == FACT_STATUS_REVIEW:
         fact_warnings = _dedupe((*fact_warnings, warning))
     return build_property_fact_value(
@@ -411,6 +416,14 @@ def _is_implausible_count(field: str, value: object) -> bool:
         return value < 0 or value > 10
     if field == "rooms":
         return value < 1 or value > 30
+    return False
+
+
+def _is_implausible_area(field: str, value: object) -> bool:
+    if not isinstance(value, int):
+        return False
+    if field == "living_area_m2":
+        return value < 10 or value > 1000
     return False
 
 

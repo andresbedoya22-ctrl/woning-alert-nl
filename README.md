@@ -317,6 +317,18 @@ address, postcode, and city are usable. It does not create Excel, send email, ru
 dashboard, persist raw HTML or raw web JSON, call an LLM, download images, scrape Funda or Pararius, modify
 `data/raw`, change the base OGonline parser, or change inventory eligibility.
 
+## KIN Key Matching Fields Hardening v1
+
+The OGonline facts extractor now applies conservative family-level hardening for key future matching fields:
+`bedrooms`, `living_area_m2`, `property_type`, and `energy_label`. Bedrooms are accepted only from structured fields or
+strong slaapkamer labels, living area is accepted from specific woonoppervlakte/gebruiksoppervlakte wonen signals,
+property type prefers structured OGonline detail state over weak text, and energy-label spacing/casing variants are
+normalized before conflict handling.
+
+This phase does not infer bedrooms from rooms, does not use an LLM, does not persist raw HTML or raw web JSON, and does
+not create Excel, send email, run matching, touch n8n, build a dashboard, modify `data/raw`, scrape Funda or Pararius,
+change inventory eligibility, or add a parser per makelaar.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
