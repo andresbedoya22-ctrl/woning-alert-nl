@@ -27,6 +27,9 @@ PROPERTY_COLUMNS = (
     "property_link",
     "address",
     "postcode",
+    "postcode_status",
+    "postcode_source",
+    "postcode_review_reason",
     "city",
     "asking_price",
     "property_type",
@@ -39,13 +42,22 @@ PROPERTY_COLUMNS = (
     "plot_area_m2",
     "volume_m3",
     "energy_label",
+    "energy_label_status",
+    "energy_label_raw",
+    "energy_label_review_reason",
     "bouwjaar",
     "heating",
     "garden",
     "parking",
     "garage",
     "ownership_or_erfpacht",
+    "vve_active",
+    "vve_monthly_cost",
+    "vve_status",
+    "vve_review_reason",
+    "vve_missing_reason",
     "description_length_bucket",
+    "residential_classification",
     "location_readiness",
     "quality_status",
     "export_readiness",
@@ -78,7 +90,13 @@ FIELD_GAP_FIELDS = (
     "ownership_or_erfpacht",
     "description_length_bucket",
     "postcode",
+    "postcode_status",
     "coordinates",
+    "vve_active",
+    "vve_monthly_cost",
+    "vve_status",
+    "energy_label_status",
+    "residential_classification",
 )
 WORKSHEET_NAMES = ("Realworks Properties", "Summary", "Field Gaps", "Warnings", "Problem Rows")
 _FACT_FIELD_ALIASES = {
@@ -316,6 +334,9 @@ def _property_row_values(row: RealworksPropertyReadinessRow) -> dict[str, object
         "property_link": "Open listing" if _is_valid_http_url(row.canonical_url) else "",
         "address": row.address,
         "postcode": row.postcode,
+        "postcode_status": row.postcode_status,
+        "postcode_source": row.postcode_source,
+        "postcode_review_reason": row.postcode_review_reason,
         "city": row.city,
         "asking_price": row.asking_price,
         "property_type": row.property_type,
@@ -328,13 +349,22 @@ def _property_row_values(row: RealworksPropertyReadinessRow) -> dict[str, object
         "plot_area_m2": row.plot_area_m2,
         "volume_m3": row.volume_m3,
         "energy_label": row.energy_label,
+        "energy_label_status": row.energy_label_status,
+        "energy_label_raw": row.energy_label_raw,
+        "energy_label_review_reason": row.energy_label_review_reason,
         "bouwjaar": row.bouwjaar,
         "heating": row.heating,
         "garden": row.garden,
         "parking": row.parking,
         "garage": row.garage,
         "ownership_or_erfpacht": row.ownership_or_erfpacht,
+        "vve_active": row.vve_active,
+        "vve_monthly_cost": row.vve_monthly_cost,
+        "vve_status": row.vve_status,
+        "vve_review_reason": row.vve_review_reason,
+        "vve_missing_reason": row.vve_missing_reason,
         "description_length_bucket": row.description_length_bucket,
+        "residential_classification": row.residential_classification,
         "location_readiness": row.location_readiness.location_status,
         "quality_status": row.quality_status,
         "export_readiness": row.export_readiness,
@@ -369,6 +399,11 @@ def _field_gap(field: str, rows: Sequence[RealworksPropertyReadinessRow]) -> _Fi
         usable = sum(1 for row in rows if row.postcode)
         missing = len(rows) - usable
         return _FieldGap(field, usable, 0, missing, "location field")
+    if field == "postcode_status":
+        usable = sum(1 for row in rows if row.postcode_status == "usable")
+        missing = sum(1 for row in rows if row.postcode_status == "missing")
+        review = len(rows) - usable - missing
+        return _FieldGap(field, usable, review, missing, "critical production field")
     if field == "coordinates":
         usable = sum(
             1
@@ -377,6 +412,21 @@ def _field_gap(field: str, rows: Sequence[RealworksPropertyReadinessRow]) -> _Fi
         )
         missing = len(rows) - usable
         return _FieldGap(field, usable, 0, missing, "latitude and longitude")
+    if field == "vve_status":
+        usable = sum(1 for row in rows if row.vve_status in {"usable", "not_applicable"})
+        review = sum(1 for row in rows if row.vve_status == "review")
+        missing = sum(1 for row in rows if row.vve_status == "missing")
+        return _FieldGap(field, usable, review, missing, "missing VvE requires apartment review")
+    if field == "energy_label_status":
+        usable = sum(1 for row in rows if row.energy_label_status == "usable")
+        review = sum(1 for row in rows if row.energy_label_status == "review")
+        missing = sum(1 for row in rows if row.energy_label_status == "missing")
+        return _FieldGap(field, usable, review, missing, "energy label value/status/raw separated")
+    if field == "residential_classification":
+        usable = sum(1 for row in rows if row.residential_classification == "residential")
+        review = sum(1 for row in rows if row.residential_classification.endswith("_review"))
+        missing = sum(1 for row in rows if row.residential_classification.endswith("_blocked"))
+        return _FieldGap(field, usable, review, missing, "non-residential rows are not production-ready")
 
     fact_field = _FACT_FIELD_ALIASES.get(field, field)
     usable = 0
@@ -431,6 +481,12 @@ def _problem_score(row: RealworksPropertyReadinessRow) -> int:
     score += min(6, len(row.review_fields) * 2)
     if "unsupported_property_type_overigog" in row.warnings:
         score += 3
+    if "non_residential_property_type" in row.warnings:
+        score += 6
+    if row.postcode_status == "missing":
+        score += 2
+    if row.vve_status == "missing":
+        score += 2
     if "missing_coordinates" in row.warnings:
         score += 1
     return score
@@ -540,6 +596,8 @@ def _warning_note(warning: str) -> str:
         "hot_water_not_normalized": "hot-water vocabulary needs later normalization",
         "heating_not_normalized": "heating vocabulary needs later normalization",
         "unsupported_property_type_overigog": "property type is unsupported for automatic client-ready promotion",
+        "missing_vve_for_apartment": "apartment has no explicit VvE evidence",
+        "non_residential_property_type": "listing appears garage/storage/parking or otherwise non-residential",
     }
     return notes.get(warning, "")
 

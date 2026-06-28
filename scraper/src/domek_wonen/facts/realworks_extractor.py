@@ -73,6 +73,7 @@ _LABEL_TO_FIELD = {
     "aantal kamers": "rooms",
     "aantal slaapkamers": "bedrooms",
     "bouwjaar": "bouwjaar",
+    "bijdrage vve": "vve_monthly_cost",
     "c.v.-ketel": "cv_ketel_present",
     "cv ketel": "cv_ketel_present",
     "cv-ketel": "cv_ketel_present",
@@ -87,6 +88,7 @@ _LABEL_TO_FIELD = {
     "parkeertypes": "parking",
     "perceeloppervlakte": "plot_area_m2",
     "status": "availability_date",
+    "servicekosten": "vve_monthly_cost",
     "soort object": "property_type",
     "tuin": "garden",
     "tuintypes": "garden",
@@ -409,7 +411,10 @@ def _missing_fact(field: str) -> PropertyFactValue:
 def _normalize_realworks_property_type(value: str) -> tuple[str | None, tuple[str, ...]]:
     text = _normalize_text(value)
     if text == "overigog":
-        return "unknown", ("unsupported_property_type_overigog",)
+        return "unknown", ("unsupported_property_type_overigog", "non_residential_property_type")
+    if _is_non_residential_text(text):
+        normalized = normalize_property_type(value)
+        return normalized or "unknown", ("non_residential_property_type",)
     normalized = normalize_property_type(value)
     if normalized in {None, "unknown"}:
         return normalized, ("property_type_not_supported",)
@@ -443,6 +448,23 @@ def _normalize_open_text_value(value: str) -> str:
 def _is_ambiguous_parking_or_garage(value: str) -> bool:
     text = _normalize_text(value)
     return text in {"n.v.t.", "nvt", "onbekend", "diverse", "nader te bepalen"} or "mogelijk" in text
+
+
+def _is_non_residential_text(text: str) -> bool:
+    terms = (
+        "garage",
+        "garages",
+        "parkeerplaats",
+        "parkeerplaatsen",
+        "berging",
+        "schuur",
+        "opslag",
+        "box",
+        "bedrijfsruimte",
+        "kantoor",
+        "winkelruimte",
+    )
+    return any(term in text for term in terms)
 
 
 def _description_length_bucket(html: str, label_values: tuple[tuple[str, str], ...]) -> str:

@@ -121,6 +121,15 @@ def test_non_explicit_energy_label_becomes_review() -> None:
     assert "energy_label_not_explicit" in facts["energy_label"].warnings
 
 
+def test_niet_aanwezig_energy_label_is_review_not_usable() -> None:
+    facts = _facts(_extract(_html(("Energieklasse", "Niet aanwezig"))))
+
+    assert facts["energy_label"].normalized_value is None
+    assert facts["energy_label"].value == "Niet aanwezig"
+    assert facts["energy_label"].status == "review"
+    assert "energy_label_not_explicit" in facts["energy_label"].warnings
+
+
 def test_extracts_bouwjaar() -> None:
     facts = _facts(_extract(_html(("Bouwjaar", "1998"))))
 
@@ -165,6 +174,23 @@ def test_marks_overigog_property_type_as_review_unsupported() -> None:
     assert facts["property_type"].status == "review"
     assert facts["property_type"].normalized_value == "unknown"
     assert "unsupported_property_type_overigog" in facts["property_type"].warnings
+    assert "non_residential_property_type" in facts["property_type"].warnings
+
+
+def test_marks_garage_property_type_as_non_residential_warning() -> None:
+    facts = _facts(_extract(_html(("Soort object", "Garage"))))
+
+    assert facts["property_type"].normalized_value == "garage"
+    assert facts["property_type"].status == "review"
+    assert "non_residential_property_type" in facts["property_type"].warnings
+
+
+def test_extracts_vve_labels() -> None:
+    facts = _facts(_extract(_html(("VvE", "Ja"), ("Bijdrage VvE", "EUR 125 per maand"))))
+
+    assert facts["vve_active"].normalized_value is True
+    assert facts["vve_active"].status == "usable"
+    assert facts["vve_monthly_cost"].normalized_value == 125
 
 
 def test_keeps_descriptions_as_length_bucket_only() -> None:

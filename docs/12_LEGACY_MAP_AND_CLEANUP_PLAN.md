@@ -150,8 +150,10 @@ readiness rows. It consumes already-built rows, writes a caller-provided local/g
 including `export_review`, preserves full `canonical_url` text, and creates a clickable `property_link`.
 
 The workbook contains `Realworks Properties`, `Summary`, `Field Gaps`, `Warnings`, and `Problem Rows` worksheets. The
-current Oldenkotte sample remains validation-only: all `9` rows are `export_review`, not production client-ready
-output. Generated `.xlsx` files remain uncommitted local artifacts.
+current Oldenkotte sample remains validation-only: `8` rows are `export_review`, the Corellistraat-style `OverigOG`
+row is `export_blocked`, and no row is production client-ready. Postcode is exposed as a critical status/source field,
+VvE is explicit for apartments, energy labels keep value/status/raw separated, and non-residential rows are blocked or
+clearly marked. Generated `.xlsx` files remain uncommitted local artifacts.
 
 This is not matching, advisor email, n8n, dashboard, Funda/Pararius work, raw HTML/JSON persistence, long-description
 storage, image download, LLM extraction, eligibility change, or a parser-per-makelaar phase.

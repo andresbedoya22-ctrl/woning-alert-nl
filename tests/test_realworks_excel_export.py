@@ -113,6 +113,29 @@ def _full_record(index: int = 1):
     )
 
 
+def _apartment_record(index: int = 3):
+    return _record(
+        index,
+        _fact("asking_price", 325000),
+        _fact("property_type", "Appartement", normalized_value="appartement"),
+        _fact("availability_date", "Beschikbaar"),
+        _fact("rooms", 3),
+        _fact("bedrooms", 2),
+        _fact("bathrooms", 1),
+        _fact("living_area_m2", 83),
+        _fact("plot_area_m2", None, normalized_value=None, status="missing"),
+        _fact("volume_m3", 250),
+        _fact("energy_label", "Niet aanwezig", normalized_value=None, status="review", warnings=("energy_label_not_explicit",)),
+        _fact("bouwjaar", 1998),
+        _fact("heating_type", "CV-ketel", normalized_value="cv_ketel"),
+        _fact("garden", None, normalized_value=None, status="missing"),
+        _fact("parking", "Openbaar parkeren"),
+        _fact("garage", None, normalized_value=None, status="missing"),
+        _fact("eigendomssituatie", "Volle eigendom", normalized_value="volle_eigendom"),
+        _fact("description_length_bucket", "medium"),
+    )
+
+
 def _problem_record(index: int = 2):
     return _record(
         index,
@@ -262,8 +285,10 @@ def test_summary_counts_are_written(tmp_path: Path) -> None:
     assert values["listing_parser_total"] == 2
     assert values["readiness_rows_built"] == 2
     assert values["excel_rows_written"] == 2
-    assert values["advisor_review_count"] == 2
-    assert values["export_review_count"] == 2
+    assert values["advisor_review_count"] == 1
+    assert values["blocked_count"] == 1
+    assert values["export_review_count"] == 1
+    assert values["export_blocked_count"] == 1
     assert values["artifact_statement"] == "Excel validation artifact only"
     assert values["production_statement"] == "Not client-ready production output"
 
@@ -274,8 +299,11 @@ def test_field_gaps_are_written(tmp_path: Path) -> None:
 
     assert set(FIELD_GAP_FIELDS).issubset(rows)
     assert rows["postcode"][1:4] == [0, 0, 2]
+    assert rows["postcode_status"][1:4] == [0, 0, 2]
     assert rows["coordinates"][1:4] == [0, 0, 2]
     assert rows["property_type"][1:4] == [1, 1, 0]
+    assert rows["energy_label_status"][1:4] == [1, 1, 0]
+    assert rows["residential_classification"][1:4] == [1, 0, 1]
 
 
 def test_warnings_are_aggregated_with_sample_urls(tmp_path: Path) -> None:
@@ -288,6 +316,7 @@ def test_warnings_are_aggregated_with_sample_urls(tmp_path: Path) -> None:
     assert row_one.canonical_url in values["missing_coordinates"][2]
     assert values["description_not_stored"][1] == 2
     assert values["unsupported_property_type_overigog"][1] == 1
+    assert values["non_residential_property_type"][1] == 1
 
 
 def test_problem_rows_are_sorted_by_problem_severity(tmp_path: Path) -> None:
@@ -299,6 +328,51 @@ def test_problem_rows_are_sorted_by_problem_severity(tmp_path: Path) -> None:
 
     assert worksheet.cell(2, _col(headers, "address")).value == "Corellistraat"
     assert worksheet.cell(2, _col(headers, "problem_score")).value > worksheet.cell(3, _col(headers, "problem_score")).value
+
+
+def test_excel_includes_critical_status_columns(tmp_path: Path) -> None:
+    _, workbook = _export(tmp_path, _row(1, _apartment_record(1), property_type="appartement"))
+    headers = _headers(workbook["Realworks Properties"])
+
+    for column in (
+        "residential_classification",
+        "postcode_status",
+        "postcode_source",
+        "vve_active",
+        "vve_monthly_cost",
+        "vve_status",
+        "vve_review_reason",
+        "energy_label_status",
+        "energy_label_raw",
+        "energy_label_review_reason",
+    ):
+        assert column in headers
+
+
+def test_apartment_without_vve_and_energy_review_are_visible(tmp_path: Path) -> None:
+    row = _row(1, _apartment_record(1), property_type="appartement")
+    _, workbook = _export(tmp_path, row)
+    worksheet = workbook["Realworks Properties"]
+    headers = _headers(worksheet)
+
+    assert worksheet.cell(2, _col(headers, "vve_status")).value == "missing"
+    assert worksheet.cell(2, _col(headers, "vve_missing_reason")).value == "missing_vve_for_apartment"
+    assert worksheet.cell(2, _col(headers, "energy_label")).value in (None, "")
+    assert worksheet.cell(2, _col(headers, "energy_label_raw")).value == "Niet aanwezig"
+    assert worksheet.cell(2, _col(headers, "energy_label_status")).value == "review"
+    assert "missing_vve_for_apartment" in worksheet.cell(2, _col(headers, "warnings")).value
+
+
+def test_blocked_rows_are_still_written_for_human_validation(tmp_path: Path) -> None:
+    blocked = _row(2, _problem_record(2), address_raw="Corellistraat")
+    result, workbook = _export(tmp_path, blocked)
+    worksheet = workbook["Realworks Properties"]
+    headers = _headers(worksheet)
+
+    assert result.rows_written == 1
+    assert worksheet.cell(2, _col(headers, "residential_classification")).value == "non_residential_blocked"
+    assert worksheet.cell(2, _col(headers, "quality_status")).value == "blocked"
+    assert worksheet.cell(2, _col(headers, "export_readiness")).value == "export_blocked"
 
 
 def test_does_not_include_raw_html_json_or_long_description_text(tmp_path: Path) -> None:
@@ -327,6 +401,9 @@ def test_handles_empty_warnings_and_missing_fields(tmp_path: Path) -> None:
         review_fields=(),
         quality_status="client_ready",
         export_readiness="export_ready",
+        postcode_status="usable",
+        postcode_source="parsed_listing",
+        postcode_review_reason=None,
     )
     result, workbook = _export(tmp_path, row)
 

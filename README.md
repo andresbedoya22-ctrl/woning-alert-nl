@@ -387,9 +387,10 @@ caller-provided `.xlsx` validation artifact. It writes all rows, including the c
 preserves full `canonical_url` text, and creates a clickable `property_link`.
 
 The workbook contains `Realworks Properties`, `Summary`, `Field Gaps`, `Warnings`, and `Problem Rows` worksheets. The
-current Oldenkotte sample remains human-review only: all `9` rows are `export_review`, not production client-ready
-output. Generated `.xlsx` files such as `tmp/generated/realworks_oldenkotte_excel_validation_v1.xlsx` must not be
-committed.
+current Oldenkotte sample remains human-review only: `8` rows are `export_review` and the Corellistraat-style
+`OverigOG` row is `export_blocked`, not production client-ready output. The export makes postcode critical, VvE
+explicit for apartments, energy labels visible as value/status/raw, and non-residential classifications visible.
+Generated `.xlsx` files such as `tmp/generated/realworks_oldenkotte_excel_validation_v1.xlsx` must not be committed.
 
 This phase does not send email, run matching, touch n8n, build a dashboard, modify `data/raw`, persist raw HTML or raw
 web JSON, call an LLM, download images, copy long descriptions, scrape Funda or Pararius, change inventory eligibility,
