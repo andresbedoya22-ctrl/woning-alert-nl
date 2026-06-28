@@ -93,6 +93,24 @@ def _full_record(**overrides: object):
     return _record(*values.values())
 
 
+def _apartment_record(**overrides: object):
+    values = {
+        "asking_price": _fact("asking_price", 425000),
+        "property_type": _fact("property_type", "Appartement", normalized_value="appartement"),
+        "living_area_m2": _fact("living_area_m2", 83),
+        "bedrooms": _fact("bedrooms", 2),
+        "bathrooms": _fact("bathrooms", 1),
+        "energy_label": _fact("energy_label", "A"),
+        "bouwjaar": _fact("bouwjaar", 1998),
+        "heating_type": _fact("heating_type", "CV-ketel", normalized_value="cv_ketel"),
+        "parking": _fact("parking", "Openbaar parkeren"),
+        "eigendomssituatie": _fact("eigendomssituatie", "Volle eigendom", normalized_value="volle_eigendom"),
+        "description_length_bucket": _fact("description_length_bucket", "medium"),
+    }
+    values.update(overrides)
+    return _record(*values.values())
+
+
 def _detail_html(*, energy: str = "A", bedrooms: str = "3 slaapkamers", property_type: str = "Woonhuis") -> str:
     return f"""
     <html>
@@ -156,6 +174,9 @@ def test_advisor_review_when_energy_label_is_review() -> None:
 
     assert row.quality_status == "advisor_review"
     assert "energy_label" in row.review_fields
+    assert row.energy_label is None
+    assert row.energy_label_raw == "Niet aanwezig"
+    assert row.energy_label_status == "review"
 
 
 def test_advisor_review_when_bedrooms_are_missing() -> None:
@@ -171,6 +192,18 @@ def test_advisor_review_when_postcode_is_missing() -> None:
 
     assert row.quality_status == "advisor_review"
     assert "postcode" in row.missing_key_fields
+    assert "missing_postcode" in row.warnings
+    assert row.postcode_status == "missing"
+    assert row.postcode_source == "missing_not_extracted"
+
+
+def test_usable_postcode_removes_missing_postcode_warning() -> None:
+    row = build_realworks_property_readiness_row(_listing(postcode="5044 SN"), _full_record())
+
+    assert row.postcode == "5044 SN"
+    assert row.postcode_status == "usable"
+    assert "postcode" not in row.missing_key_fields
+    assert "missing_postcode" not in row.warnings
 
 
 def test_blocked_when_canonical_url_is_missing() -> None:
@@ -205,8 +238,38 @@ def test_overigog_is_not_client_ready() -> None:
     )
     row = build_realworks_property_readiness_row(_listing(), record)
 
+    assert row.residential_classification == "non_residential_blocked"
+    assert row.quality_status == "blocked"
+    assert row.export_readiness == "export_blocked"
+    assert "non_residential_property_type" in row.warnings
+
+
+def test_garage_property_type_is_blocked_as_non_residential() -> None:
+    record = _full_record(property_type=_fact("property_type", "Garage", normalized_value="garage", status="review", warnings=("non_residential_property_type",)))
+    row = build_realworks_property_readiness_row(_listing(property_type="garage"), record)
+
+    assert row.residential_classification == "non_residential_blocked"
+    assert row.quality_status == "blocked"
+    assert row.export_readiness == "export_blocked"
+    assert row.active_inventory_eligible is False
+    assert row.db_persistence_action == "store_excluded_non_residential"
+
+
+def test_apartment_without_vve_requires_review() -> None:
+    row = build_realworks_property_readiness_row(_listing(property_type="appartement"), _apartment_record())
+
+    assert row.vve_status == "missing"
+    assert row.vve_missing_reason == "missing_vve_for_apartment"
+    assert "missing_vve_for_apartment" in row.warnings
+    assert "vve_active" in row.missing_key_fields
     assert row.quality_status == "advisor_review"
-    assert row.export_readiness == "export_review"
+
+
+def test_woonhuis_without_vve_does_not_warn() -> None:
+    row = build_realworks_property_readiness_row(_listing(), _full_record())
+
+    assert row.vve_status == "not_applicable"
+    assert "missing_vve_for_apartment" not in row.warnings
 
 
 def test_missing_lat_lon_reported_as_gap_not_invented() -> None:
@@ -275,6 +338,31 @@ def test_export_readiness_maps_correctly() -> None:
     assert ready.export_readiness == "export_ready"
     assert review.export_readiness == "export_review"
     assert blocked.export_readiness == "export_blocked"
+
+
+def test_verkocht_is_history_only_not_active_inventory() -> None:
+    row = build_realworks_property_readiness_row(_listing(status="verkocht"), _full_record())
+
+    assert row.status_bucket == "inactive_sold"
+    assert row.active_inventory_eligible is False
+    assert row.db_persistence_action == "store_status_history"
+
+
+def test_verkocht_onder_voorbehoud_is_history_only_not_active_inventory() -> None:
+    row = build_realworks_property_readiness_row(_listing(status="verkocht onder voorbehoud"), _full_record())
+
+    assert row.status_bucket == "inactive_under_contract"
+    assert row.active_inventory_eligible is False
+    assert row.db_persistence_action == "store_status_history"
+
+
+def test_beschikbaar_residential_ready_can_be_active_inventory_eligible() -> None:
+    row = build_realworks_property_readiness_row(_listing(status="beschikbaar"), _full_record())
+
+    assert row.quality_status == "client_ready"
+    assert row.status_bucket == "active_available"
+    assert row.active_inventory_eligible is True
+    assert row.db_persistence_action == "store_active_candidate"
 
 
 def test_runner_aggregates_counts_without_live_network(monkeypatch) -> None:

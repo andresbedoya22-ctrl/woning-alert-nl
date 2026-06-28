@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import json
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -73,6 +74,7 @@ _LABEL_TO_FIELD = {
     "aantal kamers": "rooms",
     "aantal slaapkamers": "bedrooms",
     "bouwjaar": "bouwjaar",
+    "bijdrage vve": "vve_monthly_cost",
     "c.v.-ketel": "cv_ketel_present",
     "cv ketel": "cv_ketel_present",
     "cv-ketel": "cv_ketel_present",
@@ -86,7 +88,9 @@ _LABEL_TO_FIELD = {
     "parkeerfaciliteiten": "parking",
     "parkeertypes": "parking",
     "perceeloppervlakte": "plot_area_m2",
+    "postcode": "postcode",
     "status": "availability_date",
+    "servicekosten": "vve_monthly_cost",
     "soort object": "property_type",
     "tuin": "garden",
     "tuintypes": "garden",
@@ -98,6 +102,11 @@ _LABEL_TO_FIELD = {
     "vve": "vve_active",
     "vve bijdrage": "vve_monthly_cost",
 }
+_POSTCODE_PATTERN = re.compile(r"\b(?P<postcode>[1-9][0-9]{3})\s?(?P<letters>[A-Z]{2})\b", re.IGNORECASE)
+_JSON_LD_PATTERN = re.compile(
+    r"<script\b[^>]*type\s*=\s*['\"]application/ld\+json['\"][^>]*>(?P<body>.*?)</script>",
+    re.IGNORECASE | re.DOTALL,
+)
 _TAG_PATTERN = re.compile(r"<[^>]+>", re.IGNORECASE)
 _WHITESPACE_PATTERN = re.compile(r"\s+")
 _KENMERK_BLOCK_PATTERN = re.compile(
@@ -124,6 +133,12 @@ class RealworksFactsExtractionResult:
     fields_review: tuple[str, ...]
     fields_missing: tuple[str, ...]
     warning_counts: tuple[tuple[str, int], ...]
+    address_raw: str | None = None
+    postcode: str | None = None
+    city: str | None = None
+    postcode_status: str = "missing"
+    postcode_source: str = "missing_not_extracted"
+    postcode_review_reason: str | None = None
     warnings: tuple[str, ...] = ()
 
 
@@ -141,6 +156,7 @@ def extract_realworks_property_facts_from_html(
     listing_fallbacks: Mapping[str, object] | None = None,
 ) -> RealworksFactsExtractionResult:
     label_values = _extract_kenmerk_label_values(html)
+    location = _extract_location_from_detail_html(html, label_values)
     warnings: list[str] = []
     facts: list[PropertyFactValue] = []
     seen_fields: set[str] = set()
@@ -148,6 +164,8 @@ def extract_realworks_property_facts_from_html(
     for label, value in label_values:
         field = _LABEL_TO_FIELD.get(label)
         if field is None:
+            continue
+        if field == "postcode":
             continue
         fact = _fact_from_kenmerk(field=field, label=label, value=value)
         facts.append(fact)
@@ -206,6 +224,12 @@ def extract_realworks_property_facts_from_html(
         fields_review=tuple(fact.field for fact in record.facts if fact.status == FACT_STATUS_REVIEW),
         fields_missing=tuple(fact.field for fact in record.facts if fact.status == FACT_STATUS_MISSING),
         warning_counts=_counter_pairs(all_warnings),
+        address_raw=location.address_raw or address_raw,
+        postcode=location.postcode,
+        city=location.city or city,
+        postcode_status=location.postcode_status,
+        postcode_source=location.postcode_source,
+        postcode_review_reason=location.postcode_review_reason,
         warnings=all_warnings,
     )
 
@@ -266,6 +290,136 @@ def _extract_kenmerk_label_values(html: str) -> tuple[tuple[str, str], ...]:
         if label and value:
             pairs.append((label, value))
     return tuple(_dedupe_pairs(pairs))
+
+
+@dataclass(frozen=True, slots=True)
+class _ExtractedLocation:
+    address_raw: str | None
+    postcode: str | None
+    city: str | None
+    postcode_status: str
+    postcode_source: str
+    postcode_review_reason: str | None = None
+
+
+def _extract_location_from_detail_html(
+    html: str,
+    label_values: tuple[tuple[str, str], ...],
+) -> _ExtractedLocation:
+    json_location = _extract_json_ld_location(html)
+    header_location = _extract_header_location(html)
+    label_location = _extract_label_postcode_location(label_values)
+    visible_location = _extract_visible_postcode_location(html)
+
+    if json_location.postcode and header_location.postcode and json_location.postcode != header_location.postcode:
+        return _ExtractedLocation(
+            address_raw=json_location.address_raw or header_location.address_raw,
+            postcode=json_location.postcode,
+            city=json_location.city or header_location.city,
+            postcode_status="review",
+            postcode_source="json_ld_conflict",
+            postcode_review_reason="postcode_conflict_json_ld_visible_header",
+        )
+    for candidate in (json_location, header_location, visible_location, label_location):
+        if candidate.postcode:
+            return candidate
+    return _ExtractedLocation(None, None, None, "missing", "missing_not_extracted", "postcode_not_found")
+
+
+def _extract_json_ld_location(html: str) -> _ExtractedLocation:
+    for match in _JSON_LD_PATTERN.finditer(html or ""):
+        try:
+            payload = json.loads(unescape(match.group("body")).strip())
+        except Exception:
+            continue
+        for item in _walk_json(payload):
+            if not isinstance(item, dict):
+                continue
+            address = item.get("address")
+            if not isinstance(address, dict):
+                continue
+            postcode = _normalize_postcode(address.get("postalCode"))
+            if not postcode:
+                continue
+            return _ExtractedLocation(
+                address_raw=_optional_text(address.get("streetAddress")),
+                postcode=postcode,
+                city=_optional_text(address.get("addressLocality")),
+                postcode_status="usable",
+                postcode_source="json_ld",
+            )
+    return _ExtractedLocation(None, None, None, "missing", "missing_not_extracted")
+
+
+def _walk_json(value: object) -> Iterable[object]:
+    if isinstance(value, dict):
+        yield value
+        for child in value.values():
+            yield from _walk_json(child)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _walk_json(item)
+
+
+def _extract_header_location(html: str) -> _ExtractedLocation:
+    text = _normalize_visible_text(unescape(_TAG_PATTERN.sub(" ", html or "")))
+    match = re.search(
+        rf"(?P<address>[^|]{{2,120}}?)\s*\|\s*(?P<postcode>[1-9][0-9]{{3}}\s?[A-Z]{{2}})\s+(?P<city>[A-Za-zÀ-ÿ' -]{{2,80}})",
+        text,
+        re.IGNORECASE,
+    )
+    if not match:
+        return _ExtractedLocation(None, None, None, "missing", "missing_not_extracted")
+    return _ExtractedLocation(
+        address_raw=_optional_text(match.group("address")),
+        postcode=_normalize_postcode(match.group("postcode")),
+        city=_optional_text(match.group("city")),
+        postcode_status="usable",
+        postcode_source="realworks_detail_header",
+    )
+
+
+def _extract_visible_postcode_location(html: str) -> _ExtractedLocation:
+    text = _normalize_visible_text(unescape(_TAG_PATTERN.sub(" ", html or "")))
+    match = _POSTCODE_PATTERN.search(text)
+    if not match:
+        return _ExtractedLocation(None, None, None, "missing", "missing_not_extracted")
+    city_match = re.match(r"\s*(?P<city>[A-Za-zÀ-ÿ' -]{2,80})", text[match.end() :])
+    return _ExtractedLocation(
+        address_raw=None,
+        postcode=_normalize_postcode(match.group(0)),
+        city=_optional_text(city_match.group("city")) if city_match else None,
+        postcode_status="usable",
+        postcode_source="visible_postcode_regex",
+    )
+
+
+def _extract_label_postcode_location(label_values: tuple[tuple[str, str], ...]) -> _ExtractedLocation:
+    for label, value in label_values:
+        if label != "postcode":
+            continue
+        postcode = _normalize_postcode(value)
+        if postcode:
+            return _ExtractedLocation(
+                address_raw=None,
+                postcode=postcode,
+                city=None,
+                postcode_status="usable",
+                postcode_source="realworks_kenmerk_postcode",
+            )
+    return _ExtractedLocation(None, None, None, "missing", "missing_not_extracted")
+
+
+def _normalize_postcode(value: object) -> str | None:
+    match = _POSTCODE_PATTERN.search(str(value or "").upper())
+    if not match:
+        return None
+    return f"{match.group('postcode')} {match.group('letters').upper()}"
+
+
+def _optional_text(value: object) -> str | None:
+    text = _normalize_visible_text(str(value or ""))
+    return text or None
 
 
 def _fact_from_kenmerk(*, field: str, label: str, value: str) -> PropertyFactValue:
@@ -409,7 +563,10 @@ def _missing_fact(field: str) -> PropertyFactValue:
 def _normalize_realworks_property_type(value: str) -> tuple[str | None, tuple[str, ...]]:
     text = _normalize_text(value)
     if text == "overigog":
-        return "unknown", ("unsupported_property_type_overigog",)
+        return "unknown", ("unsupported_property_type_overigog", "non_residential_property_type")
+    if _is_non_residential_text(text):
+        normalized = normalize_property_type(value)
+        return normalized or "unknown", ("non_residential_property_type",)
     normalized = normalize_property_type(value)
     if normalized in {None, "unknown"}:
         return normalized, ("property_type_not_supported",)
@@ -443,6 +600,23 @@ def _normalize_open_text_value(value: str) -> str:
 def _is_ambiguous_parking_or_garage(value: str) -> bool:
     text = _normalize_text(value)
     return text in {"n.v.t.", "nvt", "onbekend", "diverse", "nader te bepalen"} or "mogelijk" in text
+
+
+def _is_non_residential_text(text: str) -> bool:
+    terms = (
+        "garage",
+        "garages",
+        "parkeerplaats",
+        "parkeerplaatsen",
+        "berging",
+        "schuur",
+        "opslag",
+        "box",
+        "bedrijfsruimte",
+        "kantoor",
+        "winkelruimte",
+    )
+    return any(term in text for term in terms)
 
 
 def _description_length_bucket(html: str, label_values: tuple[tuple[str, str], ...]) -> str:

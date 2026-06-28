@@ -38,6 +38,10 @@ def _html(*pairs: tuple[str, str], description: str = "Compacte omschrijving.") 
     """
 
 
+def _html_with_body(body: str) -> str:
+    return f"<html><body>{body}</body></html>"
+
+
 def _extract(html: str, **fallbacks: object):
     return extract_realworks_property_facts_from_html(
         html=html,
@@ -61,6 +65,74 @@ def test_extracts_woonoppervlakte_to_living_area() -> None:
 
     assert facts["living_area_m2"].normalized_value == 123
     assert facts["living_area_m2"].status == "usable"
+
+
+def test_extracts_postcode_from_visible_detail_header() -> None:
+    result = _extract(
+        _html_with_body(
+            """
+            <div class="object-header">
+              <span>Magentahof 1</span> | <span>5044 SN Tilburg</span>
+            </div>
+            """
+        )
+    )
+
+    assert result.address_raw == "Magentahof 1"
+    assert result.postcode == "5044 SN"
+    assert result.city == "Tilburg"
+    assert result.postcode_status == "usable"
+    assert result.postcode_source == "realworks_detail_header"
+
+
+def test_normalizes_compact_visible_postcode() -> None:
+    result = _extract(_html_with_body("<div>Dirigentenlaan 9 b | 5049AB Tilburg</div>"))
+
+    assert result.postcode == "5049 AB"
+    assert result.city == "Tilburg"
+
+
+def test_extracts_postcode_from_json_ld_address() -> None:
+    result = _extract(
+        _html_with_body(
+            """
+            <script type="application/ld+json">
+            {"@type":"Residence","address":{"streetAddress":"Magentahof 1","postalCode":"5044SN","addressLocality":"Tilburg"}}
+            </script>
+            """
+        )
+    )
+
+    assert result.address_raw == "Magentahof 1"
+    assert result.postcode == "5044 SN"
+    assert result.city == "Tilburg"
+    assert result.postcode_source == "json_ld"
+
+
+def test_json_ld_visible_header_postcode_conflict_is_review() -> None:
+    result = _extract(
+        _html_with_body(
+            """
+            <script type="application/ld+json">
+            {"address":{"streetAddress":"Magentahof 1","postalCode":"5044SN","addressLocality":"Tilburg"}}
+            </script>
+            <div>Magentahof 1 | 5045 AB Tilburg</div>
+            """
+        )
+    )
+
+    assert result.postcode == "5044 SN"
+    assert result.postcode_status == "review"
+    assert result.postcode_source == "json_ld_conflict"
+    assert result.postcode_review_reason == "postcode_conflict_json_ld_visible_header"
+
+
+def test_does_not_invent_postcode_when_absent() -> None:
+    result = _extract(_html(("Woonoppervlakte", "123 m2")))
+
+    assert result.postcode is None
+    assert result.postcode_status == "missing"
+    assert result.postcode_source == "missing_not_extracted"
 
 
 def test_extracts_perceeloppervlakte_to_plot_area() -> None:
@@ -121,6 +193,15 @@ def test_non_explicit_energy_label_becomes_review() -> None:
     assert "energy_label_not_explicit" in facts["energy_label"].warnings
 
 
+def test_niet_aanwezig_energy_label_is_review_not_usable() -> None:
+    facts = _facts(_extract(_html(("Energieklasse", "Niet aanwezig"))))
+
+    assert facts["energy_label"].normalized_value is None
+    assert facts["energy_label"].value == "Niet aanwezig"
+    assert facts["energy_label"].status == "review"
+    assert "energy_label_not_explicit" in facts["energy_label"].warnings
+
+
 def test_extracts_bouwjaar() -> None:
     facts = _facts(_extract(_html(("Bouwjaar", "1998"))))
 
@@ -165,6 +246,23 @@ def test_marks_overigog_property_type_as_review_unsupported() -> None:
     assert facts["property_type"].status == "review"
     assert facts["property_type"].normalized_value == "unknown"
     assert "unsupported_property_type_overigog" in facts["property_type"].warnings
+    assert "non_residential_property_type" in facts["property_type"].warnings
+
+
+def test_marks_garage_property_type_as_non_residential_warning() -> None:
+    facts = _facts(_extract(_html(("Soort object", "Garage"))))
+
+    assert facts["property_type"].normalized_value == "garage"
+    assert facts["property_type"].status == "review"
+    assert "non_residential_property_type" in facts["property_type"].warnings
+
+
+def test_extracts_vve_labels() -> None:
+    facts = _facts(_extract(_html(("VvE", "Ja"), ("Bijdrage VvE", "EUR 125 per maand"))))
+
+    assert facts["vve_active"].normalized_value is True
+    assert facts["vve_active"].status == "usable"
+    assert facts["vve_monthly_cost"].normalized_value == 125
 
 
 def test_keeps_descriptions_as_length_bucket_only() -> None:

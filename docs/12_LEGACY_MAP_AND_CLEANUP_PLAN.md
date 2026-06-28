@@ -143,6 +143,23 @@ postcode and several facts remain incomplete or review-only.
 This remains in-memory only and does not create Excel, cache, matching input, advisor email, n8n flow, dashboard,
 generated raw HTML/JSON, images, an LLM extraction path, a parser per makelaar, or inventory eligibility changes.
 
+## Realworks Excel Validation v1
+
+`scraper/src/domek_wonen/pilots/realworks_excel_export.py` adds the local human-validation workbook for Realworks
+readiness rows. It consumes already-built rows, writes a caller-provided local/generated `.xlsx` path, exports all rows
+including `export_review`, preserves full `canonical_url` text, and creates a clickable `property_link`.
+
+The workbook contains `Realworks Properties`, `Summary`, `Field Gaps`, `Warnings`, and `Problem Rows` worksheets. The
+current Oldenkotte sample remains validation-only: `8` rows are `export_review`, the Corellistraat-style `OverigOG`
+row is `export_blocked`, and no row is production client-ready. Postcode is exposed as a critical status/source field,
+VvE is explicit for apartments, energy labels keep value/status/raw separated, and non-residential rows are blocked or
+clearly marked. Postcode now comes from JSON-LD address data or visible Realworks detail headers when present. Status
+policy columns keep sold, under-contract, under-offer, and rented rows for later source inventory/history while keeping
+them out of active inventory and matching. Generated `.xlsx` files remain uncommitted local artifacts.
+
+This is not matching, advisor email, n8n, dashboard, Funda/Pararius work, raw HTML/JSON persistence, long-description
+storage, image download, LLM extraction, eligibility change, or a parser-per-makelaar phase.
+
 ## Parser Family Runner v1
 
 `scraper/src/domek_wonen/parsers/runner.py` adds the first offline connector from
