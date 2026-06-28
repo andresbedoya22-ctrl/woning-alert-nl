@@ -398,6 +398,19 @@ This phase does not send email, run matching, touch n8n, build a dashboard, modi
 web JSON, call an LLM, download images, copy long descriptions, scrape Funda or Pararius, change inventory eligibility,
 or create a parser per makelaar.
 
+## Realworks Freshness & Lifecycle Fields v1
+
+`scraper/src/domek_wonen/inventory/lifecycle.py` adds a family-agnostic offline contract for source publication dates,
+first-seen/last-seen/observed timestamps, freshness buckets, and lifecycle events. Realworks readiness rows and the
+Excel validation workbook now expose these fields while keeping `source_published_at`, `first_seen_at`, and
+`observed_at` separate.
+
+The Realworks extractor reads explicit publication-date candidates from JSON-LD, embedded state, and reusable
+`kenmerkName` / `kenmerkValue` labels. It does not invent publication dates from bouwjaar, status text, or URL ids.
+`dateModified` is review-only when it is the only candidate. This phase creates no real DB, migrations, matching,
+client alerts, advisor email, n8n, dashboard, raw HTML/JSON persistence, long-description export, images, LLM path,
+Funda/Pararius path, parser per makelaar, or global eligibility change.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`

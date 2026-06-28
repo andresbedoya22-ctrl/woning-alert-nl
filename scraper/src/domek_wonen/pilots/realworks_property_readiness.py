@@ -14,6 +14,11 @@ from domek_wonen.facts.realworks_extractor import (
     extract_realworks_property_facts_for_listing,
     realworks_field_completion_counts,
 )
+from domek_wonen.inventory.lifecycle import (
+    ListingLifecycleFields,
+    build_initial_lifecycle_fields,
+)
+from domek_wonen.qa.parser_output_gate import build_listing_normalized_key
 from domek_wonen.facts.summary import ClientReadyPropertySummary, build_client_ready_property_summary
 from domek_wonen.parsers import ParserFamilyRunner, ParserInput
 from domek_wonen.parsers.models import ParsedListing
@@ -130,6 +135,23 @@ class RealworksPropertyReadinessRow:
     status_bucket: str
     active_inventory_eligible: bool
     db_persistence_action: str
+    source_published_at: datetime | None
+    source_published_at_raw: str | None
+    source_published_at_source: str | None
+    source_published_at_status: str
+    source_published_at_review_reason: str | None
+    first_seen_at: datetime | None
+    last_seen_at: datetime | None
+    observed_at: datetime | None
+    status_first_seen_at: datetime | None
+    status_changed_at: datetime | None
+    price_first_seen_at: datetime | None
+    price_changed_at: datetime | None
+    removed_at: datetime | None
+    days_on_market_source: int | None
+    days_since_first_seen: int | None
+    freshness_bucket: str
+    lifecycle_events: tuple[str, ...]
     asking_price: int | None
     property_type: str | None
     status: str | None
@@ -218,6 +240,13 @@ def build_realworks_property_readiness_row(
     postcode_status: str | None = None,
     postcode_source: str | None = None,
     postcode_review_reason: str | None = None,
+    observed_at: datetime | None = None,
+    source_published_at: datetime | None = None,
+    source_published_at_raw: str | None = None,
+    source_published_at_source: str | None = None,
+    source_published_at_status: str = "missing",
+    source_published_at_review_reason: str | None = None,
+    previous_lifecycle_record: ListingLifecycleFields | None = None,
 ) -> RealworksPropertyReadinessRow:
     location = location or build_location_readiness_from_listing(listing)
     summary = build_client_ready_property_summary(facts_record)
@@ -241,6 +270,8 @@ def build_realworks_property_readiness_row(
         summary,
         residential_classification=residential_classification,
         vve_status=vve_status,
+        source_published_at_status=source_published_at_status,
+        source_published_at_review_reason=source_published_at_review_reason,
     )
     quality_status = _quality_status(
         listing=listing,
@@ -261,6 +292,22 @@ def build_realworks_property_readiness_row(
         residential_classification=residential_classification,
         status_bucket=status_bucket,
     )
+    observed_at = observed_at or _parse_utc_datetime(facts_record.fetched_at) or datetime.now(UTC)
+    lifecycle = build_initial_lifecycle_fields(
+        canonical_url=listing.canonical_url,
+        normalized_key=build_listing_normalized_key(listing),
+        source_id=listing.source_id,
+        source_published_at=source_published_at,
+        source_published_at_raw=source_published_at_raw,
+        source_published_at_source=source_published_at_source,
+        source_published_at_status=source_published_at_status,
+        source_published_at_review_reason=source_published_at_review_reason,
+        asking_price=_int_fact(fact_map, "asking_price"),
+        status_bucket=status_bucket,
+        residential_classification=residential_classification,
+        observed_at=observed_at,
+        previous_lifecycle_record=previous_lifecycle_record,
+    )
     row = RealworksPropertyReadinessRow(
         source_id=listing.source_id,
         source_domain=listing.source_domain,
@@ -273,6 +320,23 @@ def build_realworks_property_readiness_row(
         status_bucket=status_bucket,
         active_inventory_eligible=active_inventory_eligible,
         db_persistence_action=db_persistence_action,
+        source_published_at=lifecycle.source_published_at,
+        source_published_at_raw=lifecycle.source_published_at_raw,
+        source_published_at_source=lifecycle.source_published_at_source,
+        source_published_at_status=lifecycle.source_published_at_status,
+        source_published_at_review_reason=lifecycle.source_published_at_review_reason,
+        first_seen_at=lifecycle.first_seen_at,
+        last_seen_at=lifecycle.last_seen_at,
+        observed_at=lifecycle.observed_at,
+        status_first_seen_at=lifecycle.status_first_seen_at,
+        status_changed_at=lifecycle.status_changed_at,
+        price_first_seen_at=lifecycle.price_first_seen_at,
+        price_changed_at=lifecycle.price_changed_at,
+        removed_at=lifecycle.removed_at,
+        days_on_market_source=lifecycle.days_on_market_source,
+        days_since_first_seen=lifecycle.days_since_first_seen,
+        freshness_bucket=lifecycle.freshness_bucket,
+        lifecycle_events=lifecycle.lifecycle_events,
         asking_price=_int_fact(fact_map, "asking_price"),
         property_type=_str_fact(fact_map, "property_type"),
         status=listing.status or facts_record.status,
@@ -333,8 +397,11 @@ def run_realworks_property_readiness(
     timeout_seconds: float = 15.0,
     fetch_html: Callable[[str], str] | None = None,
     now: datetime | None = None,
+    observed_at: datetime | None = None,
+    previous_lifecycle_records: dict[str, ListingLifecycleFields] | None = None,
 ) -> RealworksPropertyReadinessResult:
-    fetched_at = now or datetime.now(UTC)
+    fetched_at = now or observed_at or datetime.now(UTC)
+    observed = observed_at or fetched_at
     fetch = fetch_html or (lambda url: controlled_http_fetch_html(url, timeout_seconds=timeout_seconds))
     warnings: list[str] = []
     rows: list[RealworksPropertyReadinessRow] = []
@@ -449,6 +516,13 @@ def run_realworks_property_readiness(
             postcode_status=extraction.postcode_status,
             postcode_source=extraction.postcode_source,
             postcode_review_reason=extraction.postcode_review_reason,
+            observed_at=observed,
+            source_published_at=extraction.source_published_at,
+            source_published_at_raw=extraction.source_published_at_raw,
+            source_published_at_source=extraction.source_published_at_source,
+            source_published_at_status=extraction.source_published_at_status,
+            source_published_at_review_reason=extraction.source_published_at_review_reason,
+            previous_lifecycle_record=(previous_lifecycle_records or {}).get(build_listing_normalized_key(listing)),
         )
         rows.append(row)
 
@@ -599,12 +673,20 @@ def _row_warnings(
     *,
     residential_classification: str,
     vve_status: str,
+    source_published_at_status: str = "missing",
+    source_published_at_review_reason: str | None = None,
 ) -> tuple[str, ...]:
     warnings = [*location.warnings, *facts_record.warnings, *summary.warnings]
     if residential_classification.startswith("non_residential"):
         warnings.append("non_residential_property_type")
     if vve_status == "missing":
         warnings.append("missing_vve_for_apartment")
+    if source_published_at_status == "missing":
+        warnings.append("source_published_at_missing")
+    if source_published_at_status == "review":
+        warnings.append("source_published_at_review")
+    if source_published_at_review_reason:
+        warnings.append(source_published_at_review_reason)
     return _dedupe(warnings)
 
 
@@ -867,3 +949,15 @@ def _dedupe(values: Iterable[str]) -> tuple[str, ...]:
             seen.add(value)
             result.append(value)
     return tuple(result)
+
+
+def _parse_utc_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)

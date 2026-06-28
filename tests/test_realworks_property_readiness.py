@@ -161,6 +161,45 @@ def test_builds_row_from_qa_clean_listing_and_usable_facts() -> None:
     assert row.client_summary.headline
 
 
+def test_adds_lifecycle_fields_to_readiness_row() -> None:
+    row = build_realworks_property_readiness_row(
+        _listing(),
+        _full_record(),
+        observed_at=NOW,
+        source_published_at=datetime(2026, 6, 27, tzinfo=UTC),
+        source_published_at_raw="2026-06-27",
+        source_published_at_source="json_ld_datePublished",
+        source_published_at_status="usable",
+    )
+
+    assert row.source_published_at == datetime(2026, 6, 27, tzinfo=UTC)
+    assert row.source_published_at_raw == "2026-06-27"
+    assert row.source_published_at_source == "json_ld_datePublished"
+    assert row.source_published_at_status == "usable"
+    assert row.first_seen_at == NOW
+    assert row.last_seen_at == NOW
+    assert row.observed_at == NOW
+    assert row.days_on_market_source == 1
+    assert row.days_since_first_seen == 0
+    assert row.freshness_bucket == "new_3d"
+    assert row.lifecycle_events == ("new_listing",)
+
+
+def test_uses_explicit_observed_at() -> None:
+    row = build_realworks_property_readiness_row(_listing(), _full_record(), observed_at=NOW)
+
+    assert row.observed_at == NOW
+    assert row.first_seen_at == NOW
+
+
+def test_preserves_missing_source_published_at_without_inventing() -> None:
+    row = build_realworks_property_readiness_row(_listing(), _full_record(), observed_at=NOW)
+
+    assert row.source_published_at is None
+    assert row.source_published_at_status == "missing"
+    assert "source_published_at_missing" in row.warnings
+
+
 def test_client_ready_when_critical_fields_are_usable() -> None:
     row = build_realworks_property_readiness_row(_listing(), _full_record())
 
@@ -346,6 +385,7 @@ def test_verkocht_is_history_only_not_active_inventory() -> None:
     assert row.status_bucket == "inactive_sold"
     assert row.active_inventory_eligible is False
     assert row.db_persistence_action == "store_status_history"
+    assert "sold" in row.lifecycle_events
 
 
 def test_verkocht_onder_voorbehoud_is_history_only_not_active_inventory() -> None:

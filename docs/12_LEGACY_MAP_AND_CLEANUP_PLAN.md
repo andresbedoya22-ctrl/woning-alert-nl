@@ -160,6 +160,22 @@ them out of active inventory and matching. Generated `.xlsx` files remain uncomm
 This is not matching, advisor email, n8n, dashboard, Funda/Pararius work, raw HTML/JSON persistence, long-description
 storage, image download, LLM extraction, eligibility change, or a parser-per-makelaar phase.
 
+## Realworks Freshness & Lifecycle Fields v1
+
+`scraper/src/domek_wonen/inventory/lifecycle.py` adds the offline lifecycle contract used by Realworks readiness rows
+and the Excel validation workbook. The contract separates source-declared publication date from system `first_seen_at`
+and run-level `observed_at`, computes source/system age, assigns freshness buckets, and records lifecycle events such
+as `new_listing`, `price_changed`, `status_changed`, `under_offer`, `sold`, and `non_residential_excluded`.
+
+Realworks-specific extraction remains in `scraper/src/domek_wonen/facts/realworks_extractor.py`, using JSON-LD,
+embedded state, and reusable `kenmerkName` / `kenmerkValue` labels. No publication date is invented from bouwjaar,
+status text, or URL ids. The existing Realworks status/history policy remains separate through `status_bucket`,
+`active_inventory_eligible`, and `db_persistence_action`.
+
+This phase creates no real database, migrations, matching, client alerts, advisor email, n8n, dashboard, Funda/Pararius
+path, raw HTML/JSON persistence, long descriptions, images, LLM extraction, parser per makelaar, or global eligibility
+change.
+
 ## Parser Family Runner v1
 
 `scraper/src/domek_wonen/parsers/runner.py` adds the first offline connector from

@@ -124,6 +124,36 @@ _META_DESCRIPTION_PATTERN = re.compile(
 )
 _DESCRIPTION_PAIR_LABELS = frozenset({"omschrijving", "description", "beschrijving"})
 _YEAR_PATTERN = re.compile(r"\b(1[89]\d{2}|20\d{2})\b")
+_DATE_TOKEN_PATTERN = re.compile(
+    r"\b(?:20\d{2}-\d{1,2}-\d{1,2}(?:T[0-9:.+-]+Z?)?|\d{1,2}[-/.]\d{1,2}[-/.]20\d{2}|\d{1,2}\s+[A-Za-z]+\s+20\d{2})\b",
+    re.IGNORECASE,
+)
+_SOURCE_PUBLISHED_LABELS = frozenset(
+    {
+        "aangemeld",
+        "gepubliceerd",
+        "publicatiedatum",
+        "datum plaatsing",
+        "sinds",
+        "beschikbaar sinds",
+        "plaatsingsdatum",
+        "online sinds",
+    }
+)
+_DUTCH_MONTHS = {
+    "januari": 1,
+    "februari": 2,
+    "maart": 3,
+    "april": 4,
+    "mei": 5,
+    "juni": 6,
+    "juli": 7,
+    "augustus": 8,
+    "september": 9,
+    "oktober": 10,
+    "november": 11,
+    "december": 12,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +169,11 @@ class RealworksFactsExtractionResult:
     postcode_status: str = "missing"
     postcode_source: str = "missing_not_extracted"
     postcode_review_reason: str | None = None
+    source_published_at: datetime | None = None
+    source_published_at_raw: str | None = None
+    source_published_at_source: str | None = None
+    source_published_at_status: str = "missing"
+    source_published_at_review_reason: str | None = None
     warnings: tuple[str, ...] = ()
 
 
@@ -157,6 +192,7 @@ def extract_realworks_property_facts_from_html(
 ) -> RealworksFactsExtractionResult:
     label_values = _extract_kenmerk_label_values(html)
     location = _extract_location_from_detail_html(html, label_values)
+    published_at = _extract_source_published_at(html, label_values)
     warnings: list[str] = []
     facts: list[PropertyFactValue] = []
     seen_fields: set[str] = set()
@@ -230,6 +266,11 @@ def extract_realworks_property_facts_from_html(
         postcode_status=location.postcode_status,
         postcode_source=location.postcode_source,
         postcode_review_reason=location.postcode_review_reason,
+        source_published_at=published_at.source_published_at,
+        source_published_at_raw=published_at.source_published_at_raw,
+        source_published_at_source=published_at.source_published_at_source,
+        source_published_at_status=published_at.source_published_at_status,
+        source_published_at_review_reason=published_at.source_published_at_review_reason,
         warnings=all_warnings,
     )
 
@@ -300,6 +341,182 @@ class _ExtractedLocation:
     postcode_status: str
     postcode_source: str
     postcode_review_reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _ExtractedSourcePublishedAt:
+    source_published_at: datetime | None
+    source_published_at_raw: str | None
+    source_published_at_source: str | None
+    source_published_at_status: str
+    source_published_at_review_reason: str | None = None
+
+
+def _extract_source_published_at(
+    html: str,
+    label_values: tuple[tuple[str, str], ...],
+) -> _ExtractedSourcePublishedAt:
+    strong_candidates: list[_ExtractedSourcePublishedAt] = []
+    review_candidates: list[_ExtractedSourcePublishedAt] = []
+
+    for match in _JSON_LD_PATTERN.finditer(html or ""):
+        try:
+            payload = json.loads(unescape(match.group("body")).strip())
+        except Exception:
+            continue
+        for item in _walk_json(payload):
+            if not isinstance(item, dict):
+                continue
+            for key, source in (("datePosted", "json_ld_datePosted"), ("datePublished", "json_ld_datePublished")):
+                parsed = _source_published_candidate(item.get(key), source=source, status="usable")
+                if parsed:
+                    strong_candidates.append(parsed)
+            parsed_modified = _source_published_candidate(
+                item.get("dateModified"),
+                source="json_ld_dateModified",
+                status="review",
+                review_reason="date_modified_not_publication_date",
+            )
+            if parsed_modified:
+                review_candidates.append(parsed_modified)
+
+    for label, value in label_values:
+        if label not in _SOURCE_PUBLISHED_LABELS:
+            continue
+        parsed = _source_published_candidate(value, source=f"realworks_kenmerk_{label.replace(' ', '_')}", status="usable")
+        if parsed:
+            strong_candidates.append(parsed)
+
+    for parsed in _extract_embedded_state_dates(html):
+        if parsed.source_published_at_status == "usable":
+            strong_candidates.append(parsed)
+        else:
+            review_candidates.append(parsed)
+
+    return _select_source_published_candidate(strong_candidates, review_candidates)
+
+
+def _extract_embedded_state_dates(html: str) -> tuple[_ExtractedSourcePublishedAt, ...]:
+    candidates: list[_ExtractedSourcePublishedAt] = []
+    source_names = {
+        "publishedAt": ("embedded_state_publishedAt", "usable", None),
+        "createdAt": ("embedded_state_createdAt", "usable", None),
+        "datePublished": ("embedded_state_datePublished", "usable", None),
+        "datePosted": ("embedded_state_datePosted", "usable", None),
+        "availableFrom": ("embedded_state_availableFrom", "usable", None),
+        "updatedAt": ("embedded_state_updatedAt", "review", "updated_at_not_publication_date"),
+        "statusChangedAt": ("embedded_state_statusChangedAt", "review", "status_changed_at_not_publication_date"),
+    }
+    for field, (source, status, reason) in source_names.items():
+        pattern = re.compile(rf'["\']{re.escape(field)}["\']\s*:\s*["\'](?P<value>[^"\']+)["\']', re.IGNORECASE)
+        for match in pattern.finditer(html or ""):
+            parsed = _source_published_candidate(
+                match.group("value"),
+                source=source,
+                status=status,
+                review_reason=reason,
+            )
+            if parsed:
+                candidates.append(parsed)
+    return tuple(candidates)
+
+
+def _select_source_published_candidate(
+    strong_candidates: list[_ExtractedSourcePublishedAt],
+    review_candidates: list[_ExtractedSourcePublishedAt],
+) -> _ExtractedSourcePublishedAt:
+    strong = _unique_source_date_candidates(strong_candidates)
+    if len({candidate.source_published_at.date() for candidate in strong if candidate.source_published_at}) > 1:
+        raw = "; ".join(candidate.source_published_at_raw or "" for candidate in strong if candidate.source_published_at_raw)
+        return _ExtractedSourcePublishedAt(
+            source_published_at=None,
+            source_published_at_raw=raw or None,
+            source_published_at_source="conflicting_source_published_at_candidates",
+            source_published_at_status="review",
+            source_published_at_review_reason="source_published_at_conflict",
+        )
+    if strong:
+        return strong[0]
+    if review_candidates:
+        return review_candidates[0]
+    return _ExtractedSourcePublishedAt(None, None, None, "missing", None)
+
+
+def _unique_source_date_candidates(
+    candidates: list[_ExtractedSourcePublishedAt],
+) -> list[_ExtractedSourcePublishedAt]:
+    seen: set[tuple[datetime | None, str | None, str | None]] = set()
+    result: list[_ExtractedSourcePublishedAt] = []
+    for candidate in candidates:
+        key = (candidate.source_published_at, candidate.source_published_at_raw, candidate.source_published_at_source)
+        if key not in seen:
+            seen.add(key)
+            result.append(candidate)
+    return result
+
+
+def _source_published_candidate(
+    value: object,
+    *,
+    source: str,
+    status: str,
+    review_reason: str | None = None,
+) -> _ExtractedSourcePublishedAt | None:
+    raw = _optional_text(value)
+    if not raw:
+        return None
+    parsed = _parse_publication_date(raw)
+    if parsed is None:
+        return _ExtractedSourcePublishedAt(
+            source_published_at=None,
+            source_published_at_raw=raw,
+            source_published_at_source=source,
+            source_published_at_status="review",
+            source_published_at_review_reason="source_published_at_unparseable",
+        )
+    return _ExtractedSourcePublishedAt(
+        source_published_at=parsed,
+        source_published_at_raw=raw,
+        source_published_at_source=source,
+        source_published_at_status=status,
+        source_published_at_review_reason=review_reason,
+    )
+
+
+def _parse_publication_date(value: str) -> datetime | None:
+    text = _clean_evidence(value)
+    token_match = _DATE_TOKEN_PATTERN.search(text)
+    if token_match:
+        text = token_match.group(0)
+    iso_text = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(iso_text)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
+    except ValueError:
+        pass
+    numeric_match = re.fullmatch(r"(?P<day>\d{1,2})[-/.](?P<month>\d{1,2})[-/.](?P<year>20\d{2})", text)
+    if numeric_match:
+        return _date_parts_to_datetime(
+            int(numeric_match.group("year")),
+            int(numeric_match.group("month")),
+            int(numeric_match.group("day")),
+        )
+    textual_match = re.fullmatch(r"(?P<day>\d{1,2})\s+(?P<month>[A-Za-z]+)\s+(?P<year>20\d{2})", text, re.IGNORECASE)
+    if textual_match:
+        month = _DUTCH_MONTHS.get(textual_match.group("month").casefold())
+        if month is None:
+            return None
+        return _date_parts_to_datetime(int(textual_match.group("year")), month, int(textual_match.group("day")))
+    return None
+
+
+def _date_parts_to_datetime(year: int, month: int, day: int) -> datetime | None:
+    try:
+        return datetime(year, month, day, tzinfo=UTC)
+    except ValueError:
+        return None
 
 
 def _extract_location_from_detail_html(
