@@ -180,6 +180,22 @@ The extractor is family-level, not Oldenkotte-specific, and does not create a pa
 
 This phase does not add cache, readiness rows, Excel, matching, email, n8n, dashboard, eligibility changes, Funda/Pararius work, browser automation, Playwright, Selenium, proxies, stealth behavior, CAPTCHA solving, bypass logic, raw HTML/JSON persistence, long-description storage, image downloads, or LLM extraction.
 
+## Realworks Readiness Rows v1
+
+`scraper/src/domek_wonen/pilots/realworks_property_readiness.py` builds in-memory Realworks readiness rows from
+QA-clean parser listings, Realworks `PropertyFactsRecord` detail facts, `ClientReadyPropertySummary`, and location
+readiness. It classifies rows as `client_ready`, `advisor_review`, or `blocked`, maps them to export readiness, and
+reports field completion, missing key fields, review fields, warnings, sample rows, and compact problem rows before any
+Excel phase.
+
+The Oldenkotte validation built `9` readiness rows from `9` QA-clean listings and `9` successful detail facts records.
+All rows were `advisor_review` / `export_review`, mainly because postcode is missing for all rows; this is ready for a
+human Excel validation phase, not production client-ready promotion.
+
+This phase remains in-memory only. It creates no Excel, cache, matching input, email, n8n flow, dashboard, raw
+persistence, Funda/Pararius path, browser automation, LLM extraction, image downloads, parser per makelaar, or
+eligibility changes.
+
 ## KIN OGonline XHR Paginated Runner v1
 
 `scraper/src/domek_wonen/pilots/ogonline_xhr_paginated_runner.py` adds a controlled paginated runner for `ogonline_xhr` source configs, starting with the KIN fixture. It builds deterministic API URLs with `build_paginated_api_url`, checks `robots_gate.can_fetch(api_domain, api_path)` before each injected `fetch_json` call, then sends caller-provided JSON through `build_parser_input_from_api_json`, `ParserFamilyRunner`, and the parser output QA gate.

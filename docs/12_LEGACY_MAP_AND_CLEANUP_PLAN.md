@@ -129,6 +129,20 @@ The validation helper in `scraper/src/domek_wonen/pilots/realworks_property_fact
 rows, export Excel, touch matching/email/n8n/dashboard/eligibility, use browser automation, or create a parser per
 makelaar.
 
+## Realworks Readiness Rows v1
+
+`scraper/src/domek_wonen/pilots/realworks_property_readiness.py` adds the next Realworks pilot layer after parser QA and
+property facts extraction. It builds in-memory readiness rows from QA-clean `realworks_public` listings, Realworks
+`PropertyFactsRecord` detail facts, the existing `ClientReadyPropertySummary`, and location readiness.
+
+The runner reports readiness row counts, `client_ready` / `advisor_review` / `blocked` status, export readiness, field
+completion, missing key fields, review fields, warnings, sample rows, and compact problem rows. Oldenkotte validation
+built `9` rows from `9` QA-clean listings and `9` successful detail facts records; all rows are `advisor_review` because
+postcode and several facts remain incomplete or review-only.
+
+This remains in-memory only and does not create Excel, cache, matching input, advisor email, n8n flow, dashboard,
+generated raw HTML/JSON, images, an LLM extraction path, a parser per makelaar, or inventory eligibility changes.
+
 ## Parser Family Runner v1
 
 `scraper/src/domek_wonen/parsers/runner.py` adds the first offline connector from
