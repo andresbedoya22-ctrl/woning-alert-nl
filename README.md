@@ -329,6 +329,21 @@ This phase does not infer bedrooms from rooms, does not use an LLM, does not per
 not create Excel, send email, run matching, touch n8n, build a dashboard, modify `data/raw`, scrape Funda or Pararius,
 change inventory eligibility, or add a parser per makelaar.
 
+## KIN Excel Export v1
+
+`scraper/src/domek_wonen/pilots/kin_excel_export.py` exports existing in-memory KIN readiness rows to a local `.xlsx`
+validation artifact. It consumes rows produced by `run_kin_full_property_readiness`, writes all available rows rather
+than only client-ready samples, and includes canonical URL text plus a clickable `property_link`.
+
+The workbook includes facts, client-ready summary lines, location readiness, `export_readiness`, `quality_status`,
+`missing_key_fields`, warnings, summary counts, field gaps, warning aggregation, and compact problem rows. Output paths
+are caller-provided local/generated paths such as `tmp/generated/kin_excel_export_v1.xlsx`; generated `.xlsx` files and
+cache files must not be committed.
+
+This phase does not send email, run matching, touch n8n, build a dashboard, modify `data/raw`, persist raw HTML or raw
+web JSON, call an LLM, download images, scrape Funda or Pararius, change inventory eligibility, or create a parser per
+makelaar.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`

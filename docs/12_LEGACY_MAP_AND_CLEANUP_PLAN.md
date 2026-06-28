@@ -380,6 +380,19 @@ This remains a parser-family improvement, not a KIN-specific parser or parser-pe
 bedrooms from rooms, use an LLM, persist raw HTML or raw web JSON, create Excel, send email, run matching, touch n8n,
 build a dashboard, modify `data/raw`, scrape Funda or Pararius, or change inventory eligibility.
 
+## KIN Excel Export v1
+
+`scraper/src/domek_wonen/pilots/kin_excel_export.py` adds the human-validation artifact for the KIN full readiness
+rows. It writes a caller-provided local/generated `.xlsx` path, exports all available rows, preserves
+`canonical_url` as full text, and creates a clickable `property_link` for valid listing URLs.
+
+The workbook contains `KIN Properties`, `Summary`, `Field Gaps`, `Warnings`, and compact `Problem Rows` worksheets.
+Rows include normalized facts, summary lines, location fields, export readiness, quality status, missing key fields,
+and warnings without copying raw HTML, raw web JSON, images, long descriptions, or evidence dumps.
+
+This is not email, matching, n8n, dashboard, source crawling, Funda/Pararius work, LLM work, an eligibility change, or a
+parser-per-makelaar phase. Generated `.xlsx` files and cache files remain uncommitted local artifacts.
+
 ## Controlled Realworks Capture Pilot v1
 
 `scraper/src/domek_wonen/pilots/realworks_capture_pilot.py` adds a small, auditable pilot for permitted

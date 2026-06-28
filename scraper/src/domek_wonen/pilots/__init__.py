@@ -44,6 +44,11 @@ from .kin_full_coverage_audit import (
     build_kin_full_coverage_completion_result,
     run_kin_full_coverage_completion_audit,
 )
+from .kin_excel_export import (
+    KINExcelExportResult,
+    export_kin_readiness_rows_to_excel,
+    run_kin_excel_export,
+)
 from .ogonline_detail_property_type_enrichment import (
     DetailPropertyTypeEnrichmentItem,
     DetailPropertyTypeEnrichmentResult,
@@ -93,6 +98,7 @@ __all__ = [
     "KINOGonlineValidationAuditResult",
     "KINOGonlineFullValidationAuditResult",
     "KINFullPropertyReadinessResult",
+    "KINExcelExportResult",
     "KINCoverageCompletionResult",
     "KINFieldGap",
     "KINPropertyReadinessRow",
@@ -126,6 +132,8 @@ __all__ = [
     "run_kin_ogonline_full_validation_audit_config",
     "run_kin_full_property_readiness",
     "run_kin_full_coverage_completion_audit",
+    "run_kin_excel_export",
+    "export_kin_readiness_rows_to_excel",
     "run_kin_full_property_readiness_config",
     "build_kin_full_coverage_completion_result",
     "run_kin_ogonline_detail_facts_probe",
