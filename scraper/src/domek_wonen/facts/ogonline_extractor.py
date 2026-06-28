@@ -42,8 +42,10 @@ from .normalization import (
     normalize_description_length_bucket,
     normalize_eigendomssituatie,
     normalize_energy_label,
+    normalize_heating_system,
     normalize_price,
     normalize_property_type,
+    normalize_small_count,
     normalize_vve_monthly_cost,
 )
 
@@ -79,21 +81,29 @@ _NORMALIZERS = {
     "living_area_m2": normalize_area_m2,
     "plot_area_m2": normalize_area_m2,
     "rooms": normalize_count,
-    "bedrooms": normalize_count,
-    "bathrooms": normalize_count,
+    "bedrooms": lambda value: normalize_small_count(value, minimum=0, maximum=8),
+    "bathrooms": lambda value: normalize_small_count(value, minimum=0, maximum=10),
+    "floors": lambda value: normalize_small_count(value, minimum=1, maximum=10),
+    "volume_m3": normalize_count,
     "energy_label": normalize_energy_label,
     "property_type": normalize_property_type,
     "vve_monthly_cost": normalize_vve_monthly_cost,
     "vve_active": normalize_boolean_signal,
+    "heating_type": normalize_heating_system,
+    "hot_water": normalize_heating_system,
     "cv_ketel_present": normalize_boolean_signal,
     "cv_ketel_ownership": normalize_cv_ketel_ownership,
     "eigendomssituatie": normalize_eigendomssituatie,
     "description_length_bucket": normalize_description_length_bucket,
+    "main_garden_area_m2": normalize_area_m2,
+    "garage_count": lambda value: normalize_small_count(value, minimum=0, maximum=10),
 }
 _UNITS = {
     "asking_price": "EUR",
     "living_area_m2": "m2",
     "plot_area_m2": "m2",
+    "volume_m3": "m3",
+    "main_garden_area_m2": "m2",
     "vve_monthly_cost": "EUR_month",
 }
 _SOURCE_CONFIDENCE = {
@@ -369,9 +379,30 @@ def _fact_from_candidate(
     warning_forces_review = bool(warning and warning != _AMBIGUOUS_FACT_WARNING)
     status = FACT_STATUS_USABLE if normalized is not None and confidence >= 0.65 and not warning_forces_review else FACT_STATUS_REVIEW
     fact_warnings = (warning,) if warning and warning != _AMBIGUOUS_FACT_WARNING else ()
+    raw_count = normalize_count(value) if field in {"rooms", "bedrooms", "bathrooms", "floors", "garage_count"} else None
+    if normalized is None and raw_count is not None and _is_implausible_count(field, raw_count):
+        normalized = raw_count
+        status = FACT_STATUS_REVIEW
+        fact_warnings = _dedupe((*fact_warnings, "implausible_count"))
     if normalized is None:
-        if field in {"erfpacht_details", "heating_type", "outdoor_space", "garden", "balcony", "storage", "garage", "parking", "availability_date", "open_huis_badge_or_event"}:
+        if field in {
+            "erfpacht_details",
+            "insulation",
+            "outdoor_space",
+            "garden",
+            "balcony",
+            "storage",
+            "garage",
+            "parking",
+            "availability_date",
+            "open_huis_badge_or_event",
+            "cv_ketel_brand",
+        }:
             normalized = str(value)
+        elif field in {"heating_type", "hot_water"} and _is_rawish_value(value):
+            normalized = None
+            status = FACT_STATUS_REVIEW
+            fact_warnings = _dedupe((*fact_warnings, "rawish_value_suppressed", "normalization_failed"))
         else:
             status = FACT_STATUS_REVIEW
             fact_warnings = _dedupe((*fact_warnings, "normalization_failed"))
@@ -411,11 +442,15 @@ def _is_implausible_count(field: str, value: object) -> bool:
     if not isinstance(value, int):
         return False
     if field == "bedrooms":
-        return value < 0 or value > 15
+        return value < 0 or value > 8
     if field == "bathrooms":
         return value < 0 or value > 10
     if field == "rooms":
         return value < 1 or value > 30
+    if field == "floors":
+        return value < 1 or value > 10
+    if field == "garage_count":
+        return value < 0 or value > 10
     return False
 
 
@@ -424,7 +459,18 @@ def _is_implausible_area(field: str, value: object) -> bool:
         return False
     if field == "living_area_m2":
         return value < 10 or value > 1000
+    if field == "plot_area_m2":
+        return value < 0 or value > 100000
+    if field == "main_garden_area_m2":
+        return value < 0 or value > 10000
+    if field == "volume_m3":
+        return value < 10 or value > 10000
     return False
+
+
+def _is_rawish_value(value: object) -> bool:
+    text = str(value or "").casefold()
+    return any(marker in text for marker in ('{"', "{'", '":', "\\\"", "[{", "}]"))
 
 
 def _listing_fallback_fields(fallbacks: Mapping[str, object]) -> tuple[tuple[str, object], ...]:

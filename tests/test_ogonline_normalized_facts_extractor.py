@@ -121,6 +121,114 @@ def _facts(result) -> dict[str, object]:
     return {fact.field: fact for fact in result.record.facts}
 
 
+AKKERSTRAAT_69_HTML = """
+<html><body>
+  <dl>
+    <dt>Status</dt><dd>Beschikbaar</dd>
+    <dt>Vraagprijs</dt><dd>EUR 450.000 k.k.</dd>
+    <dt>Aanvaarding</dt><dd>In overleg</dd>
+    <dt>Adres</dt><dd>Akkerstraat 69</dd>
+    <dt>Postcode</dt><dd>5025 MG</dd>
+    <dt>Hoofdtype</dt><dd>Eengezinswoning</dd>
+    <dt>Bouwtype</dt><dd>Bestaand</dd>
+    <dt>Bouwjaar</dt><dd>1930</dd>
+    <dt>Kamers</dt><dd>4 kamers</dd>
+    <dt>Slaapkamers</dt><dd>3 slaapkamers</dd>
+    <dt>Badkamers</dt><dd>1 badkamer</dd>
+    <dt>Verdiepingen</dt><dd>3 verdiepingen</dd>
+    <dt>Woonoppervlakte</dt><dd>130 m2</dd>
+    <dt>Perceeloppervlakte</dt><dd>218 m2</dd>
+    <dt>Inhoud</dt><dd>497 m3</dd>
+    <dt>Energielabel</dt><dd>C</dd>
+    <dt>Isolatie</dt><dd>Dubbel glas, Volledig geisoleerd</dd>
+    <dt>Verwarming</dt><dd>Cv ketel</dd>
+    <dt>Water</dt><dd>Cv ketel</dd>
+    <dt>Ketelmerk</dt><dd>Remeha (Huur)</dd>
+    <dt>Tuintypes</dt><dd>Achtertuin</dd>
+    <dt>Hoofdtuin Type</dt><dd>Achtertuin</dd>
+    <dt>Oppervlakte Hoofdtuin</dt><dd>63 m2 (502 cm x 1.247 cm)</dd>
+    <dt>Parkeertypes</dt><dd>Parkeervergunningen, Op eigen terrein</dd>
+    <dt>Garagetypes</dt><dd>Vrijstaand hout</dd>
+    <dt>Aantal Garages</dt><dd>1</dd>
+  </dl>
+</body></html>
+"""
+
+
+def test_akkerstraat_69_expected_critical_facts_from_visible_fixture() -> None:
+    facts = _facts(_extract(AKKERSTRAAT_69_HTML))
+
+    expected = {
+        "asking_price": 450000,
+        "rooms": 4,
+        "bedrooms": 3,
+        "bathrooms": 1,
+        "floors": 3,
+        "living_area_m2": 130,
+        "plot_area_m2": 218,
+        "volume_m3": 497,
+        "energy_label": "C",
+        "heating_type": "cv_ketel",
+        "hot_water": "cv_ketel",
+        "cv_ketel_brand": "Remeha",
+        "cv_ketel_ownership": "huur",
+        "main_garden_area_m2": 63,
+        "garage_count": 1,
+    }
+    for field, value in expected.items():
+        assert facts[field].normalized_value == value
+
+    assert facts["garden"].normalized_value == "Achtertuin"
+    assert facts["parking"].normalized_value == "Parkeervergunningen, Op eigen terrein"
+    assert facts["garage"].normalized_value == "vrijstaand_hout"
+    assert "eigendomssituatie" not in facts
+
+
+def test_bedrooms_only_uses_strong_bedroom_label() -> None:
+    html = """
+    <dl>
+      <dt>Oppervlakte Hoofdtuin</dt><dd>63 m2 (502 cm x 1.247 cm)</dd>
+      <dt>Verdiepingen</dt><dd>3 verdiepingen</dd>
+      <dt>Aantal Garages</dt><dd>1</dd>
+    </dl>
+    <script>{"id":"6a3e86c10b3069e4614b02c1"}</script>
+    """
+    facts = _facts(_extract(html))
+
+    assert "bedrooms" not in facts
+    assert facts["floors"].normalized_value == 3
+    assert facts["garage_count"].normalized_value == 1
+
+
+def test_rooms_bathrooms_floors_do_not_cross_feed_bedrooms() -> None:
+    facts = _facts(_extract("<dl><dt>Kamers</dt><dd>4 kamers</dd><dt>Badkamers</dt><dd>1 badkamer</dd><dt>Verdiepingen</dt><dd>3 verdiepingen</dd></dl>"))
+
+    assert facts["rooms"].normalized_value == 4
+    assert facts["bathrooms"].normalized_value == 1
+    assert facts["floors"].normalized_value == 3
+    assert "bedrooms" not in facts
+
+
+def test_energy_label_exact_label_value_and_spacing() -> None:
+    assert _facts(_extract("<dl><dt>Energielabel</dt><dd>C</dd></dl>"))["energy_label"].normalized_value == "C"
+    assert "energy_label" not in _facts(_extract("<dl><dt>Energielabel</dt><dd></dd></dl>"))
+    assert _facts(_extract("<dl><dt>Energielabel</dt><dd>A ++</dd></dl>"))["energy_label"].normalized_value == "A++"
+
+
+def test_eigendomssituatie_requires_explicit_source() -> None:
+    assert "eigendomssituatie" not in _facts(_extract(AKKERSTRAAT_69_HTML))
+    assert _facts(_extract("<dl><dt>Eigendomssituatie</dt><dd>Volle eigendom</dd></dl>"))["eigendomssituatie"].normalized_value == "volle_eigendom"
+    assert _facts(_extract("<dl><dt>Eigendomssituatie</dt><dd>Erfpacht</dd></dl>"))["eigendomssituatie"].normalized_value == "erfpacht"
+
+
+def test_raw_heating_object_is_suppressed() -> None:
+    result = _extract('<script>{"heating":{"heating":[{"id":"10","name":"Cv ketel"}]}}</script>')
+    payload = json.dumps(record_to_dict(result.record)).casefold()
+
+    assert "heating\":{\"heating\"" not in payload
+    assert "heating_type" not in _facts(result) or _facts(result)["heating_type"].normalized_value != "10"
+
+
 def _cached_record(url: str = _detail_url(1), fetched_at: str = "2026-06-27T00:00:00Z", expires_at: str = "2026-07-11T00:00:00Z"):
     return build_property_facts_record(
         source_id="kinmakelaars.nl__breda",
@@ -180,6 +288,13 @@ def test_extracts_ownership_and_erfpacht() -> None:
     facts = _facts(_extract())
 
     assert facts["eigendomssituatie"].normalized_value == "volle_eigendom"
+    assert "erfpacht_details" not in facts
+
+
+def test_extracts_explicit_erfpacht_details_only_when_affirmative() -> None:
+    facts = _facts(_extract("<dl><dt>Eigendomssituatie</dt><dd>Erfpacht</dd><dt>Erfpacht</dt><dd>Canon erfpacht</dd></dl>"))
+
+    assert facts["eigendomssituatie"].normalized_value == "erfpacht"
     assert facts["erfpacht_details"].normalized_value == "source_available"
 
 

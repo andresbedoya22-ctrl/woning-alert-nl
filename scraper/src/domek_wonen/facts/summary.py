@@ -320,6 +320,9 @@ def _raw_text(value: object | None) -> str | None:
     text = " ".join(str(value).split())
     if text == "source_available":
         return None
+    lowered = text.casefold()
+    if any(marker in lowered for marker in ("<html", "<script", "</", '{"', "{'", '"docs"', "window.__", '":', "\\\"")):
+        return None
     return text or None
 
 
