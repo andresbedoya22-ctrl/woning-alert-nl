@@ -390,6 +390,8 @@ The workbook contains `Realworks Properties`, `Summary`, `Field Gaps`, `Warnings
 current Oldenkotte sample remains human-review only: `8` rows are `export_review` and the Corellistraat-style
 `OverigOG` row is `export_blocked`, not production client-ready output. The export makes postcode critical, VvE
 explicit for apartments, energy labels visible as value/status/raw, and non-residential classifications visible.
+Postcode is extracted from JSON-LD or visible Realworks detail headers when present, and status policy columns keep
+sold/under-contract rows for source history while excluding them from active inventory/matching.
 Generated `.xlsx` files such as `tmp/generated/realworks_oldenkotte_excel_validation_v1.xlsx` must not be committed.
 
 This phase does not send email, run matching, touch n8n, build a dashboard, modify `data/raw`, persist raw HTML or raw

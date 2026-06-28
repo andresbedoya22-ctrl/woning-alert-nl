@@ -126,6 +126,10 @@ class RealworksPropertyReadinessRow:
     address: str | None
     postcode: str | None
     city: str | None
+    source_status: str | None
+    status_bucket: str
+    active_inventory_eligible: bool
+    db_persistence_action: str
     asking_price: int | None
     property_type: str | None
     status: str | None
@@ -211,6 +215,9 @@ def build_realworks_property_readiness_row(
     listing: ParsedListing,
     facts_record: PropertyFactsRecord,
     location: PropertyLocationReadiness | None = None,
+    postcode_status: str | None = None,
+    postcode_source: str | None = None,
+    postcode_review_reason: str | None = None,
 ) -> RealworksPropertyReadinessRow:
     location = location or build_location_readiness_from_listing(listing)
     summary = build_client_ready_property_summary(facts_record)
@@ -218,7 +225,10 @@ def build_realworks_property_readiness_row(
     missing_key_fields = _missing_key_fields(listing, facts_record, summary, location)
     review_fields = _review_fields(facts_record)
     residential_classification = _residential_classification(listing, facts_record)
-    postcode_status, postcode_source, postcode_review_reason = _postcode_status(location)
+    derived_postcode_status, derived_postcode_source, derived_postcode_review_reason = _postcode_status(location)
+    postcode_status = postcode_status or derived_postcode_status
+    postcode_source = postcode_source or derived_postcode_source
+    postcode_review_reason = postcode_review_reason or derived_postcode_review_reason
     vve_active, vve_monthly_cost, vve_status, vve_review_reason, vve_missing_reason = _vve_status(facts_record)
     energy_label_status, energy_label_raw, energy_label_review_reason = _energy_label_status(facts_record)
     if vve_status == "missing" and "vve_active" not in missing_key_fields:
@@ -240,6 +250,17 @@ def build_realworks_property_readiness_row(
         review_fields=review_fields,
         warnings=row_warnings,
     )
+    source_status = listing.status or facts_record.status
+    status_bucket = _status_bucket(source_status, _value(fact_map, "availability_date"))
+    active_inventory_eligible = _active_inventory_eligible(
+        quality_status=quality_status,
+        residential_classification=residential_classification,
+        status_bucket=status_bucket,
+    )
+    db_persistence_action = _db_persistence_action(
+        residential_classification=residential_classification,
+        status_bucket=status_bucket,
+    )
     row = RealworksPropertyReadinessRow(
         source_id=listing.source_id,
         source_domain=listing.source_domain,
@@ -248,6 +269,10 @@ def build_realworks_property_readiness_row(
         address=location.address_raw,
         postcode=location.postcode,
         city=location.city,
+        source_status=source_status,
+        status_bucket=status_bucket,
+        active_inventory_eligible=active_inventory_eligible,
+        db_persistence_action=db_persistence_action,
         asking_price=_int_fact(fact_map, "asking_price"),
         property_type=_str_fact(fact_map, "property_type"),
         status=listing.status or facts_record.status,
@@ -420,7 +445,10 @@ def run_realworks_property_readiness(
         row = build_realworks_property_readiness_row(
             listing,
             extraction.record,
-            build_location_readiness_from_listing(listing),
+            _location_with_extracted_detail(listing, extraction),
+            postcode_status=extraction.postcode_status,
+            postcode_source=extraction.postcode_source,
+            postcode_review_reason=extraction.postcode_review_reason,
         )
         rows.append(row)
 
@@ -623,7 +651,31 @@ def _problem_rank(row: RealworksPropertyReadinessRow) -> int:
 def _postcode_status(location: PropertyLocationReadiness) -> tuple[str, str, str | None]:
     if (location.postcode or "").strip():
         return "usable", "parsed_listing", None
-    return "missing", "missing_not_enriched", "postcode_missing_no_official_enrichment"
+    return "missing", "missing_not_extracted", "postcode_missing_no_detail_or_listing_extraction"
+
+
+def _location_with_extracted_detail(listing: ParsedListing, extraction: object) -> PropertyLocationReadiness:
+    base = build_location_readiness_from_listing(listing)
+    postcode = getattr(extraction, "postcode", None) or base.postcode
+    city = getattr(extraction, "city", None) or base.city
+    address_raw = getattr(extraction, "address_raw", None) or base.address_raw
+    if postcode and address_raw and city:
+        status = "usable"
+        confidence = max(base.location_confidence, 0.88)
+        warnings = tuple(warning for warning in base.warnings if warning not in {"missing_postcode", "partial_location"})
+    else:
+        status = base.location_status
+        confidence = base.location_confidence
+        warnings = base.warnings
+    return replace(
+        base,
+        address_raw=address_raw,
+        postcode=postcode,
+        city=city,
+        location_status=status,
+        location_confidence=confidence,
+        warnings=warnings,
+    )
 
 
 def _vve_status(facts_record: PropertyFactsRecord) -> tuple[bool | None, int | None, str, str | None, str | None]:
@@ -679,6 +731,47 @@ def _residential_classification(listing: ParsedListing, facts_record: PropertyFa
     if property_type in {"garage", "bouwgrond"}:
         return "non_residential_blocked"
     return "residential_review"
+
+
+def _status_bucket(source_status: object, availability: object) -> str:
+    text = " ".join(str(value or "") for value in (source_status, availability)).casefold().replace("_", " ")
+    if "verkocht onder voorbehoud" in text:
+        return "inactive_under_contract"
+    if "verkocht" in text:
+        return "inactive_sold"
+    if "onder bod" in text or "onder optie" in text:
+        return "inactive_under_offer"
+    if "verhuurd" in text:
+        return "inactive_rented"
+    if "beschikbaar" in text or "te koop" in text:
+        return "active_available"
+    return "status_review"
+
+
+def _active_inventory_eligible(
+    *,
+    quality_status: str,
+    residential_classification: str,
+    status_bucket: str,
+) -> bool:
+    return (
+        quality_status == "client_ready"
+        and residential_classification == "residential"
+        and status_bucket == "active_available"
+    )
+
+
+def _db_persistence_action(*, residential_classification: str, status_bucket: str) -> str:
+    if residential_classification.startswith("non_residential"):
+        return "store_excluded_non_residential"
+    if status_bucket in {
+        "inactive_under_contract",
+        "inactive_sold",
+        "inactive_under_offer",
+        "inactive_rented",
+    }:
+        return "store_status_history"
+    return "store_active_candidate"
 
 
 def _fingerprint(*, source_id: str, source_domain: str) -> DeliveryFingerprintResult:

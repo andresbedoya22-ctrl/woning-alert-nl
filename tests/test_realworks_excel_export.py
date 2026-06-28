@@ -338,6 +338,11 @@ def test_excel_includes_critical_status_columns(tmp_path: Path) -> None:
         "residential_classification",
         "postcode_status",
         "postcode_source",
+        "postcode_review_reason",
+        "source_status",
+        "status_bucket",
+        "active_inventory_eligible",
+        "db_persistence_action",
         "vve_active",
         "vve_monthly_cost",
         "vve_status",
@@ -347,6 +352,31 @@ def test_excel_includes_critical_status_columns(tmp_path: Path) -> None:
         "energy_label_review_reason",
     ):
         assert column in headers
+
+
+def test_excel_writes_extracted_postcode_and_status_policy(tmp_path: Path) -> None:
+    row = _row(1, postcode="5044 SN", status="beschikbaar")
+    _, workbook = _export(tmp_path, row)
+    worksheet = workbook["Realworks Properties"]
+    headers = _headers(worksheet)
+
+    assert worksheet.cell(2, _col(headers, "postcode")).value == "5044 SN"
+    assert worksheet.cell(2, _col(headers, "postcode_status")).value == "usable"
+    assert worksheet.cell(2, _col(headers, "status_bucket")).value == "active_available"
+    assert worksheet.cell(2, _col(headers, "active_inventory_eligible")).value is True
+    assert worksheet.cell(2, _col(headers, "db_persistence_action")).value == "store_active_candidate"
+
+
+def test_verkocht_rows_are_visible_but_not_active_eligible(tmp_path: Path) -> None:
+    row = _row(1, postcode="5044 SN", status="verkocht")
+    _, workbook = _export(tmp_path, row)
+    worksheet = workbook["Realworks Properties"]
+    headers = _headers(worksheet)
+
+    assert worksheet.cell(2, _col(headers, "source_status")).value == "verkocht"
+    assert worksheet.cell(2, _col(headers, "status_bucket")).value == "inactive_sold"
+    assert worksheet.cell(2, _col(headers, "active_inventory_eligible")).value is False
+    assert worksheet.cell(2, _col(headers, "db_persistence_action")).value == "store_status_history"
 
 
 def test_apartment_without_vve_and_energy_review_are_visible(tmp_path: Path) -> None:
@@ -373,6 +403,8 @@ def test_blocked_rows_are_still_written_for_human_validation(tmp_path: Path) -> 
     assert worksheet.cell(2, _col(headers, "residential_classification")).value == "non_residential_blocked"
     assert worksheet.cell(2, _col(headers, "quality_status")).value == "blocked"
     assert worksheet.cell(2, _col(headers, "export_readiness")).value == "export_blocked"
+    assert worksheet.cell(2, _col(headers, "active_inventory_eligible")).value is False
+    assert worksheet.cell(2, _col(headers, "db_persistence_action")).value == "store_excluded_non_residential"
 
 
 def test_does_not_include_raw_html_json_or_long_description_text(tmp_path: Path) -> None:

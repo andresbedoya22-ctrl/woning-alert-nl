@@ -153,7 +153,9 @@ The workbook contains `Realworks Properties`, `Summary`, `Field Gaps`, `Warnings
 current Oldenkotte sample remains validation-only: `8` rows are `export_review`, the Corellistraat-style `OverigOG`
 row is `export_blocked`, and no row is production client-ready. Postcode is exposed as a critical status/source field,
 VvE is explicit for apartments, energy labels keep value/status/raw separated, and non-residential rows are blocked or
-clearly marked. Generated `.xlsx` files remain uncommitted local artifacts.
+clearly marked. Postcode now comes from JSON-LD address data or visible Realworks detail headers when present. Status
+policy columns keep sold, under-contract, under-offer, and rented rows for later source inventory/history while keeping
+them out of active inventory and matching. Generated `.xlsx` files remain uncommitted local artifacts.
 
 This is not matching, advisor email, n8n, dashboard, Funda/Pararius work, raw HTML/JSON persistence, long-description
 storage, image download, LLM extraction, eligibility change, or a parser-per-makelaar phase.
