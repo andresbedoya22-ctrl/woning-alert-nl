@@ -5,6 +5,10 @@ from .realworks_capture_pilot import (
     run_realworks_capture_pilot,
     run_realworks_capture_pilot_for_source,
 )
+from .realworks_property_facts_validation import (
+    RealworksFactsValidationResult,
+    run_realworks_property_facts_validation,
+)
 from .live_fetch import (
     ControlledFetchContentTypeError,
     ControlledFetchError,
@@ -106,6 +110,7 @@ __all__ = [
     "OGonlineDetailFactsProbeResult",
     "OGonlineDetailFactsProbeSample",
     "PropertyLocationReadiness",
+    "RealworksFactsValidationResult",
     "ActiveInventoryPilotResult",
     "PaginatedPageResult",
     "PaginatedRunResult",
@@ -124,6 +129,7 @@ __all__ = [
     "classify_export_readiness",
     "run_realworks_capture_pilot",
     "run_realworks_capture_pilot_for_source",
+    "run_realworks_property_facts_validation",
     "run_ogonline_xhr_paginated_config",
     "run_kin_ogonline_live_paginated_pilot",
     "run_kin_ogonline_active_inventory_pilot",

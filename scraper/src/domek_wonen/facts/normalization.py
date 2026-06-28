@@ -67,7 +67,7 @@ def normalize_heating_system(value: object) -> str | None:
     text = _clean_text(value)
     if not text or _is_rawish_text(text):
         return None
-    if "cv ketel" in text or "cv-ketel" in text or "cvketel" in text:
+    if "cv ketel" in text or "cv-ketel" in text or "cvketel" in text or "c.v.-ketel" in text:
         return "cv_ketel"
     if "warmtepomp" in text:
         return "warmtepomp"

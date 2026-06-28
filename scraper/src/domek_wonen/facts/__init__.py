@@ -17,6 +17,13 @@ from .ogonline_extractor import (
     run_kin_ogonline_normalized_facts_extraction_batch,
     run_kin_ogonline_normalized_facts_extraction_batch_config,
 )
+from .realworks_extractor import (
+    REALWORKS_TRACKED_FIELDS,
+    RealworksFactsExtractionResult,
+    extract_realworks_property_facts_for_listing,
+    extract_realworks_property_facts_from_html,
+    realworks_field_completion_counts,
+)
 from .normalization import (
     normalize_area_m2,
     normalize_boolean_signal,
@@ -45,12 +52,16 @@ __all__ = [
     "PropertyFactValue",
     "PropertyFactsCache",
     "PropertyFactsRecord",
+    "REALWORKS_TRACKED_FIELDS",
+    "RealworksFactsExtractionResult",
     "OGonlineFactsBatchResult",
     "OGonlineFactsExtractionResult",
     "build_client_ready_property_summary",
     "build_property_fact_value",
     "build_property_facts_record",
     "extract_ogonline_property_facts_from_html",
+    "extract_realworks_property_facts_for_listing",
+    "extract_realworks_property_facts_from_html",
     "normalize_area_m2",
     "normalize_boolean_signal",
     "normalize_count",
@@ -64,6 +75,7 @@ __all__ = [
     "property_facts_record_from_probe_sample",
     "record_from_dict",
     "record_to_dict",
+    "realworks_field_completion_counts",
     "run_kin_ogonline_normalized_facts_extraction_batch",
     "run_kin_ogonline_normalized_facts_extraction_batch_config",
     "summary_from_dict",

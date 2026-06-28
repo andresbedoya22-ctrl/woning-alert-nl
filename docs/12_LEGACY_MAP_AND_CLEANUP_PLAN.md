@@ -118,6 +118,17 @@ legacy `scraper/src/domek_wonen/properties/platform_parsers/realworks_parser.py`
 property-discovery runtime. Integration with a runner, source configs, inventory state, and QA promotion comes after
 this stabilization step.
 
+## Realworks Property Facts Extractor v1
+
+`scraper/src/domek_wonen/facts/realworks_extractor.py` adds a family-level facts extractor for Realworks detail pages.
+It accepts already-permitted in-memory detail HTML, reads `kenmerkName` / `kenmerkValue` blocks, and returns the
+existing `PropertyFactsRecord` contract with normalized fact values, statuses, capped evidence previews, and warnings.
+
+The validation helper in `scraper/src/domek_wonen/pilots/realworks_property_facts_validation.py` is bounded and checks
+`robots_gate.can_fetch` before listing and detail fetches. It does not persist raw HTML or JSON, create cache/readiness
+rows, export Excel, touch matching/email/n8n/dashboard/eligibility, use browser automation, or create a parser per
+makelaar.
+
 ## Parser Family Runner v1
 
 `scraper/src/domek_wonen/parsers/runner.py` adds the first offline connector from
