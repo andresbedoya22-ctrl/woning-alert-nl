@@ -380,6 +380,21 @@ This phase does not send email, run matching, touch n8n, build a dashboard, modi
 web JSON, call an LLM, download images, scrape Funda or Pararius, change inventory eligibility, or create a parser per
 makelaar.
 
+## Realworks Excel Validation v1
+
+`scraper/src/domek_wonen/pilots/realworks_excel_export.py` exports existing Realworks readiness rows to a local
+caller-provided `.xlsx` validation artifact. It writes all rows, including the current Oldenkotte `export_review` rows,
+preserves full `canonical_url` text, and creates a clickable `property_link`.
+
+The workbook contains `Realworks Properties`, `Summary`, `Field Gaps`, `Warnings`, and `Problem Rows` worksheets. The
+current Oldenkotte sample remains human-review only: all `9` rows are `export_review`, not production client-ready
+output. Generated `.xlsx` files such as `tmp/generated/realworks_oldenkotte_excel_validation_v1.xlsx` must not be
+committed.
+
+This phase does not send email, run matching, touch n8n, build a dashboard, modify `data/raw`, persist raw HTML or raw
+web JSON, call an LLM, download images, copy long descriptions, scrape Funda or Pararius, change inventory eligibility,
+or create a parser per makelaar.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`

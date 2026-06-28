@@ -53,6 +53,11 @@ from .kin_excel_export import (
     export_kin_readiness_rows_to_excel,
     run_kin_excel_export,
 )
+from .realworks_excel_export import (
+    RealworksExcelExportResult,
+    export_realworks_readiness_rows_to_excel,
+    run_realworks_excel_export,
+)
 from .ogonline_detail_property_type_enrichment import (
     DetailPropertyTypeEnrichmentItem,
     DetailPropertyTypeEnrichmentResult,
@@ -111,6 +116,7 @@ __all__ = [
     "OGonlineDetailFactsProbeSample",
     "PropertyLocationReadiness",
     "RealworksFactsValidationResult",
+    "RealworksExcelExportResult",
     "ActiveInventoryPilotResult",
     "PaginatedPageResult",
     "PaginatedRunResult",
@@ -139,7 +145,9 @@ __all__ = [
     "run_kin_full_property_readiness",
     "run_kin_full_coverage_completion_audit",
     "run_kin_excel_export",
+    "run_realworks_excel_export",
     "export_kin_readiness_rows_to_excel",
+    "export_realworks_readiness_rows_to_excel",
     "run_kin_full_property_readiness_config",
     "build_kin_full_coverage_completion_result",
     "run_kin_ogonline_detail_facts_probe",
