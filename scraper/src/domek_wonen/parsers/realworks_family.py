@@ -13,6 +13,11 @@ _ANCHOR_PATTERN = re.compile(
     r"<a\b(?P<attrs>[^>]*)\bhref\s*=\s*[\"'](?P<href>[^\"']+)[\"'][^>]*>(?P<body>.*?)</a>",
     flags=re.IGNORECASE | re.DOTALL,
 )
+_REALWORKS_CONTAINER_PATTERN = re.compile(
+    r"<(?P<tag>li|article|div)\b[^>]*class\s*=\s*[\"'][^\"']*(?:aanbodEntry|realworks-card|property-card|listing-card)[^\"']*[\"'][^>]*>"
+    r"(?P<body>.*?)</(?P=tag)>",
+    flags=re.IGNORECASE | re.DOTALL,
+)
 _TAG_PATTERN = re.compile(r"<[^>]+>", flags=re.IGNORECASE)
 _WHITESPACE_PATTERN = re.compile(r"\s+")
 _PRICE_PATTERN = re.compile(r"(?:\u20ac|eur)\s*([\d][\d\.,]*)", flags=re.IGNORECASE)
@@ -27,19 +32,37 @@ _FIELD_CLASS_PATTERN = (
     r"(?P<body>.*?)</(?P=tag)>"
 )
 _DETAIL_PATH_PATTERNS = (
-    re.compile(r"/aanbod/woningaanbod/.+", flags=re.IGNORECASE),
-    re.compile(r"/woningaanbod/.+", flags=re.IGNORECASE),
+    re.compile(r"^/aanbod/woningaanbod/[^/]+/(?:koop|huur)/[^/]+$", flags=re.IGNORECASE),
+    re.compile(r"^/aanbod/woningaanbod/(?:koop|huur)/[^/]+/[^/]+$", flags=re.IGNORECASE),
+    re.compile(r"^/woningaanbod/(?:koop|huur)/[^/]+/[^/]+$", flags=re.IGNORECASE),
     re.compile(r"/aanbod/wonen/[^/]+/[^/]+/[a-z0-9]+$", flags=re.IGNORECASE),
     re.compile(r"/woningen/[^/]+$", flags=re.IGNORECASE),
     re.compile(r"/(?:huis|appartement|woning)-[^/]+$", flags=re.IGNORECASE),
 )
+_CATEGORY_PATH_SEGMENTS = {
+    "aanbod",
+    "archief",
+    "garage",
+    "koop",
+    "open-huis",
+    "schuur-berging",
+    "tuin",
+    "woningaanbod",
+}
 _EXCLUDED_SEGMENTS = {
     "aankoop",
+    "blog",
     "contact",
     "over-ons",
     "provincie",
     "taxatie",
+    "woning-kopen",
+    "woning-verkopen",
     "verkoopadvies",
+}
+_SERVICE_PATHS = {
+    "/woning-kopen",
+    "/woning-verkopen",
 }
 _EXCLUDED_DETAIL_SLUG_PREFIXES = (
     "bouwperiode-",
@@ -66,22 +89,16 @@ class RealworksParserFamily:
         seen_urls: set[str] = set()
         rejected_count = 0
 
-        for match in _ANCHOR_PATTERN.finditer(parser_input.content or ""):
-            href = unescape(match.group("href")).strip()
-            canonical_url = _canonical_url(parser_input.source_url, href)
-            if not canonical_url or canonical_url in seen_urls:
-                continue
-            if not _looks_like_realworks_detail_url(canonical_url, parser_input.source_domain):
-                rejected_count += 1
-                continue
-
-            listing = _parse_card(
+        for card_html in _candidate_card_html(parser_input.content or ""):
+            listing, rejected = _listing_from_card(
                 parser_input=parser_input,
-                canonical_url=canonical_url,
-                card_html=match.group("body"),
+                card_html=card_html,
+                seen_urls=seen_urls,
             )
-            seen_urls.add(canonical_url)
-            listings.append(listing)
+            if rejected:
+                rejected_count += 1
+            if listing is not None:
+                listings.append(listing)
 
         if not listings:
             warnings.append("no_realworks_detail_urls_found")
@@ -112,19 +129,19 @@ def can_parse_realworks_source(fingerprint_result: DeliveryFingerprintResult) ->
 def _parse_card(*, parser_input: ParserInput, canonical_url: str, card_html: str) -> ParsedListing:
     text = _visible_text(card_html)
     address_raw = (
-        _extract_field(card_html, ("address", "title", "street-address"))
+        _extract_field(card_html, ("street-address", "address", "title"))
         or _extract_first_tag(card_html, ("h1", "h2", "h3", "h4"))
     )
-    city = _extract_field(card_html, ("city", "locality", "plaats"))
+    city = _extract_field(card_html, ("locality", "plaats", "city"))
     price_raw = _extract_field(card_html, ("price", "asking-price", "vraagprijs")) or _extract_price_raw(text)
-    status_raw = _extract_field(card_html, ("status", "label", "badge"))
+    status_raw = _extract_field(card_html, ("status", "objectstatusbanner", "label", "badge"))
     living_area_m2 = _extract_int(text, _LIVING_AREA_PATTERN)
     plot_area_m2 = _extract_int(text, _PLOT_AREA_PATTERN)
     rooms_count = _extract_int(text, _ROOMS_PATTERN)
     bedrooms_count = _extract_int(text, _BEDROOMS_PATTERN)
     property_type = _extract_property_type(text)
     energy_label = _extract_energy_label(text)
-    asking_price_eur = _parse_price_eur(price_raw or text)
+    asking_price_eur = _parse_price_eur(price_raw) or _parse_price_eur(text)
     transaction_type = _classify_transaction_type(" ".join((text, price_raw)))
     status = _classify_status(" ".join((text, status_raw, price_raw)))
     street, house_number, postcode = _split_address(address_raw)
@@ -172,6 +189,41 @@ def _parse_card(*, parser_input: ParserInput, canonical_url: str, card_html: str
     )
 
 
+def _candidate_card_html(html: str) -> tuple[str, ...]:
+    containers = tuple(match.group(0) for match in _REALWORKS_CONTAINER_PATTERN.finditer(html or ""))
+    if containers:
+        return containers
+    return tuple(match.group(0) for match in _ANCHOR_PATTERN.finditer(html or ""))
+
+
+def _listing_from_card(
+    *,
+    parser_input: ParserInput,
+    card_html: str,
+    seen_urls: set[str],
+) -> tuple[ParsedListing | None, bool]:
+    for match in _ANCHOR_PATTERN.finditer(card_html or ""):
+        href = unescape(match.group("href")).strip()
+        canonical_url = _canonical_url(parser_input.source_url, href)
+        if not canonical_url:
+            continue
+        if canonical_url in seen_urls:
+            return None, False
+        if not _looks_like_realworks_detail_url(canonical_url, parser_input.source_domain):
+            continue
+
+        seen_urls.add(canonical_url)
+        return (
+            _parse_card(
+                parser_input=parser_input,
+                canonical_url=canonical_url,
+                card_html=card_html,
+            ),
+            False,
+        )
+    return None, True
+
+
 def _canonical_url(base_url: str, href: str) -> str:
     if not href or href.startswith(("mailto:", "tel:", "javascript:")):
         return ""
@@ -189,12 +241,21 @@ def _looks_like_realworks_detail_url(url: str, source_domain: str) -> bool:
     domain = (source_domain or "").lower()
     if domain and hostname != domain and not hostname.endswith(f".{domain}"):
         return False
+    path = parts.path.rstrip("/") or "/"
+    if path.lower() in _SERVICE_PATHS:
+        return False
     segments = [segment.lower() for segment in parts.path.split("/") if segment]
     if not segments or any(segment in _EXCLUDED_SEGMENTS for segment in segments):
         return False
+    if "archief" in segments or "open-huis" in segments:
+        return False
     if any(segments[-1].startswith(prefix) for prefix in _EXCLUDED_DETAIL_SLUG_PREFIXES):
         return False
-    return any(pattern.search(parts.path) for pattern in _DETAIL_PATH_PATTERNS)
+    if segments[-1] in _CATEGORY_PATH_SEGMENTS or len(segments[-1]) < 6:
+        return False
+    if not any(char.isdigit() for char in segments[-1]):
+        return False
+    return any(pattern.search(path) for pattern in _DETAIL_PATH_PATTERNS)
 
 
 def _visible_text(html: str) -> str:

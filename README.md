@@ -160,6 +160,12 @@ This selection layer is offline. It does not make network requests, call `robots
 
 The fetcher does not call `robots_gate` itself: the capture pilot remains responsible for checking `robots_gate.can_fetch(domain, path)` before invoking any fetch function. The live helper defaults to `max_sources=3`, includes domain dedupe so the first run avoids several variants from the same source domain, and adds no Playwright, Selenium, proxies, stealth behavior, CAPTCHA handling, bypass logic, persistence, or generated outputs.
 
+## Realworks Parser Family Validation v1
+
+Oldenkotte (`oldenkotte.com__tilburg`) was used as the Realworks parser-family validation target. The family-level parser now prefers Realworks listing card containers such as `aanbodEntry`, filters category/archive/service links before parsing, and extracts address, city, price, status, and detail URL fields from the listing card container instead of global navigation anchors.
+
+Validation on the live Oldenkotte listing page improved from `36 total / 0 clean / 36 review / 0 rejected` to `9 total / 9 clean / 0 review / 0 rejected`, with `9` inventory snapshot listings. Backup validation on `olden.nl__heusden` produced `10 total / 10 clean / 0 review / 0 rejected`. This remains a reusable Realworks parser-family improvement, not an Oldenkotte-specific parser, and it does not add matching, email, n8n, dashboard, Excel, eligibility changes, Funda/Pararius work, browser automation, LLM extraction, or raw HTML/JSON persistence.
+
 ## KIN OGonline XHR Paginated Runner v1
 
 `scraper/src/domek_wonen/pilots/ogonline_xhr_paginated_runner.py` adds a controlled paginated runner for `ogonline_xhr` source configs, starting with the KIN fixture. It builds deterministic API URLs with `build_paginated_api_url`, checks `robots_gate.can_fetch(api_domain, api_path)` before each injected `fetch_json` call, then sends caller-provided JSON through `build_parser_input_from_api_json`, `ParserFamilyRunner`, and the parser output QA gate.

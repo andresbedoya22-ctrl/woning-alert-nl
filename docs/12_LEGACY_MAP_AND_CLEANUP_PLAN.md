@@ -428,3 +428,20 @@ Robots compliance remains upstream in the capture pilot: `run_realworks_capture_
 `max_sources=3` and provides domain dedupe for the first run so multiple selected city variants from the same domain
 are not fetched together. This phase adds no Playwright, Selenium, proxies, stealth behavior, CAPTCHA handling,
 bypass logic, DB persistence, property-discovery runtime changes, matching, dashboard work, or generated outputs.
+
+## Realworks Parser Family Validation v1
+
+`scraper/src/domek_wonen/parsers/realworks_family.py` now hardens the reusable Realworks parser family against
+navigation and filter overcapture. The parser prefers Realworks listing containers such as `aanbodEntry`, requires
+detail-like Realworks URL shapes, rejects category/archive/open-house/service paths, and parses card-level address,
+city, price, status, and property signals before QA.
+
+Oldenkotte (`oldenkotte.com__tilburg`) was the validation lab. Baseline live parser output was `36 total / 0 clean /
+36 review / 0 rejected`, with category URLs such as `/aanbod/woningaanbod/koop` and
+`/aanbod/woningaanbod/koop/garage`. After hardening, Oldenkotte produced `9 total / 9 clean / 0 review / 0 rejected`
+and `9` inventory snapshot listings. Backup validation on `olden.nl__heusden` produced `10 total / 10 clean / 0
+review / 0 rejected`.
+
+This remains parser-family work only. No parser per makelaar, matching, advisor email, n8n, dashboard, Excel,
+eligibility change, Funda/Pararius extraction, browser automation, LLM extraction, or raw HTML/JSON persistence was
+added.
