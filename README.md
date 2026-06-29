@@ -411,6 +411,21 @@ The Realworks extractor reads explicit publication-date candidates from JSON-LD,
 client alerts, advisor email, n8n, dashboard, raw HTML/JSON persistence, long-description export, images, LLM path,
 Funda/Pararius path, parser per makelaar, or global eligibility change.
 
+## Realworks Multi-source Validation v1
+
+`scraper/src/domek_wonen/pilots/realworks_multi_source_validation.py` validates the reusable Realworks family across
+locally evidenced sources instead of treating Oldenkotte as the only proof point. The selector keeps Oldenkotte as
+control, includes Olden when local evidence is available, excludes Funda/Pararius and blocked/legal-review/permission
+rows, then runs the existing parser, QA, bounded detail facts, readiness, status/history, and lifecycle path per source.
+
+The bounded live validation selected `oldenkotte.com__tilburg` and `olden.nl__heusden`. Both passed with explicit
+review gaps, so the family decision is `realworks_family_usable_for_broader_audit`. Generated artifacts such as
+`tmp/generated/realworks_multi_source_validation_v1.xlsx` and the summary CSV remain local and must not be committed.
+
+This phase does not add matching, client alerts, advisor email, n8n, dashboard, DB, migrations, Noord-Brabant full
+census, raw HTML/JSON persistence, long descriptions, images, browser automation, proxies, bypass behavior, LLM use,
+parser-per-makelaar logic, Funda/Pararius work, `data/raw` changes, or global eligibility changes.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
