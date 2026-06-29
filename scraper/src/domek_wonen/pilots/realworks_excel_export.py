@@ -35,6 +35,23 @@ PROPERTY_COLUMNS = (
     "status_bucket",
     "active_inventory_eligible",
     "db_persistence_action",
+    "source_published_at",
+    "source_published_at_raw",
+    "source_published_at_source",
+    "source_published_at_status",
+    "source_published_at_review_reason",
+    "first_seen_at",
+    "last_seen_at",
+    "observed_at",
+    "status_first_seen_at",
+    "status_changed_at",
+    "price_first_seen_at",
+    "price_changed_at",
+    "removed_at",
+    "days_on_market_source",
+    "days_since_first_seen",
+    "freshness_bucket",
+    "lifecycle_events",
     "asking_price",
     "property_type",
     "status",
@@ -101,6 +118,7 @@ FIELD_GAP_FIELDS = (
     "vve_status",
     "energy_label_status",
     "residential_classification",
+    "source_published_at",
 )
 WORKSHEET_NAMES = ("Realworks Properties", "Summary", "Field Gaps", "Warnings", "Problem Rows")
 _FACT_FIELD_ALIASES = {
@@ -207,6 +225,7 @@ def run_realworks_excel_export(
     max_listing_fetches: int = 1,
     max_detail_fetches: int = 9,
     timeout_seconds: float = 15.0,
+    observed_at: datetime | None = None,
 ) -> tuple[RealworksPropertyReadinessResult, RealworksExcelExportResult]:
     readiness = run_realworks_property_readiness(
         source_id=source_id,
@@ -215,6 +234,7 @@ def run_realworks_excel_export(
         max_listing_fetches=max_listing_fetches,
         max_detail_fetches=max_detail_fetches,
         timeout_seconds=timeout_seconds,
+        observed_at=observed_at,
     )
     export = export_realworks_readiness_rows_to_excel(
         rows=readiness.rows,
@@ -248,6 +268,9 @@ def _write_summary_sheet(
 ) -> None:
     quality_counts = Counter(row.quality_status for row in rows)
     export_counts = Counter(row.export_readiness for row in rows)
+    source_published_counts = Counter(row.source_published_at_status for row in rows)
+    freshness_counts = Counter(row.freshness_bucket for row in rows)
+    lifecycle_counts = Counter(event for row in rows for event in row.lifecycle_events)
     metrics = (
         ("source_id", source_id),
         ("source_domain", source_domain),
@@ -267,6 +290,11 @@ def _write_summary_sheet(
         ("export_ready_count", export_counts["export_ready"]),
         ("export_review_count", export_counts["export_review"]),
         ("export_blocked_count", export_counts["export_blocked"]),
+        ("source_published_at_usable_count", source_published_counts["usable"]),
+        ("source_published_at_review_count", source_published_counts["review"]),
+        ("source_published_at_missing_count", source_published_counts["missing"]),
+        ("freshness_bucket_counts", _counts_text(freshness_counts)),
+        ("lifecycle_event_counts", _counts_text(lifecycle_counts)),
         ("generated_at", generated_at),
         ("artifact_statement", "Excel validation artifact only"),
         ("production_statement", "Not client-ready production output"),
@@ -346,6 +374,23 @@ def _property_row_values(row: RealworksPropertyReadinessRow) -> dict[str, object
         "status_bucket": row.status_bucket,
         "active_inventory_eligible": row.active_inventory_eligible,
         "db_persistence_action": row.db_persistence_action,
+        "source_published_at": _datetime_cell(row.source_published_at),
+        "source_published_at_raw": row.source_published_at_raw,
+        "source_published_at_source": row.source_published_at_source,
+        "source_published_at_status": row.source_published_at_status,
+        "source_published_at_review_reason": row.source_published_at_review_reason,
+        "first_seen_at": _datetime_cell(row.first_seen_at),
+        "last_seen_at": _datetime_cell(row.last_seen_at),
+        "observed_at": _datetime_cell(row.observed_at),
+        "status_first_seen_at": _datetime_cell(row.status_first_seen_at),
+        "status_changed_at": _datetime_cell(row.status_changed_at),
+        "price_first_seen_at": _datetime_cell(row.price_first_seen_at),
+        "price_changed_at": _datetime_cell(row.price_changed_at),
+        "removed_at": _datetime_cell(row.removed_at),
+        "days_on_market_source": row.days_on_market_source,
+        "days_since_first_seen": row.days_since_first_seen,
+        "freshness_bucket": row.freshness_bucket,
+        "lifecycle_events": _join(row.lifecycle_events),
         "asking_price": row.asking_price,
         "property_type": row.property_type,
         "status": row.status,
@@ -435,6 +480,11 @@ def _field_gap(field: str, rows: Sequence[RealworksPropertyReadinessRow]) -> _Fi
         review = sum(1 for row in rows if row.residential_classification.endswith("_review"))
         missing = sum(1 for row in rows if row.residential_classification.endswith("_blocked"))
         return _FieldGap(field, usable, review, missing, "non-residential rows are not production-ready")
+    if field == "source_published_at":
+        usable = sum(1 for row in rows if row.source_published_at_status == "usable")
+        review = sum(1 for row in rows if row.source_published_at_status == "review")
+        missing = sum(1 for row in rows if row.source_published_at_status == "missing")
+        return _FieldGap(field, usable, review, missing, "source-declared publication date only")
 
     fact_field = _FACT_FIELD_ALIASES.get(field, field)
     usable = 0
@@ -606,6 +656,10 @@ def _warning_note(warning: str) -> str:
         "unsupported_property_type_overigog": "property type is unsupported for automatic client-ready promotion",
         "missing_vve_for_apartment": "apartment has no explicit VvE evidence",
         "non_residential_property_type": "listing appears garage/storage/parking or otherwise non-residential",
+        "source_published_at_missing": "source did not expose an explicit publication date",
+        "source_published_at_review": "source publication date needs human review",
+        "date_modified_not_publication_date": "dateModified is not a reliable publication date",
+        "source_published_at_conflict": "multiple strong publication-date candidates conflict",
     }
     return notes.get(warning, "")
 
@@ -614,3 +668,9 @@ def _datetime_to_utc_iso(value: datetime) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _datetime_cell(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return _datetime_to_utc_iso(value)

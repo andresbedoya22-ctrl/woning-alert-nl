@@ -109,6 +109,97 @@ def test_extracts_postcode_from_json_ld_address() -> None:
     assert result.postcode_source == "json_ld"
 
 
+def test_extracts_json_ld_date_published() -> None:
+    result = _extract(
+        _html_with_body(
+            """
+            <script type="application/ld+json">
+            {"@type":"Residence","datePublished":"2026-06-28","address":{"postalCode":"5044SN"}}
+            </script>
+            """
+        )
+    )
+
+    assert result.source_published_at == datetime(2026, 6, 28, tzinfo=UTC)
+    assert result.source_published_at_source == "json_ld_datePublished"
+    assert result.source_published_at_status == "usable"
+
+
+def test_extracts_json_ld_date_posted() -> None:
+    result = _extract(
+        _html_with_body(
+            """
+            <script type="application/ld+json">
+            {"@type":"Residence","datePosted":"2026-06-27T10:30:00Z"}
+            </script>
+            """
+        )
+    )
+
+    assert result.source_published_at == datetime(2026, 6, 27, 10, 30, tzinfo=UTC)
+    assert result.source_published_at_source == "json_ld_datePosted"
+    assert result.source_published_at_status == "usable"
+
+
+def test_json_ld_date_modified_only_is_review() -> None:
+    result = _extract(
+        _html_with_body(
+            """
+            <script type="application/ld+json">
+            {"@type":"Residence","dateModified":"2026-06-26"}
+            </script>
+            """
+        )
+    )
+
+    assert result.source_published_at == datetime(2026, 6, 26, tzinfo=UTC)
+    assert result.source_published_at_source == "json_ld_dateModified"
+    assert result.source_published_at_status == "review"
+    assert result.source_published_at_review_reason == "date_modified_not_publication_date"
+
+
+def test_extracts_dutch_label_aangemeld() -> None:
+    result = _extract(_html(("Aangemeld", "28-06-2026")))
+
+    assert result.source_published_at == datetime(2026, 6, 28, tzinfo=UTC)
+    assert result.source_published_at_status == "usable"
+
+
+def test_extracts_dutch_textual_publication_date() -> None:
+    result = _extract(_html(("Publicatiedatum", "28 juni 2026")))
+
+    assert result.source_published_at == datetime(2026, 6, 28, tzinfo=UTC)
+
+
+def test_extracts_dutch_numeric_publication_date() -> None:
+    result = _extract(_html(("Datum plaatsing", "28/06/2026")))
+
+    assert result.source_published_at == datetime(2026, 6, 28, tzinfo=UTC)
+
+
+def test_does_not_infer_publication_date_from_url_bouwjaar_or_status() -> None:
+    result = _extract(_html(("Bouwjaar", "1998"), ("Status", "Beschikbaar")))
+
+    assert result.source_published_at is None
+    assert result.source_published_at_status == "missing"
+
+
+def test_conflicting_strong_publication_dates_are_review() -> None:
+    result = _extract(
+        _html_with_body(
+            """
+            <script type="application/ld+json">
+            {"datePublished":"2026-06-28","datePosted":"2026-06-27"}
+            </script>
+            """
+        )
+    )
+
+    assert result.source_published_at is None
+    assert result.source_published_at_status == "review"
+    assert result.source_published_at_review_reason == "source_published_at_conflict"
+
+
 def test_json_ld_visible_header_postcode_conflict_is_review() -> None:
     result = _extract(
         _html_with_body(

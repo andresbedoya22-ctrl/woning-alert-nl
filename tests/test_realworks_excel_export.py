@@ -343,6 +343,23 @@ def test_excel_includes_critical_status_columns(tmp_path: Path) -> None:
         "status_bucket",
         "active_inventory_eligible",
         "db_persistence_action",
+        "source_published_at",
+        "source_published_at_raw",
+        "source_published_at_source",
+        "source_published_at_status",
+        "source_published_at_review_reason",
+        "first_seen_at",
+        "last_seen_at",
+        "observed_at",
+        "status_first_seen_at",
+        "status_changed_at",
+        "price_first_seen_at",
+        "price_changed_at",
+        "removed_at",
+        "days_on_market_source",
+        "days_since_first_seen",
+        "freshness_bucket",
+        "lifecycle_events",
         "vve_active",
         "vve_monthly_cost",
         "vve_status",
@@ -352,6 +369,39 @@ def test_excel_includes_critical_status_columns(tmp_path: Path) -> None:
         "energy_label_review_reason",
     ):
         assert column in headers
+
+
+def test_summary_has_source_published_freshness_and_lifecycle_counts(tmp_path: Path) -> None:
+    row = build_realworks_property_readiness_row(
+        _listing(1),
+        _full_record(1),
+        observed_at=NOW,
+        source_published_at=datetime(2026, 6, 28, tzinfo=UTC),
+        source_published_at_raw="2026-06-28",
+        source_published_at_source="json_ld_datePublished",
+        source_published_at_status="usable",
+    )
+    _, workbook = _export(tmp_path, row)
+    values = {row[0].value: row[1].value for row in workbook["Summary"].iter_rows(min_row=2)}
+
+    assert values["source_published_at_usable_count"] == 1
+    assert values["source_published_at_review_count"] == 0
+    assert values["source_published_at_missing_count"] == 0
+    assert values["freshness_bucket_counts"] == "new_today=1"
+    assert values["lifecycle_event_counts"] == "new_listing=1"
+
+
+def test_workbook_writes_rows_when_source_published_at_missing(tmp_path: Path) -> None:
+    row = build_realworks_property_readiness_row(_listing(1), _full_record(1), observed_at=NOW)
+    result, workbook = _export(tmp_path, row)
+    worksheet = workbook["Realworks Properties"]
+    headers = _headers(worksheet)
+
+    assert result.rows_written == 1
+    assert worksheet.cell(2, _col(headers, "source_published_at")).value in (None, "")
+    assert worksheet.cell(2, _col(headers, "source_published_at_status")).value == "missing"
+    assert worksheet.cell(2, _col(headers, "first_seen_at")).value == "2026-06-28T10:00:00Z"
+    assert worksheet.cell(2, _col(headers, "observed_at")).value == "2026-06-28T10:00:00Z"
 
 
 def test_excel_writes_extracted_postcode_and_status_policy(tmp_path: Path) -> None:
