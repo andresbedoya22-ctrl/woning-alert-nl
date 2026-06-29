@@ -176,6 +176,18 @@ This phase creates no real database, migrations, matching, client alerts, adviso
 path, raw HTML/JSON persistence, long descriptions, images, LLM extraction, parser per makelaar, or global eligibility
 change.
 
+## Realworks Multi-source Validation v1
+
+`scraper/src/domek_wonen/pilots/realworks_multi_source_validation.py` adds the controlled Realworks family validation
+runner across locally evidenced sources. It selects Oldenkotte as control and Olden as the second makelaar when local
+evidence supplies source id, domain, listing URL, Realworks delivery/parser signals, and allowed access status.
+
+The runner reuses the existing Realworks parser, parser QA, bounded detail facts, readiness rows, status/history, and
+lifecycle path per source, then writes a local validation workbook and summary CSV under `tmp/generated/`. It does not
+create a parser per makelaar, a database, matching, client alerts, advisor email, n8n, dashboard, Funda/Pararius path,
+browser automation, raw HTML/JSON persistence, long descriptions, images, LLM extraction, `data/raw` changes, or global
+eligibility changes.
+
 ## Parser Family Runner v1
 
 `scraper/src/domek_wonen/parsers/runner.py` adds the first offline connector from
