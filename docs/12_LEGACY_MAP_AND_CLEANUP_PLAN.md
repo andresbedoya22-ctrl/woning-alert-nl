@@ -204,6 +204,18 @@ census, apply-to-all Realworks execution, raw HTML/JSON persistence, long descri
 proxies, bypass behavior, LLM use, parser-per-makelaar logic, Funda/Pararius work, `data/raw` changes, or global
 eligibility changes.
 
+## Noord-Brabant Coverage Source Census v1
+
+`scraper/src/domek_wonen/sources/coverage_census.py` is the first dedicated coverage-census layer for deciding which
+parser family or technical delivery classification should apply after source inventory consolidation. It uses local
+seed, override, fingerprint, and source-master evidence, preserves source aliases while deduping by normalized domain,
+and keeps office, coverage, and aanbod evidence separate.
+
+The runner `scripts/run_noord_brabant_coverage_source_census.py` writes local generated CSV/XLSX artifacts under
+`tmp/generated/`. It remains a source-intelligence step only: no matching, advisor email, n8n, dashboard, DB,
+migrations, property inventory parsing, Funda/Pararius operational source, raw HTML/JSON persistence, browser
+automation, LLM runtime, parser per makelaar, or global eligibility change is introduced.
+
 ## Parser Family Runner v1
 
 `scraper/src/domek_wonen/parsers/runner.py` adds the first offline connector from
