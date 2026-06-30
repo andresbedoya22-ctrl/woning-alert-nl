@@ -188,6 +188,22 @@ create a parser per makelaar, a database, matching, client alerts, advisor email
 browser automation, raw HTML/JSON persistence, long descriptions, images, LLM extraction, `data/raw` changes, or global
 eligibility changes.
 
+## Realworks Broader Bounded Audit v1
+
+`scraper/src/domek_wonen/pilots/realworks_broader_bounded_audit.py` extends the reusable Realworks family validation to
+additional locally evidenced Realworks makelaars beyond the Oldenkotte and Olden control sources. The bounded audit
+selected `alstedevanmierlomakelaardij.nl__tilburg`, `cvda.nl__tilburg`, and `hansvanberkel.nl__tilburg`, then wrote a
+local manual-verification workbook and summary CSV under `tmp/generated/`.
+
+The run produced 29 manual verification rows and the family decision
+`realworks_ready_for_noord_brabant_realworks_audit`. Remaining review gaps stay explicit: coordinates,
+`source_published_at`, VvE, and heating/hot-water normalization.
+
+This phase does not add matching, client alerts, advisor email, n8n, dashboard, DB, migrations, Noord-Brabant full
+census, apply-to-all Realworks execution, raw HTML/JSON persistence, long descriptions, images, browser automation,
+proxies, bypass behavior, LLM use, parser-per-makelaar logic, Funda/Pararius work, `data/raw` changes, or global
+eligibility changes.
+
 ## Parser Family Runner v1
 
 `scraper/src/domek_wonen/parsers/runner.py` adds the first offline connector from

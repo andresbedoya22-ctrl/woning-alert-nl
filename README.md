@@ -426,6 +426,21 @@ This phase does not add matching, client alerts, advisor email, n8n, dashboard, 
 census, raw HTML/JSON persistence, long descriptions, images, browser automation, proxies, bypass behavior, LLM use,
 parser-per-makelaar logic, Funda/Pararius work, `data/raw` changes, or global eligibility changes.
 
+## Realworks Broader Bounded Audit v1
+
+`scraper/src/domek_wonen/pilots/realworks_broader_bounded_audit.py` validates the reusable Realworks family on
+additional locally evidenced Realworks makelaars beyond Oldenkotte and Olden. It writes a local manual-verification
+workbook and summary CSV under `tmp/generated/`, excluding generated artifacts from git.
+
+The bounded audit selected `alstedevanmierlomakelaardij.nl__tilburg`, `cvda.nl__tilburg`, and
+`hansvanberkel.nl__tilburg`, producing 29 manual verification rows. The family decision is
+`realworks_ready_for_noord_brabant_realworks_audit`, with review gaps still explicit.
+
+This phase does not add matching, client alerts, advisor email, n8n, dashboard, DB, migrations, Noord-Brabant full
+census, raw HTML/JSON persistence, long descriptions, images, browser automation, proxies, bypass behavior, LLM use,
+parser-per-makelaar logic, Funda/Pararius work, `data/raw` changes, apply-to-all Realworks execution, or global
+eligibility changes.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
