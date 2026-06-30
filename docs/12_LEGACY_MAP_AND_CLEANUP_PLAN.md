@@ -204,17 +204,22 @@ census, apply-to-all Realworks execution, raw HTML/JSON persistence, long descri
 proxies, bypass behavior, LLM use, parser-per-makelaar logic, Funda/Pararius work, `data/raw` changes, or global
 eligibility changes.
 
-## Noord-Brabant Coverage Source Census v1
+## Noord-Brabant Coverage Source Census Hardened v1
 
 `scraper/src/domek_wonen/sources/coverage_census.py` is the first dedicated coverage-census layer for deciding which
 parser family or technical delivery classification should apply after source inventory consolidation. It uses local
 seed, override, fingerprint, and source-master evidence, preserves source aliases while deduping by normalized domain,
-and keeps office, coverage, and aanbod evidence separate.
+and keeps office, coverage, accepted aanbod, rejected-candidate, and missing-domain evidence separate.
 
 The runner `scripts/run_noord_brabant_coverage_source_census.py` writes local generated CSV/XLSX artifacts under
-`tmp/generated/`. It remains a source-intelligence step only: no matching, advisor email, n8n, dashboard, DB,
-migrations, property inventory parsing, Funda/Pararius operational source, raw HTML/JSON persistence, browser
-automation, LLM runtime, parser per makelaar, or global eligibility change is introduced.
+`tmp/generated/`. The hardened version replaces the original v1 generated artifacts with `*_hardened_v1.*` outputs,
+uses `accepted_aanbod_url` rather than an ambiguous master `aanbod_url`, rejects operational Funda/Pararius and
+property-detail URLs, verifies Realworks with strong structural evidence, resolves KIN to `ogonline_xhr`, re-fingerprints
+`custom_js_app` rows, and exposes `Missing Domain Queue`, `Realworks Verification`, `Custom JS Refingerprint`,
+`Family Conflicts`, `Normalization Issues`, and `Quality Gates` workbook sheets. It remains a source-intelligence step
+only: no matching, advisor email, n8n, dashboard, DB, migrations, property inventory parsing, Funda/Pararius operational
+source, raw HTML/JSON persistence, browser automation, LLM runtime, parser per makelaar, or global eligibility change is
+introduced.
 
 ## Parser Family Runner v1
 

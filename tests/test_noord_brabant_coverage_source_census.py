@@ -6,17 +6,21 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from domek_wonen.sources.coverage_census import (
+    AanbodUrlCandidate,
     CoverageCensusResult,
     CoverageSourceRecord,
     CoverageTerminalStatus,
     classify_family_from_content,
     compute_quality_metrics,
     consolidate_coverage_source_seeds,
+    derive_listing_index_candidates_from_detail_url,
     discover_aanbod_url,
+    normalize_gemeente_name,
     finalize_coverage_record,
     run_investigation_loop,
     run_noord_brabant_coverage_source_census,
     write_coverage_census_outputs,
+    _set_accepted_aanbod_url,
 )
 
 
@@ -208,11 +212,17 @@ def test_writes_workbook_with_all_required_sheets(tmp_path: Path) -> None:
             "Investigation Attempts",
             "Coverage Matrix",
             "Realworks Candidates",
+            "Realworks Verification",
             "OGonline Candidates",
             "Custom Needs Parser",
+            "Custom JS Refingerprint",
+            "Family Conflicts",
             "Blocked or Legal Review",
             "Duplicates",
+            "Missing Domain Queue",
+            "Normalization Issues",
             "Review Queue",
+            "Quality Gates",
         ]
     finally:
         workbook.close()
@@ -293,3 +303,205 @@ def test_runner_writes_outputs_from_local_csvs(tmp_path: Path) -> None:
     assert result.workbook_path and result.workbook_path.exists()
     assert result.master_csv_path and result.master_csv_path.exists()
     assert result.review_queue_csv_path and result.review_queue_csv_path.exists()
+
+
+def test_rejected_candidate_cannot_appear_as_accepted_aanbod_url() -> None:
+    record = _record(aanbod_url="https://other.nl/woningen")
+    assert not discover_aanbod_url(record, fetch_text=None)
+    assert record.accepted_aanbod_url == ""
+    assert record.best_rejected_candidate_reason == "candidate_not_on_official_domain"
+
+
+def test_later_acceptance_reconciles_prior_rejected_duplicate_candidate() -> None:
+    record = _record()
+    record.aanbod_url_candidates.append(
+        AanbodUrlCandidate(
+            source_id=record.source_id,
+            domain=record.domain,
+            candidate_url="https://alpha.nl/aanbod",
+            accepted=False,
+            rejection_reason="page_does_not_look_like_listing_index",
+            evidence_type="homepage_link",
+            pass_name="pass_2_homepage_links",
+            confidence=0.45,
+        )
+    )
+    _set_accepted_aanbod_url(record, "https://alpha.nl/aanbod", "common_path", "listing cards", 0.62)
+    metrics = compute_quality_metrics(CoverageCensusResult(records=(record,), initial_source_count=1, deduped_source_count=1))
+    assert record.aanbod_url_candidates[0].accepted is True
+    assert record.aanbod_url_candidates[0].rejection_reason == "reconciled_after_later_acceptance"
+    assert metrics["rejected_candidate_used_as_master_aanbod_url_count"] == 0
+
+
+def test_property_detail_url_cannot_appear_as_accepted_aanbod_url() -> None:
+    record = _record(aanbod_url="https://alpha.nl/koop/huis-123-straat-1")
+    discover_aanbod_url(record, fetch_text=None)
+    assert record.accepted_aanbod_url == ""
+
+
+def test_realworks_detail_url_derives_listing_index_candidates() -> None:
+    candidates = derive_listing_index_candidates_from_detail_url(
+        "https://alpha.nl/aanbod/woningaanbod/tilburg/koop/huis-123-straat-1"
+    )
+    assert "https://alpha.nl/aanbod/woningaanbod/tilburg/koop" in candidates
+    assert "https://alpha.nl/aanbod/woningaanbod/koop" in candidates
+    assert "https://alpha.nl/aanbod/woningaanbod" in candidates
+
+
+def test_derived_realworks_listing_index_can_become_accepted_aanbod_url() -> None:
+    record = _record(aanbod_url="https://alpha.nl/aanbod/woningaanbod/tilburg/koop/huis-123-straat-1")
+    fetch = _fetcher({
+        "https://alpha.nl/aanbod/woningaanbod/tilburg/koop": '<li class="aanbodEntry">Vraagprijs</li>',
+    })
+    assert discover_aanbod_url(record, fetch_text=fetch, can_fetch=lambda _d, _p: True)
+    assert record.accepted_aanbod_url == "https://alpha.nl/aanbod/woningaanbod/tilburg/koop"
+
+
+def test_platform_guess_realworks_is_not_enough_to_classify_realworks() -> None:
+    record = _record(aanbod_url="https://alpha.nl/woningen", platform_guess="realworks")
+    run_investigation_loop(record)
+    assert record.parser_family_candidate != "realworks_public"
+
+
+def test_realworks_requires_strong_evidence() -> None:
+    record = _record(aanbod_url="https://alpha.nl/woningen", platform_guess="realworks", parser_family_candidate="realworks_public")
+    run_investigation_loop(record)
+    metrics = compute_quality_metrics(CoverageCensusResult(records=(record,), initial_source_count=1, deduped_source_count=1))
+    assert record.parser_family_candidate != "realworks_public"
+    assert metrics["realworks_without_strong_evidence_count"] == 0
+
+
+def test_kin_is_not_classified_as_realworks_from_stale_local_evidence() -> None:
+    record = _record(
+        source_id="kinmakelaars-nl__breda",
+        domain="kinmakelaars.nl",
+        aanbod_url="https://www.kinmakelaars.nl/aanbod/wonen/te-koop",
+        platform_guess="realworks",
+        parser_family_candidate="realworks_public",
+    )
+    run_investigation_loop(record)
+    assert record.parser_family_candidate == "ogonline_xhr"
+
+
+def test_kin_resolves_to_ogonline_or_explicit_review_status() -> None:
+    record = _record(source_id="kinmakelaars-nl__breda", domain="kinmakelaars.nl", aanbod_url="https://www.kinmakelaars.nl/aanbod/wonen/te-koop")
+    run_investigation_loop(record)
+    assert record.parser_family_candidate == "ogonline_xhr"
+    assert record.validation_status in {"needs_ogonline_revalidation", "passed_quality_gates"}
+
+
+def test_family_conflicts_are_reported() -> None:
+    record = _record(source_id="kinmakelaars-nl__breda", domain="kinmakelaars.nl", aanbod_url="https://www.kinmakelaars.nl/aanbod/wonen/te-koop", parser_family_candidate="realworks_public")
+    run_investigation_loop(record)
+    assert record.family_conflicts
+
+
+def test_custom_js_app_sources_are_refingerprinted() -> None:
+    record = _record(aanbod_url="https://alpha.nl/woningen", parser_family_candidate="custom_js_app")
+    run_investigation_loop(record)
+    assert record.custom_js_refingerprint_attempts
+
+
+def test_custom_js_app_with_wp_json_moves_to_wordpress_json() -> None:
+    record = _record(aanbod_url="https://alpha.nl/woningen", parser_family_candidate="custom_js_app", family_evidence="wp-json")
+    run_investigation_loop(record)
+    assert record.parser_family_candidate == "wordpress_json"
+
+
+def test_custom_js_app_with_server_rendered_cards_moves_to_custom_html() -> None:
+    record = _record(aanbod_url="https://alpha.nl/woningen", parser_family_candidate="custom_js_app", family_evidence="property-card Vraagprijs")
+    run_investigation_loop(record)
+    assert record.parser_family_candidate == "custom_html"
+
+
+def test_custom_js_app_with_realworks_strong_signals_moves_to_realworks_public() -> None:
+    record = _record(aanbod_url="https://alpha.nl/aanbod/woningaanbod", parser_family_candidate="custom_js_app", family_evidence="aanbodEntry")
+    run_investigation_loop(record)
+    assert record.parser_family_candidate == "realworks_public"
+
+
+def test_custom_js_app_with_only_app_shell_remains_custom_js_app_with_evidence() -> None:
+    record = _record(aanbod_url="https://alpha.nl/woningen", parser_family_candidate="custom_js_app", family_evidence='<div id="app"></div>')
+    run_investigation_loop(record)
+    assert record.parser_family_candidate == "custom_js_app"
+    assert record.custom_js_refingerprint_attempts[0].decision == "confirmed_custom_js_app"
+
+
+def test_gemeente_names_are_normalized() -> None:
+    assert normalize_gemeente_name("Bergen Op Zoom") == "Bergen op Zoom"
+    assert normalize_gemeente_name("S Hertogenbosch") == "'s-Hertogenbosch"
+
+
+def test_missing_domain_rows_go_to_missing_domain_queue(tmp_path: Path) -> None:
+    seed = tmp_path / "seed.csv"
+    seed.write_text("source_id,office_name,gemeente,province\nmissing,No Domain,Tilburg,Noord-Brabant\n", encoding="utf-8")
+    result = run_noord_brabant_coverage_source_census(repo_root=tmp_path, evidence_paths=(Path("seed.csv"),))
+    assert len(result.records) == 0
+    assert len(result.missing_domain_queue) == 1
+
+
+def test_office_location_is_not_fabricated_as_noord_brabant_when_missing() -> None:
+    records, _ = consolidate_coverage_source_seeds([_row(office_province="", office_gemeente="")])
+    assert records[0].office_province == ""
+    assert records[0].office_location_status != "known"
+
+
+def test_outside_office_coverage_fields_are_separate_from_office_fields() -> None:
+    records, _ = consolidate_coverage_source_seeds([_row(office_province="Zuid-Holland", office_gemeente="Rotterdam")])
+    assert records[0].office_province == "Zuid-Holland"
+    assert records[0].coverage_province == "Noord-Brabant"
+    assert records[0].outside_office_coverage_status == "outside_office_source_included"
+
+
+def test_quality_gate_fails_when_rejected_candidate_is_used_in_master() -> None:
+    record = _record()
+    record.accepted_aanbod_url = "https://other.nl/woningen"
+    record.aanbod_url_candidates.append(type("C", (), {"accepted": False, "candidate_url": "https://other.nl/woningen"})())
+    metrics = compute_quality_metrics(CoverageCensusResult(records=(record,), initial_source_count=1, deduped_source_count=1))
+    assert metrics["rejected_candidate_used_as_master_aanbod_url_count"] == 1
+    assert metrics["quality_gate_passed"] is False
+
+
+def test_quality_gate_fails_when_property_detail_url_remains_accepted() -> None:
+    record = _record()
+    record.accepted_aanbod_url = "https://alpha.nl/koop/huis-123-straat-1"
+    metrics = compute_quality_metrics(CoverageCensusResult(records=(record,), initial_source_count=1, deduped_source_count=1))
+    assert metrics["property_detail_url_as_aanbod_url_count"] == 1
+    assert metrics["quality_gate_passed"] is False
+
+
+def test_quality_gate_fails_when_realworks_lacks_strong_evidence() -> None:
+    record = _record(accepted_aanbod_url="https://alpha.nl/woningen", parser_family_candidate="realworks_public")
+    metrics = compute_quality_metrics(CoverageCensusResult(records=(record,), initial_source_count=1, deduped_source_count=1))
+    assert metrics["realworks_without_strong_evidence_count"] == 1
+    assert metrics["quality_gate_passed"] is False
+
+
+def test_quality_gate_fails_when_kin_remains_realworks() -> None:
+    record = _record(source_id="kinmakelaars-nl__breda", domain="kinmakelaars.nl", accepted_aanbod_url="https://kinmakelaars.nl/aanbod/wonen/te-koop", parser_family_candidate="realworks_public")
+    metrics = compute_quality_metrics(CoverageCensusResult(records=(record,), initial_source_count=1, deduped_source_count=1))
+    assert metrics["kin_family_conflict_count"] == 1
+    assert metrics["quality_gate_passed"] is False
+
+
+def test_quality_gate_fails_when_custom_js_app_has_no_fingerprint_attempt() -> None:
+    record = _record(accepted_aanbod_url="https://alpha.nl/woningen", parser_family_candidate="custom_js_app")
+    metrics = compute_quality_metrics(CoverageCensusResult(records=(record,), initial_source_count=1, deduped_source_count=1))
+    assert metrics["custom_js_app_without_fingerprint_attempt_count"] == 1
+    assert metrics["quality_gate_passed"] is False
+
+
+def test_quality_gate_fails_on_gemeente_normalization_conflicts() -> None:
+    record = _record()
+    result = CoverageCensusResult(records=(record,), normalization_issues=(), initial_source_count=1, deduped_source_count=1)
+    metrics = compute_quality_metrics(result)
+    assert metrics["gemeente_normalization_conflict_count"] == 0
+
+
+def test_hardened_workbook_uses_accepted_aanbod_url_not_ambiguous_aanbod_url(tmp_path: Path) -> None:
+    record = _record(aanbod_url="https://alpha.nl/woningen")
+    run_investigation_loop(record)
+    _wb, master, _review = write_coverage_census_outputs(CoverageCensusResult(records=(record,), initial_source_count=1, deduped_source_count=1), tmp_path / "census.xlsx", tmp_path / "master.csv", tmp_path / "review.csv")
+    columns = master.read_text(encoding="utf-8").splitlines()[0].split(",")
+    assert "accepted_aanbod_url" in columns
+    assert "aanbod_url" not in columns

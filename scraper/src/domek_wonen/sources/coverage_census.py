@@ -87,11 +87,14 @@ MASTER_COLUMNS = (
     "office_city",
     "office_gemeente",
     "office_province",
+    "office_location_status",
     "coverage_city",
     "coverage_gemeente",
     "coverage_province",
+    "coverage_location_status",
+    "outside_office_coverage_status",
     "has_noord_brabant_coverage",
-    "aanbod_url",
+    "accepted_aanbod_url",
     "aanbod_url_status",
     "aanbod_url_confidence",
     "platform_guess",
@@ -99,6 +102,7 @@ MASTER_COLUMNS = (
     "parser_family_candidate",
     "family_confidence",
     "family_terminal_status",
+    "realworks_verification_status",
     "access_policy_status",
     "terminal_status",
     "validation_status",
@@ -106,6 +110,33 @@ MASTER_COLUMNS = (
     "manual_check_result",
     "manual_check_notes",
 )
+
+QUALITY_GATE_NAMES = (
+    "operational_unknown_family_count",
+    "missing_aanbod_url_without_terminal_reason_count",
+    "rejected_candidate_used_as_master_aanbod_url_count",
+    "property_detail_url_as_aanbod_url_count",
+    "funda_or_pararius_operational_aanbod_url_count",
+    "realworks_without_strong_evidence_count",
+    "platform_guess_realworks_but_family_custom_js_app_unreviewed_count",
+    "kin_family_conflict_count",
+    "custom_js_app_without_fingerprint_attempt_count",
+    "gemeente_normalization_conflict_count",
+)
+
+GEMEENTE_NORMALIZATION_MAP = {
+    "bergen_op_zoom": "Bergen op Zoom",
+    "geldrop_mierlo": "Geldrop-Mierlo",
+    "gemert_bakel": "Gemert-Bakel",
+    "gilze_en_rijen": "Gilze en Rijen",
+    "land_van_cuijk": "Land van Cuijk",
+    "reusel_de_mierden": "Reusel-De Mierden",
+    "s_hertogenbosch": "'s-Hertogenbosch",
+    "'s_hertogenbosch": "'s-Hertogenbosch",
+    "s-hertogenbosch": "'s-Hertogenbosch",
+    "sint_michielsgestel": "Sint-Michielsgestel",
+    "son_en_breugel": "Son en Breugel",
+}
 
 
 @dataclass(slots=True)
@@ -146,6 +177,65 @@ class FamilyFingerprintEvidence:
 
 
 @dataclass(slots=True)
+class FamilyConflictRecord:
+    source_id: str
+    domain: str
+    old_family: str
+    new_family: str
+    conflict_type: str
+    evidence: str
+    resolution: str
+    remaining_action: str = ""
+
+
+@dataclass(slots=True)
+class CustomJSRefingerprintRecord:
+    source_id: str
+    domain: str
+    initial_family: str
+    final_family: str
+    signal: str
+    evidence_preview: str
+    decision: str
+
+
+@dataclass(slots=True)
+class MissingDomainQueueRecord:
+    source_name: str
+    raw_source_id: str
+    gemeente: str
+    province: str
+    evidence_file: str
+    reason: str
+    suggested_search_query: str
+    suggested_next_action: str
+
+
+@dataclass(slots=True)
+class NormalizationIssueRecord:
+    source_id: str
+    domain: str
+    raw_gemeente: str
+    normalized_gemeente: str
+    field_name: str
+    status: str
+
+
+@dataclass(slots=True)
+class RealworksVerificationRecord:
+    source_id: str
+    domain: str
+    platform_guess: str
+    accepted_aanbod_url: str
+    realworks_verification_status: str
+    realworks_evidence_strength: str
+    signals_found: str
+    signals_missing: str
+    decision: str
+    reason: str
+
+
+@dataclass(slots=True)
 class CoverageSourceRecord:
     source_id: str
     source_name: str
@@ -159,22 +249,37 @@ class CoverageSourceRecord:
     coverage_province: str = ""
     has_noord_brabant_coverage: bool = False
     coverage_evidence: str = ""
+    raw_aanbod_url_candidate: str = ""
     aanbod_url: str = ""
     aanbod_url_type: str = ""
     aanbod_url_status: str = ""
     aanbod_url_confidence: float = 0.0
     aanbod_url_evidence: str = ""
+    accepted_aanbod_url: str = ""
+    accepted_aanbod_url_source: str = ""
+    accepted_aanbod_url_confidence: float = 0.0
+    accepted_aanbod_url_evidence: str = ""
+    rejected_aanbod_url_count: int = 0
+    best_rejected_candidate_url: str = ""
+    best_rejected_candidate_reason: str = ""
     platform_guess: str = ""
     delivery_mode: str = ""
     parser_family_candidate: str = ""
     family_confidence: float = 0.0
     family_evidence: str = ""
     family_terminal_status: str = ""
+    realworks_verification_status: str = ""
+    realworks_evidence_strength: str = ""
+    realworks_signals_found: str = ""
+    realworks_signals_missing: str = ""
     access_policy_status: str = "researching"
     robots_status_if_known: str = "not_checked"
     source_quality_status: str = ""
     validation_status: str = ""
     terminal_status: str = ""
+    office_location_status: str = ""
+    coverage_location_status: str = ""
+    outside_office_coverage_status: str = ""
     duplicate_group_id: str = ""
     duplicate_reason: str = ""
     investigation_pass_count: int = 0
@@ -183,6 +288,8 @@ class CoverageSourceRecord:
     recommended_next_action: str = ""
     aanbod_url_candidates: list[AanbodUrlCandidate] = field(default_factory=list)
     family_fingerprint_evidence: list[FamilyFingerprintEvidence] = field(default_factory=list)
+    family_conflicts: list[FamilyConflictRecord] = field(default_factory=list)
+    custom_js_refingerprint_attempts: list[CustomJSRefingerprintRecord] = field(default_factory=list)
     aliases: list[str] = field(default_factory=list)
     source_ids: list[str] = field(default_factory=list)
 
@@ -191,6 +298,8 @@ class CoverageSourceRecord:
 class CoverageCensusResult:
     records: tuple[CoverageSourceRecord, ...]
     duplicate_records: tuple[CoverageSourceRecord, ...] = ()
+    missing_domain_queue: tuple[MissingDomainQueueRecord, ...] = ()
+    normalization_issues: tuple[NormalizationIssueRecord, ...] = ()
     initial_source_count: int = 0
     deduped_source_count: int = 0
     workbook_path: Path | None = None
@@ -214,6 +323,7 @@ def run_noord_brabant_coverage_source_census(
     evidence_paths: Sequence[Path] | None = None,
     allow_live_http: bool = False,
     max_sources: int | None = None,
+    max_passes: int = 8,
     max_requests_per_domain: int = 3,
     timeout_seconds: float = 10.0,
     fetch_text: FetchText | None = None,
@@ -221,7 +331,10 @@ def run_noord_brabant_coverage_source_census(
 ) -> CoverageCensusResult:
     paths = tuple(evidence_paths or LOCAL_EVIDENCE_PATHS)
     rows = load_local_source_seed_rows(repo_root=repo_root, evidence_paths=paths)
-    records, duplicates = consolidate_coverage_source_seeds(rows)
+    missing_domain_queue = build_missing_domain_queue(rows)
+    operational_rows = [row for row in rows if _normalize_domain(_first_value({_normalize_key(k): _clean_text(v) for k, v in row.items()}, ("root_domain", "domain", "source_domain", "website", "website_url")))]
+    records, duplicates = consolidate_coverage_source_seeds(operational_rows)
+    normalization_issues = collect_normalization_issues(records)
     if max_sources is not None:
         records = records[: max(0, max_sources)]
 
@@ -237,11 +350,14 @@ def run_noord_brabant_coverage_source_census(
             can_fetch=can_fetch,
             request_counts=request_counts,
             max_requests_per_domain=max_requests_per_domain,
+            max_passes=max_passes,
         )
 
     result = CoverageCensusResult(
         records=tuple(records),
         duplicate_records=tuple(duplicates),
+        missing_domain_queue=tuple(missing_domain_queue),
+        normalization_issues=tuple(normalization_issues),
         initial_source_count=len(rows),
         deduped_source_count=len(records),
         warnings=(),
@@ -249,13 +365,15 @@ def run_noord_brabant_coverage_source_census(
     if output_dir is None:
         return result
 
-    workbook_path = output_dir / "noord_brabant_coverage_source_census_v1.xlsx"
-    master_csv_path = output_dir / "noord_brabant_coverage_source_census_v1.csv"
-    review_queue_csv_path = output_dir / "noord_brabant_coverage_source_census_v1_review_queue.csv"
+    workbook_path = output_dir / "noord_brabant_coverage_source_census_hardened_v1.xlsx"
+    master_csv_path = output_dir / "noord_brabant_coverage_source_census_hardened_v1.csv"
+    review_queue_csv_path = output_dir / "noord_brabant_coverage_source_census_hardened_v1_review_queue.csv"
     write_coverage_census_outputs(result, workbook_path, master_csv_path, review_queue_csv_path)
     return CoverageCensusResult(
         records=result.records,
         duplicate_records=result.duplicate_records,
+        missing_domain_queue=result.missing_domain_queue,
+        normalization_issues=result.normalization_issues,
         initial_source_count=result.initial_source_count,
         deduped_source_count=result.deduped_source_count,
         workbook_path=workbook_path,
@@ -301,10 +419,12 @@ def coverage_record_from_seed_row(row: Mapping[str, Any]) -> CoverageSourceRecor
     domain = _normalize_domain(_first_value(normalized, ("root_domain", "domain", "source_domain", "website", "website_url")))
     homepage = _canonical_root_url(_first_value(normalized, ("website", "website_url", "homepage_url")), domain)
     source_name = _first_value(normalized, ("office_name", "source_name", "makelaar_name", "name"))
-    coverage_gemeente = _first_value(normalized, ("gemeente", "plaats", "normalized_place", "coverage_gemeente"))
+    raw_coverage_gemeente = _first_value(normalized, ("gemeente", "plaats", "normalized_place", "coverage_gemeente"))
+    coverage_gemeente = normalize_gemeente_name(raw_coverage_gemeente)
     coverage_province = _first_value(normalized, ("province", "provincie", "coverage_province"))
-    office_gemeente = _first_value(normalized, ("office_gemeente", "gemeente", "plaats", "normalized_place"))
-    office_province = _first_value(normalized, ("office_province", "province", "provincie"))
+    office_gemeente_raw = _first_value(normalized, ("office_gemeente",))
+    office_gemeente = normalize_gemeente_name(office_gemeente_raw)
+    office_province = _first_value(normalized, ("office_province",))
     source_id = _first_value(normalized, ("source_id",)) or _source_id(domain, source_name, coverage_gemeente)
     aanbod_url = _first_value(normalized, ("aanbod_url", "koopaanbod_url", "listing_url", "source_url"))
     aanbod_status = _first_value(normalized, ("aanbod_url_quality", "koopaanbod_url_quality", "aanbod_url_status"))
@@ -331,7 +451,8 @@ def coverage_record_from_seed_row(row: Mapping[str, Any]) -> CoverageSourceRecor
         coverage_province=coverage_province or office_province,
         has_noord_brabant_coverage=has_nb_coverage,
         coverage_evidence=_join(evidence_parts),
-        aanbod_url=aanbod_url,
+        raw_aanbod_url_candidate=aanbod_url,
+        aanbod_url="",
         aanbod_url_type=_first_value(normalized, ("aanbod_url_type",)),
         aanbod_url_status=aanbod_status,
         aanbod_url_confidence=_float_value(_first_value(normalized, ("confidence_score", "confidence", "score"))),
@@ -348,6 +469,9 @@ def coverage_record_from_seed_row(row: Mapping[str, Any]) -> CoverageSourceRecor
         ),
         access_policy_status=legal_status,
         source_quality_status=_first_value(normalized, ("source_quality_status", "koopaanbod_url_quality", "aanbod_url_quality")),
+        office_location_status=_location_status(office_gemeente, office_province),
+        coverage_location_status=_location_status(coverage_gemeente, coverage_province),
+        outside_office_coverage_status=_outside_office_status(office_province, coverage_province),
         aliases=[],
         source_ids=[source_id] if source_id else [],
     )
@@ -381,7 +505,7 @@ def merge_coverage_source_record(target: CoverageSourceRecord, incoming: Coverag
         "coverage_city",
         "coverage_gemeente",
         "coverage_province",
-        "aanbod_url",
+        "raw_aanbod_url_candidate",
         "aanbod_url_type",
         "aanbod_url_status",
         "platform_guess",
@@ -389,6 +513,9 @@ def merge_coverage_source_record(target: CoverageSourceRecord, incoming: Coverag
         "parser_family_candidate",
         "access_policy_status",
         "source_quality_status",
+        "office_location_status",
+        "coverage_location_status",
+        "outside_office_coverage_status",
     ):
         current = _clean_text(getattr(target, field_name))
         incoming_value = _clean_text(getattr(incoming, field_name))
@@ -452,7 +579,7 @@ def discover_aanbod_url(
     max_requests_per_domain: int = 3,
 ) -> bool:
     request_counts = request_counts if request_counts is not None else defaultdict(int)
-    explicit_url = _clean_text(record.aanbod_url)
+    explicit_url = _clean_text(record.accepted_aanbod_url or record.aanbod_url or record.raw_aanbod_url_candidate)
     if explicit_url:
         accepted, reason = _validate_aanbod_candidate(explicit_url, record.domain)
         candidate = AanbodUrlCandidate(
@@ -468,11 +595,32 @@ def discover_aanbod_url(
         )
         record.aanbod_url_candidates.append(candidate)
         if accepted:
-            record.aanbod_url = _canonical_url(explicit_url)
-            record.aanbod_url_status = "accepted"
-            record.aanbod_url_type = record.aanbod_url_type or "listing_index"
-            record.aanbod_url_confidence = max(record.aanbod_url_confidence, candidate.confidence)
+            _set_accepted_aanbod_url(record, _canonical_url(explicit_url), "local_explicit", record.aanbod_url_evidence, candidate.confidence)
             return True
+        record.aanbod_url = ""
+        _refresh_rejected_candidate_summary(record)
+
+        if reason == "property_detail_url_rejected" and fetch_text is not None:
+            for derived_url in derive_listing_index_candidates_from_detail_url(explicit_url):
+                derived_html = _guarded_fetch(
+                    record,
+                    derived_url,
+                    pass_name="pass_3_derive_listing_index_from_detail_url",
+                    fetch_text=fetch_text,
+                    can_fetch=can_fetch,
+                    request_counts=request_counts,
+                    max_requests_per_domain=max_requests_per_domain,
+                )
+                if _accept_candidate(
+                    record,
+                    derived_url,
+                    "derived_from_detail_url",
+                    derived_html or derived_url,
+                    "pass_3_derive_listing_index_from_detail_url",
+                    confidence=0.78,
+                    require_listing_evidence=True,
+                ):
+                    return True
 
     if fetch_text is None:
         record.investigation_attempts.append(
@@ -511,7 +659,7 @@ def discover_aanbod_url(
     sitemap_text = _guarded_fetch(
         record,
         sitemap_url,
-        pass_name="pass_3_sitemap",
+        pass_name="pass_4_sitemap",
         fetch_text=fetch_text,
         can_fetch=can_fetch,
         request_counts=request_counts,
@@ -519,7 +667,7 @@ def discover_aanbod_url(
     )
     if sitemap_text:
         for url in _sitemap_listing_urls(sitemap_text):
-            if _accept_candidate(record, url, "sitemap_url", url, "pass_3_sitemap", confidence=0.70):
+            if _accept_candidate(record, url, "sitemap_url", url, "pass_4_sitemap", confidence=0.70, require_listing_evidence=False):
                 return True
 
     for path in COMMON_AANBOD_PATHS:
@@ -527,14 +675,14 @@ def discover_aanbod_url(
         html = _guarded_fetch(
             record,
             url,
-            pass_name="pass_4_common_paths",
+            pass_name="pass_5_common_paths",
             fetch_text=fetch_text,
             can_fetch=can_fetch,
             request_counts=request_counts,
             max_requests_per_domain=max_requests_per_domain,
         )
         if html and _page_looks_like_listing_index(html):
-            if _accept_candidate(record, url, "common_path", html, "pass_4_common_paths", confidence=0.62):
+            if _accept_candidate(record, url, "common_path", html, "pass_5_common_paths", confidence=0.62):
                 return True
 
     return False
@@ -559,7 +707,7 @@ def fingerprint_source_family(
         content = _guarded_fetch(
             record,
             record.aanbod_url,
-            pass_name="pass_5_family_fingerprint",
+            pass_name="pass_6_family_fingerprint",
             fetch_text=fetch_text,
             can_fetch=can_fetch,
             request_counts=request_counts,
@@ -579,13 +727,40 @@ def finalize_coverage_record(record: CoverageSourceRecord) -> CoverageSourceReco
         _set_terminal(record, "out_of_scope", CoverageTerminalStatus.CONFIRMED_OUT_OF_SCOPE, "source has no Noord-Brabant coverage evidence")
     elif _access_blocks(record):
         _set_terminal(record, "blocked_or_legal_review", CoverageTerminalStatus.CONFIRMED_BLOCKED_OR_LEGAL_REVIEW, "blocked or legal review required")
-    elif not record.aanbod_url:
+    elif not record.accepted_aanbod_url:
         _set_terminal(record, "no_public_aanbod", CoverageTerminalStatus.CONFIRMED_NO_PUBLIC_AANBOD, "no accepted public aanbod URL after configured investigation passes")
     else:
+        resolve_family_conflicts(record)
+        if _is_kin_record(record):
+            resolve_kin_family_conflict(record)
         family = _canonical_family(record.parser_family_candidate or record.delivery_mode)
         if family in PROHIBITED_FINAL_VALUES:
             family = "custom_js_app"
             _add_family_evidence(record, family, family, "fallback_delivery_classification", record.family_evidence, 0.35)
+        if family == "custom_js_app":
+            refingerprint_custom_js_app(record)
+            family = _canonical_family(record.parser_family_candidate or record.delivery_mode)
+        if family == "realworks_public":
+            verification = verify_realworks_candidate(record)
+            if verification.realworks_verification_status != "verified":
+                old_family = "realworks_public"
+                new_family = "custom_js_app" if _is_kin_record(record) else "custom_html"
+                if _is_kin_record(record):
+                    new_family = "ogonline_xhr"
+                record.family_conflicts.append(
+                    FamilyConflictRecord(
+                        source_id=record.source_id,
+                        domain=record.domain,
+                        old_family=old_family,
+                        new_family=new_family,
+                        conflict_type="realworks_without_strong_evidence",
+                        evidence=verification.reason,
+                        resolution="reclassified",
+                        remaining_action="review derived listing and source config",
+                    )
+                )
+                _add_family_evidence(record, new_family, new_family, "realworks_verification_reclassified", verification.reason, 0.55)
+                family = new_family
         if family not in ALLOWED_CLASSIFICATIONS:
             family = "custom_html"
             _add_family_evidence(record, family, family, "canonicalized_unmapped_family", record.family_evidence, 0.40)
@@ -628,6 +803,188 @@ def classify_family_from_content(*, content: str, url: str = "", local_text: str
     return "custom_js_app", "custom_js_app", 0.35, "no_static_listing_payload"
 
 
+def verify_realworks_candidate(record: CoverageSourceRecord) -> RealworksVerificationRecord:
+    url = record.accepted_aanbod_url or record.aanbod_url
+    text = " ".join((url, record.family_evidence, record.accepted_aanbod_url_evidence, record.realworks_signals_found)).casefold()
+    found: list[str] = []
+    missing: list[str] = []
+    if "/aanbod/woningaanbod" in urlsplit(url).path.casefold():
+        found.append("accepted_aanbod_url_realworks_shape")
+    else:
+        missing.append("accepted_listing_index_realworks_shape")
+    if "aanbodentry" in text:
+        found.append("aanbodEntry")
+    else:
+        missing.append("aanbodEntry")
+    if "kenmerkname" in text or "kenmerkvalue" in text:
+        found.append("kenmerkName/kenmerkValue")
+    else:
+        missing.append("kenmerkName/kenmerkValue")
+    if "realworks_signal" in text or "local_family_evidence" in text:
+        found.append("realworks_family_signal")
+    else:
+        missing.append("realworks_family_signal")
+
+    strong = bool({"accepted_aanbod_url_realworks_shape", "aanbodEntry", "kenmerkName/kenmerkValue"} & set(found))
+    status = "verified" if strong else "rejected"
+    strength = "strong" if strong else "weak"
+    decision = "keep_realworks_public" if strong else "do_not_use_realworks_without_strong_evidence"
+    reason = "strong Realworks structural evidence found" if strong else "platform_guess or stale local evidence is insufficient"
+    record.realworks_verification_status = status
+    record.realworks_evidence_strength = strength
+    record.realworks_signals_found = "; ".join(found)
+    record.realworks_signals_missing = "; ".join(missing)
+    return RealworksVerificationRecord(
+        source_id=record.source_id,
+        domain=record.domain,
+        platform_guess=record.platform_guess,
+        accepted_aanbod_url=url,
+        realworks_verification_status=status,
+        realworks_evidence_strength=strength,
+        signals_found=record.realworks_signals_found,
+        signals_missing=record.realworks_signals_missing,
+        decision=decision,
+        reason=reason,
+    )
+
+
+def resolve_kin_family_conflict(record: CoverageSourceRecord) -> None:
+    if not _is_kin_record(record):
+        return
+    old_family = record.parser_family_candidate or record.delivery_mode or "unknown"
+    if old_family != "ogonline_xhr":
+        record.family_conflicts.append(
+            FamilyConflictRecord(
+                source_id=record.source_id,
+                domain=record.domain,
+                old_family=old_family,
+                new_family="ogonline_xhr",
+                conflict_type="kin_stale_realworks_or_local_guess",
+                evidence="KIN is the repo's OGonline/XHR laboratory; stale Realworks guess is not accepted",
+                resolution="resolved_to_probable_ogonline_xhr",
+                remaining_action="revalidate with existing KIN OGonline source config",
+            )
+        )
+    _add_family_evidence(
+        record,
+        "ogonline_xhr",
+        "ogonline_xhr",
+        "kin_existing_ogonline_repo_evidence",
+        "KIN treated by repo as OGonline/XHR across KIN pilots and source config",
+        0.84,
+    )
+    record.family_terminal_status = "probable_with_evidence"
+    record.validation_status = "needs_ogonline_revalidation"
+    record.recommended_next_action = "revalidate_with_kin_ogonline_source_config"
+
+
+def resolve_family_conflicts(record: CoverageSourceRecord) -> None:
+    if _is_kin_record(record):
+        resolve_kin_family_conflict(record)
+
+
+def refingerprint_custom_js_app(record: CoverageSourceRecord) -> None:
+    evidence_text = " ".join(
+        (
+            record.family_evidence,
+            record.accepted_aanbod_url_evidence,
+            " ".join(candidate.evidence_preview for candidate in record.aanbod_url_candidates),
+        )
+    )
+    family, delivery, confidence, signal = classify_family_from_content(
+        content=evidence_text,
+        url=record.accepted_aanbod_url or record.aanbod_url,
+        local_text=record.platform_guess,
+    )
+    if family == "custom_js_app":
+        signal = "confirmed_app_shell_or_no_static_listing_payload"
+    _add_family_evidence(record, family, delivery, f"custom_js_app_refingerprint:{signal}", evidence_text, confidence)
+    record.custom_js_refingerprint_attempts.append(
+        CustomJSRefingerprintRecord(
+            source_id=record.source_id,
+            domain=record.domain,
+            initial_family="custom_js_app",
+            final_family=family,
+            signal=signal,
+            evidence_preview=_preview(evidence_text),
+            decision="reclassified" if family != "custom_js_app" else "confirmed_custom_js_app",
+        )
+    )
+
+
+def derive_listing_index_candidates_from_detail_url(url: str) -> tuple[str, ...]:
+    canonical = _canonical_url(url)
+    parts = urlsplit(canonical)
+    segments = [segment for segment in parts.path.split("/") if segment]
+    candidates: list[str] = []
+    if len(segments) >= 5 and segments[:2] == ["aanbod", "woningaanbod"] and segments[-2] in {"koop", "huur"}:
+        candidates.append(_url_with_segments(parts, segments[:-1]))
+        candidates.append(_url_with_segments(parts, [*segments[:2], segments[-2]]))
+        candidates.append(_url_with_segments(parts, segments[:2]))
+    if len(segments) >= 4 and segments[0] == "woningaanbod" and segments[-2] in {"koop", "huur"}:
+        candidates.append(_url_with_segments(parts, segments[:-1]))
+        candidates.append(_url_with_segments(parts, [segments[0], segments[-2]]))
+        candidates.append(_url_with_segments(parts, [segments[0]]))
+    return tuple(_dedupe(candidates))
+
+
+def normalize_gemeente_name(value: object) -> str:
+    text = _clean_text(value)
+    if not text:
+        return ""
+    key = _normalize_key(text)
+    return GEMEENTE_NORMALIZATION_MAP.get(key, text)
+
+
+def build_missing_domain_queue(rows: Iterable[Mapping[str, Any]]) -> list[MissingDomainQueueRecord]:
+    queue: list[MissingDomainQueueRecord] = []
+    for row in rows:
+        normalized = {_normalize_key(key): _clean_text(value) for key, value in row.items()}
+        domain = _normalize_domain(_first_value(normalized, ("root_domain", "domain", "source_domain", "website", "website_url")))
+        if domain:
+            continue
+        source_name = _first_value(normalized, ("office_name", "source_name", "makelaar_name", "name"))
+        raw_source_id = _first_value(normalized, ("source_id",))
+        gemeente = normalize_gemeente_name(_first_value(normalized, ("gemeente", "plaats", "normalized_place")))
+        province = _first_value(normalized, ("province", "provincie"))
+        evidence_file = _first_value(normalized, ("evidence_file",))
+        query = " ".join(part for part in (source_name, gemeente, province, "makelaar") if part)
+        queue.append(
+            MissingDomainQueueRecord(
+                source_name=source_name,
+                raw_source_id=raw_source_id,
+                gemeente=gemeente,
+                province=province,
+                evidence_file=evidence_file,
+                reason="missing_official_domain",
+                suggested_search_query=query,
+                suggested_next_action="manual_domain_resolution_before_operational_census",
+            )
+        )
+    return queue
+
+
+def collect_normalization_issues(records: Sequence[CoverageSourceRecord]) -> list[NormalizationIssueRecord]:
+    issues: list[NormalizationIssueRecord] = []
+    for record in records:
+        for field_name in ("office_gemeente", "coverage_gemeente"):
+            value = getattr(record, field_name)
+            normalized = normalize_gemeente_name(value)
+            if value and normalized != value:
+                issues.append(
+                    NormalizationIssueRecord(
+                        source_id=record.source_id,
+                        domain=record.domain,
+                        raw_gemeente=value,
+                        normalized_gemeente=normalized,
+                        field_name=field_name,
+                        status="normalized",
+                    )
+                )
+                setattr(record, field_name, normalized)
+    return issues
+
+
 def compute_quality_metrics(result: CoverageCensusResult) -> dict[str, Any]:
     records = list(result.records)
     in_scope = [record for record in records if record.has_noord_brabant_coverage and record.terminal_status not in {CoverageTerminalStatus.CONFIRMED_OUT_OF_SCOPE.value}]
@@ -642,7 +999,7 @@ def compute_quality_metrics(result: CoverageCensusResult) -> dict[str, Any]:
             and _normalize_key(record.office_province)
             and _normalize_key(record.office_province) != NOORD_BRABANT
         ),
-        "sources_with_accepted_aanbod_url": sum(1 for record in records if record.aanbod_url),
+        "sources_with_accepted_aanbod_url": sum(1 for record in records if record.accepted_aanbod_url),
         "sources_without_public_aanbod": sum(1 for record in records if record.parser_family_candidate == "no_public_aanbod"),
         "sources_blocked_or_legal_review": sum(1 for record in records if record.parser_family_candidate == "blocked_or_legal_review"),
         "sources_out_of_scope": sum(1 for record in records if record.parser_family_candidate == "out_of_scope"),
@@ -659,14 +1016,55 @@ def compute_quality_metrics(result: CoverageCensusResult) -> dict[str, Any]:
         "missing_aanbod_url_without_terminal_reason_count": sum(
             1
             for record in in_scope
-            if not record.aanbod_url
+            if not record.accepted_aanbod_url
             and record.parser_family_candidate not in {"no_public_aanbod", "blocked_or_legal_review", "out_of_scope", "duplicate", "inactive_or_no_longer_trading"}
         ),
+        "rejected_candidate_used_as_master_aanbod_url_count": sum(
+            1
+            for record in records
+            for candidate in record.aanbod_url_candidates
+            if not candidate.accepted and record.accepted_aanbod_url and _canonical_url(candidate.candidate_url) == record.accepted_aanbod_url
+        ),
+        "property_detail_url_as_aanbod_url_count": sum(
+            1 for record in records if record.accepted_aanbod_url and _looks_like_property_detail_url(urlsplit(record.accepted_aanbod_url).path)
+        ),
+        "funda_or_pararius_operational_aanbod_url_count": sum(
+            1 for record in records if any(portal in record.accepted_aanbod_url for portal in PORTAL_DOMAINS)
+        ),
+        "realworks_without_strong_evidence_count": sum(
+            1
+            for record in records
+            if record.parser_family_candidate == "realworks_public"
+            and verify_realworks_candidate(record).realworks_verification_status != "verified"
+        ),
+        "platform_guess_realworks_but_family_custom_js_app_unreviewed_count": sum(
+            1
+            for record in records
+            if _normalize_key(record.platform_guess) == "realworks"
+            and record.parser_family_candidate == "custom_js_app"
+            and not record.custom_js_refingerprint_attempts
+        ),
+        "kin_family_conflict_count": sum(
+            1 for record in records if _is_kin_record(record) and record.parser_family_candidate == "realworks_public"
+        ),
+        "custom_js_app_without_fingerprint_attempt_count": sum(
+            1 for record in records if record.parser_family_candidate == "custom_js_app" and not record.custom_js_refingerprint_attempts
+        ),
+        "gemeente_normalization_conflict_count": 0,
+        "missing_domain_queue_count": len(result.missing_domain_queue),
+        "office_location_known_count": sum(1 for record in records if record.office_location_status == "known"),
+        "office_location_unknown_count": sum(1 for record in records if record.office_location_status != "known"),
+        "outside_office_sources_identified_count": sum(1 for record in records if record.outside_office_coverage_status == "outside_office_source_included"),
+        "outside_office_sources_needing_review_count": sum(1 for record in records if record.outside_office_coverage_status == "office_location_unknown"),
+        "custom_js_app_initial_count": sum(1 for record in records if any(item.initial_family == "custom_js_app" for item in record.custom_js_refingerprint_attempts)) or sum(1 for record in records if record.parser_family_candidate == "custom_js_app"),
+        "custom_js_app_after_refingerprint_count": sum(1 for record in records if record.parser_family_candidate == "custom_js_app"),
+        "custom_js_app_reclassified_to_realworks": sum(1 for record in records for item in record.custom_js_refingerprint_attempts if item.final_family == "realworks_public"),
+        "custom_js_app_reclassified_to_wordpress_json": sum(1 for record in records for item in record.custom_js_refingerprint_attempts if item.final_family == "wordpress_json"),
+        "custom_js_app_reclassified_to_custom_html": sum(1 for record in records for item in record.custom_js_refingerprint_attempts if item.final_family == "custom_html"),
+        "custom_js_app_reclassified_to_custom_xhr": sum(1 for record in records for item in record.custom_js_refingerprint_attempts if item.final_family == "custom_xhr"),
+        "custom_js_app_confirmed_app_shell": sum(1 for record in records for item in record.custom_js_refingerprint_attempts if item.final_family == "custom_js_app"),
     }
-    metrics["quality_gate_passed"] = (
-        metrics["operational_unknown_family_count"] == 0
-        and metrics["missing_aanbod_url_without_terminal_reason_count"] == 0
-    )
+    metrics["quality_gate_passed"] = all(metrics[name] == 0 for name in QUALITY_GATE_NAMES)
     return metrics
 
 
@@ -713,11 +1111,17 @@ def write_coverage_census_workbook(result: CoverageCensusResult, output_path: Pa
     _write_rows(workbook.create_sheet("Investigation Attempts"), ("source_id", "domain", "pass_name", "attempted_url", "result", "decision", "reason"), [_attempt_row(attempt) for record in result.records for attempt in record.investigation_attempts])
     _write_rows(workbook.create_sheet("Coverage Matrix"), ("coverage_gemeente", "parser_family_candidate", "count"), _coverage_matrix_rows(result.records))
     _write_rows(workbook.create_sheet("Realworks Candidates"), MASTER_COLUMNS, [_master_row(record) for record in result.records if record.parser_family_candidate == "realworks_public"])
+    _write_rows(workbook.create_sheet("Realworks Verification"), ("source_id", "domain", "platform_guess", "accepted_aanbod_url", "realworks_verification_status", "realworks_evidence_strength", "signals_found", "signals_missing", "decision", "reason"), [_realworks_verification_row(record) for record in result.records if record.parser_family_candidate == "realworks_public" or _normalize_key(record.platform_guess) == "realworks"])
     _write_rows(workbook.create_sheet("OGonline Candidates"), MASTER_COLUMNS, [_master_row(record) for record in result.records if record.parser_family_candidate == "ogonline_xhr"])
     _write_rows(workbook.create_sheet("Custom Needs Parser"), MASTER_COLUMNS, [_master_row(record) for record in result.records if record.terminal_status == CoverageTerminalStatus.CONFIRMED_SOURCE_NEEDS_PARSER_FAMILY.value])
+    _write_rows(workbook.create_sheet("Custom JS Refingerprint"), ("source_id", "domain", "initial_family", "final_family", "signal", "evidence_preview", "decision"), [asdict(item) for record in result.records for item in record.custom_js_refingerprint_attempts])
+    _write_rows(workbook.create_sheet("Family Conflicts"), ("source_id", "domain", "old_family", "new_family", "conflict_type", "evidence", "resolution", "remaining_action"), [asdict(item) for record in result.records for item in record.family_conflicts])
     _write_rows(workbook.create_sheet("Blocked or Legal Review"), MASTER_COLUMNS, [_master_row(record) for record in result.records if record.parser_family_candidate == "blocked_or_legal_review"])
     _write_rows(workbook.create_sheet("Duplicates"), ("duplicate_group_id", "source_id", "source_name", "domain", "duplicate_reason"), [_duplicate_row(record) for record in result.duplicate_records])
+    _write_rows(workbook.create_sheet("Missing Domain Queue"), ("source_name", "raw_source_id", "gemeente", "province", "evidence_file", "reason", "suggested_search_query", "suggested_next_action"), [asdict(item) for item in result.missing_domain_queue])
+    _write_rows(workbook.create_sheet("Normalization Issues"), ("source_id", "domain", "raw_gemeente", "normalized_gemeente", "field_name", "status"), [asdict(item) for item in result.normalization_issues])
     _write_rows(workbook.create_sheet("Review Queue"), MASTER_COLUMNS, [_master_row(record) for record in review_queue_records(result.records)])
+    _write_rows(workbook.create_sheet("Quality Gates"), ("metric", "value", "gate_type", "passed"), _quality_gate_rows(result.quality_metrics))
     for worksheet in workbook.worksheets:
         _format_sheet(worksheet)
     workbook.save(output_path)
@@ -801,9 +1205,10 @@ def _accept_candidate(
     pass_name: str,
     *,
     confidence: float,
+    require_listing_evidence: bool = True,
 ) -> bool:
     accepted, reason = _validate_aanbod_candidate(url, record.domain)
-    if accepted and evidence and evidence_type != "sitemap_url" and not _page_looks_like_listing_index(evidence):
+    if accepted and require_listing_evidence and evidence and evidence_type != "sitemap_url" and not _page_looks_like_listing_index(evidence):
         accepted = False
         reason = "page_does_not_look_like_listing_index"
     candidate = AanbodUrlCandidate(
@@ -818,14 +1223,48 @@ def _accept_candidate(
         confidence=confidence,
     )
     record.aanbod_url_candidates.append(candidate)
+    _refresh_rejected_candidate_summary(record)
     if not accepted:
         return False
-    record.aanbod_url = candidate.candidate_url
+    _set_accepted_aanbod_url(record, candidate.candidate_url, evidence_type, candidate.evidence_preview, confidence)
+    return True
+
+
+def _set_accepted_aanbod_url(
+    record: CoverageSourceRecord,
+    url: str,
+    source: str,
+    evidence: str,
+    confidence: float,
+) -> None:
+    canonical_url = _canonical_url(url)
+    record.accepted_aanbod_url = canonical_url
+    record.aanbod_url = record.accepted_aanbod_url
+    record.accepted_aanbod_url_source = source
+    record.accepted_aanbod_url_confidence = max(record.accepted_aanbod_url_confidence, confidence)
+    record.accepted_aanbod_url_evidence = _merge_text(record.accepted_aanbod_url_evidence, evidence)
     record.aanbod_url_type = "listing_index"
     record.aanbod_url_status = "accepted"
     record.aanbod_url_confidence = max(record.aanbod_url_confidence, confidence)
-    record.aanbod_url_evidence = _merge_text(record.aanbod_url_evidence, f"{evidence_type}:{candidate.evidence_preview}")
-    return True
+    record.aanbod_url_evidence = _merge_text(record.aanbod_url_evidence, f"{source}:{_preview(evidence)}")
+    for candidate in record.aanbod_url_candidates:
+        if _canonical_url(candidate.candidate_url) == canonical_url:
+            candidate.accepted = True
+            if candidate.rejection_reason:
+                candidate.rejection_reason = "reconciled_after_later_acceptance"
+    _refresh_rejected_candidate_summary(record)
+
+
+def _refresh_rejected_candidate_summary(record: CoverageSourceRecord) -> None:
+    rejected = [candidate for candidate in record.aanbod_url_candidates if not candidate.accepted]
+    record.rejected_aanbod_url_count = len(rejected)
+    if not rejected:
+        record.best_rejected_candidate_url = ""
+        record.best_rejected_candidate_reason = ""
+        return
+    best = sorted(rejected, key=lambda item: item.confidence, reverse=True)[0]
+    record.best_rejected_candidate_url = best.candidate_url
+    record.best_rejected_candidate_reason = best.rejection_reason
 
 
 def _validate_aanbod_candidate(url: str, official_domain: str) -> tuple[bool, str]:
@@ -888,7 +1327,7 @@ def _record_passes_quality_gate(record: CoverageSourceRecord) -> bool:
     family = _normalize_key(record.parser_family_candidate)
     if family in PROHIBITED_FINAL_VALUES:
         return False
-    if record.has_noord_brabant_coverage and not record.aanbod_url and family not in {"no_public_aanbod", "blocked_or_legal_review", "out_of_scope", "duplicate", "inactive_or_no_longer_trading"}:
+    if record.has_noord_brabant_coverage and not record.accepted_aanbod_url and family not in {"no_public_aanbod", "blocked_or_legal_review", "out_of_scope", "duplicate", "inactive_or_no_longer_trading"}:
         return False
     return True
 
@@ -936,6 +1375,26 @@ def _duplicate_row(record: CoverageSourceRecord) -> dict[str, object]:
         "domain": record.domain,
         "duplicate_reason": record.duplicate_reason,
     }
+
+
+def _realworks_verification_row(record: CoverageSourceRecord) -> dict[str, object]:
+    verification = verify_realworks_candidate(record)
+    return asdict(verification)
+
+
+def _quality_gate_rows(metrics: Mapping[str, Any]) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for name in QUALITY_GATE_NAMES:
+        value = int(metrics.get(name, 0))
+        rows.append({"metric": name, "value": value, "gate_type": "hard", "passed": "yes" if value == 0 else "no"})
+    for name in (
+        "missing_domain_queue_count",
+        "office_location_unknown_count",
+        "outside_office_sources_needing_review_count",
+        "review_queue_count",
+    ):
+        rows.append({"metric": name, "value": metrics.get(name, 0), "gate_type": "reported", "passed": "n/a"})
+    return rows
 
 
 def _coverage_matrix_rows(records: Sequence[CoverageSourceRecord]) -> list[dict[str, object]]:
@@ -1025,10 +1484,40 @@ def _path_looks_like_listing_index(path: str) -> bool:
 def _looks_like_property_detail_url(path: str) -> bool:
     normalized = (path or "").casefold()
     return bool(
-        re.search(r"/(?:huis|appartement|woning)-[^/]*\d", normalized)
+        re.search(r"/(?:koop|huur)/(?:huis|appartement|woning)-", normalized)
+        or re.search(r"/(?:huis|appartement|woning)-[^/]*\d", normalized)
+        or re.search(r"/aanbod/woningaanbod/[^/]+/(?:koop|huur)/(?:huis|appartement|woning)-", normalized)
+        or re.search(r"/woningaanbod/[^/]+/(?:koop|huur)/(?:huis|appartement|woning)-", normalized)
         or re.search(r"/(?:koop|huur)/[^/]+/[^/]*\d", normalized)
         or re.search(r"/woningen/[^/]*\d", normalized)
     )
+
+
+def _url_with_segments(parts: Any, segments: Sequence[str]) -> str:
+    path = "/" + "/".join(segment.strip("/") for segment in segments if segment.strip("/"))
+    return urlunsplit((parts.scheme or "https", parts.netloc, path, "", ""))
+
+
+def _location_status(gemeente: str, province: str) -> str:
+    if gemeente and province:
+        return "known"
+    if gemeente or province:
+        return "partial"
+    return "unknown_office_location"
+
+
+def _outside_office_status(office_province: str, coverage_province: str) -> str:
+    office = _normalize_key(office_province)
+    coverage = _normalize_key(coverage_province)
+    if not office:
+        return "office_location_unknown"
+    if coverage == NOORD_BRABANT and office != NOORD_BRABANT:
+        return "outside_office_source_included"
+    return "not_outside_office"
+
+
+def _is_kin_record(record: CoverageSourceRecord) -> bool:
+    return "kinmakelaars.nl" in _normalize_domain(record.domain) or "kinmakelaars" in _normalize_key(record.source_id)
 
 
 def _duplicate_record(record: CoverageSourceRecord, existing: CoverageSourceRecord) -> CoverageSourceRecord:
@@ -1057,7 +1546,7 @@ def _is_inactive(record: CoverageSourceRecord) -> bool:
 
 def _access_blocks(record: CoverageSourceRecord) -> bool:
     status = _normalize_key(record.access_policy_status)
-    text = _normalize_key(" ".join((record.coverage_evidence, record.family_evidence, record.aanbod_url, record.source_quality_status)))
+    text = _normalize_key(" ".join((record.coverage_evidence, record.family_evidence, record.raw_aanbod_url_candidate, record.aanbod_url, record.accepted_aanbod_url, record.source_quality_status)))
     return (
         status in {"blocked", "permission_required", "legal_review", "disabled"}
         or any(portal in text for portal in ("funda.nl", "pararius.nl"))

@@ -441,18 +441,21 @@ census, raw HTML/JSON persistence, long descriptions, images, browser automation
 parser-per-makelaar logic, Funda/Pararius work, `data/raw` changes, apply-to-all Realworks execution, or global
 eligibility changes.
 
-## Noord-Brabant Coverage Source Census v1
+## Noord-Brabant Coverage Source Census Hardened v1
 
 `scraper/src/domek_wonen/sources/coverage_census.py` consolidates local source evidence into a terminally classified
 Noord-Brabant source census before broader parser-family application. It separates office location, coverage location,
-and accepted aanbod URL evidence, dedupes by normalized domain, rejects Funda/Pararius as operational aanbod URLs, and
-classifies every in-scope source as a reusable family, technical delivery mode, no-public-aanbod, blocked/legal-review,
-inactive, duplicate, or out of scope.
+and accepted aanbod URL evidence, dedupes by normalized domain, rejects Funda/Pararius and property-detail URLs as
+operational aanbod URLs, and classifies every in-scope source as a reusable family, technical delivery mode,
+no-public-aanbod, blocked/legal-review, inactive, duplicate, or out of scope.
 
 `scripts/run_noord_brabant_coverage_source_census.py` writes local generated artifacts under `tmp/generated/`, including
-the master CSV, review queue CSV, and workbook. Live HTTP is opt-in only, sequential, capped, standard-library based,
-and guarded by `robots_gate.can_fetch(domain, path)`. The phase does not create matching, client alerts, advisor email,
-n8n, dashboard, DB/migrations, property inventory parsing, raw HTML/JSON persistence, images, LLM runtime, a parser per
+the hardened master CSV, review queue CSV, workbook, and optional live-run log. Live HTTP is opt-in only, sequential,
+capped, standard-library based, and guarded by `robots_gate.can_fetch(domain, path)`. The hardened census writes
+`accepted_aanbod_url` instead of an ambiguous operational `aanbod_url`, moves missing-domain evidence into a dedicated
+queue, verifies Realworks with strong structural evidence, resolves KIN to `ogonline_xhr`, and re-fingerprints
+`custom_js_app` rows before finalization. The phase does not create matching, client alerts, advisor email, n8n,
+dashboard, DB/migrations, property inventory parsing, raw HTML/JSON persistence, images, LLM runtime, a parser per
 makelaar, or global eligibility changes.
 
 ## Recommended next PRs

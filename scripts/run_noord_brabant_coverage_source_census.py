@@ -24,6 +24,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Enable bounded standard-library HTTP. Default uses local evidence only.",
     )
     parser.add_argument("--timeout-seconds", type=float, default=10.0, help="Per-request timeout when live HTTP is enabled.")
+    parser.add_argument("--max-passes", type=int, default=8, help="Maximum bounded investigation passes.")
     parser.add_argument(
         "--max-requests-per-domain",
         type=int,
@@ -40,6 +41,7 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=Path(args.output_dir),
         allow_live_http=args.allow_live_http,
         max_sources=args.max_sources,
+        max_passes=args.max_passes,
         max_requests_per_domain=args.max_requests_per_domain,
         timeout_seconds=args.timeout_seconds,
     )
@@ -57,6 +59,21 @@ def main(argv: list[str] | None = None) -> int:
         flush=True,
     )
     print(f"quality_gate_passed={metrics['quality_gate_passed']}", flush=True)
+    for key in (
+        "rejected_candidate_used_as_master_aanbod_url_count",
+        "property_detail_url_as_aanbod_url_count",
+        "funda_or_pararius_operational_aanbod_url_count",
+        "realworks_without_strong_evidence_count",
+        "platform_guess_realworks_but_family_custom_js_app_unreviewed_count",
+        "kin_family_conflict_count",
+        "custom_js_app_without_fingerprint_attempt_count",
+        "gemeente_normalization_conflict_count",
+        "missing_domain_queue_count",
+        "office_location_unknown_count",
+        "outside_office_sources_needing_review_count",
+        "review_queue_count",
+    ):
+        print(f"{key}={metrics[key]}", flush=True)
     return 0 if metrics["quality_gate_passed"] else 1
 
 

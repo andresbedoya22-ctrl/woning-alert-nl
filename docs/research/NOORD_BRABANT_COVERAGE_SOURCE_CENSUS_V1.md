@@ -1,22 +1,30 @@
-# Noord-Brabant Coverage Source Census v1
+# Noord-Brabant Coverage Source Census Hardened v1
 
 ## Objective
 
 Create an auditable source census for makelaars and source domains that may publish koopwoningen in Noord-Brabant, before applying parser families across the province.
 
+This hardened version replaces the earlier `noord_brabant_coverage_source_census_v1.*` artifacts. Manual review found that the original v1 master could expose rejected evidence candidates as operational aanbod URLs, treat property-detail URLs as listing indexes, over-trust stale `platform_guess=realworks`, and hide missing-domain evidence rows. The valid artifacts for this phase are the `*_hardened_v1.*` outputs.
+
 ## Strategic context
 
-The next strategic step is source coverage intelligence, not matching or a parser-per-makelaar expansion. Realworks is ready for a later Noord-Brabant Realworks audit, but this census first identifies which domains are Realworks, OGonline, WordPress, custom delivery, blocked/legal-review, no-public-aanbod, inactive, duplicate, or out of scope.
+This is source coverage intelligence only. It prepares reusable parser-family and source-config decisions; it does not perform matching, client alerts, advisor email, n8n orchestration, dashboards, database work, migrations, property inventory parsing, or an apply-to-all Realworks rollout.
 
 ## Scope and constraints
 
-This phase adds `scraper/src/domek_wonen/sources/coverage_census.py` and `scripts/run_noord_brabant_coverage_source_census.py`. It consolidates local evidence, classifies each deduped source terminally, and writes local CSV/XLSX artifacts under `tmp/generated/`.
+This phase adds and hardens:
 
-It does not run matching, create client alerts, send advisor emails, touch n8n, create a dashboard, create a database, add migrations, apply Realworks to all makelaars, parse property inventory, create a new parser family, modify `data/raw`, use Funda or Pararius operationally, persist raw HTML/JSON, copy long descriptions, download images, use browser automation, use proxies or bypass controls, use an LLM in runtime, create a parser per makelaar, or change global eligibility.
+- `scraper/src/domek_wonen/sources/coverage_census.py`
+- `scripts/run_noord_brabant_coverage_source_census.py`
+- `tests/test_noord_brabant_coverage_source_census.py`
+
+The runner writes local generated CSV/XLSX artifacts under `tmp/generated/`. Those artifacts are intentionally not committed.
+
+It does not modify `data/raw`, use Funda or Pararius operationally, persist raw HTML/JSON, copy long descriptions, download images, use browser automation, use proxies or bypass controls, use an LLM in runtime, create a parser per makelaar, or change global eligibility.
 
 ## Local evidence inputs
 
-The census reads:
+The census reads local evidence from:
 
 - `data/processed/sources_seed_noord_brabant.csv`
 - `data/discovery/reference/property_discovery_source_overrides.csv`
@@ -24,74 +32,89 @@ The census reads:
 - `data/discovery/platform_fingerprint/platform_fingerprint_results.csv`
 - `data/discovery/runs/20260614T122022Z/makelaar_sources_master.csv`
 
-Generated artifacts are local and must not be committed.
+Rows without a normalized official source domain are not silently dropped into the operational master. They are written to the `Missing Domain Queue` sheet with search/query follow-up context.
 
-## Coverage definition
+## Coverage model
 
-Office location is the makelaar office city/gemeente/province when the local evidence provides it.
+Office location, coverage location, and accepted listing-index location are separate fields:
 
-Coverage location is the city/gemeente/province where the source evidence says the source may publish listings. This is kept separate from office location.
+- Office location is known only when local evidence explicitly provides office city/gemeente/province.
+- Coverage location is the city/gemeente/province where evidence says the source may publish listings.
+- Accepted aanbod location is represented only by `accepted_aanbod_url`.
 
-Aanbod location is represented by the accepted official `aanbod_url` and its evidence. Funda and Pararius URLs are rejected as operational aanbod URLs.
+The master no longer has an ambiguous `aanbod_url` column. It writes `accepted_aanbod_url`, raw local candidates, rejected-candidate summaries, and location status fields separately.
 
-Outside-office sources with Noord-Brabant aanbod are allowed in scope when local evidence indicates Noord-Brabant coverage, even if the office province is outside Noord-Brabant.
+Because the available local evidence does not explicitly identify office locations for the deduped source rows, the hardened run reports `office_location_unknown_count=323`. Outside-office coverage is therefore reported as `outside_office_sources_needing_review_count=323`, not as a confirmed outside-office count.
 
 ## Investigation loop
 
-The module defines the bounded pass names:
+The bounded pass names are:
 
 - `pass_1_local_evidence`
 - `pass_2_homepage_links`
-- `pass_3_sitemap`
-- `pass_4_common_paths`
-- `pass_5_family_fingerprint`
-- `pass_6_conflict_resolution`
+- `pass_3_derive_listing_index_from_detail_url`
+- `pass_4_sitemap`
+- `pass_5_common_paths`
+- `pass_6_family_fingerprint`
 - `pass_7_final_terminal_classification`
 
-The runner defaults to local evidence only. Live HTTP is opt-in with `--allow-live-http`, sequential, capped per domain, standard-library only, and guarded by `robots_gate.can_fetch(domain, path)` before fetch.
+The runner defaults to local evidence only. Live HTTP is opt-in with `--allow-live-http`, sequential, capped per domain, standard-library only, and guarded by `robots_gate.can_fetch(domain, path)` before each fetch.
 
-## Aanbod URL discovery
+## Aanbod URL hardening
 
-Discovery prioritizes explicit local `aanbod_url` values, then homepage links, sitemap URLs, and conservative common official paths when a fetcher is supplied.
+Accepted operational URLs now require an official-domain listing-index candidate. The census rejects:
 
-The census rejects Funda/Pararius as operational URLs, rejects property detail URLs, rejects non-official domains, and records rejected candidates with reasons.
+- Funda and Pararius operational URLs.
+- Off-domain URLs.
+- Homepage-only candidates without listing-index evidence.
+- Property detail URLs such as `/koop/huis-*`, `/koop/appartement-*`, `/huur/huis-*`, and Realworks detail paths under `/aanbod/woningaanbod/.../koop/huis-*`.
 
-## Family fingerprinting
+When a Realworks-style detail URL is found and live fetching is enabled, the census derives conservative listing-index candidates such as `/aanbod/woningaanbod/<plaats>/koop` and validates those instead of promoting the detail URL.
 
-Fingerprinting recognizes Realworks, OGonline XHR, WordPress JSON/static, Kolibri, Skarabee, iframe vendor, custom HTML, custom XHR, and custom JS app signals. If exact vendor evidence is not available, the census uses a technical delivery classification rather than leaving an operational unknown.
+If the same URL is rejected during an earlier pass but later accepted by stronger evidence, the candidate evidence is reconciled so the workbook does not show the same final URL as both rejected and accepted.
 
-Evidence previews are capped and sanitized. Raw HTML/JSON and long descriptions are not persisted.
+## Parser-family hardening
 
-## Terminal classifications
+The census recognizes Realworks, OGonline XHR, WordPress JSON/static, Kolibri, Skarabee, iframe vendor, custom HTML, custom XHR, and custom JS app signals. It uses technical delivery classifications when exact vendor evidence is not available.
 
-Allowed terminal source statuses are:
+Realworks is no longer accepted from `platform_guess=realworks` alone. A `realworks_public` final classification requires strong structural evidence, such as a Realworks listing-index URL shape or static Realworks listing markers. Weak Realworks candidates are reclassified and recorded in `Realworks Verification` and `Family Conflicts`.
 
-- `confirmed_source_ready`
-- `confirmed_source_needs_parser_family`
-- `confirmed_no_public_aanbod`
-- `confirmed_blocked_or_legal_review`
-- `confirmed_out_of_scope`
-- `confirmed_duplicate`
-- `confirmed_inactive_or_no_longer_trading`
+KIN is explicitly resolved away from stale Realworks evidence. The hardened run keeps `kinmakelaars.nl` as `ogonline_xhr` with accepted URL `http://kinmakelaars.nl/aanbod/wonen/te-koop`.
 
-The implementation does not leave final `unknown`, `missing`, `tbd`, or `todo` parser-family values for in-scope operational records.
+Custom JS app rows are re-fingerprinted before finalization. The hardened live run reduced the previous broad `custom_js_app` bucket from `126` rows to `9` rows and records refingerprint attempts in `Custom JS Refingerprint`.
 
 ## Quality gates
 
-The hard gates are:
+Hard gates in the hardened run:
 
 - `operational_unknown_family_count = 0`
 - `missing_aanbod_url_without_terminal_reason_count = 0`
+- `rejected_candidate_used_as_master_aanbod_url_count = 0`
+- `property_detail_url_as_aanbod_url_count = 0`
+- `funda_or_pararius_operational_aanbod_url_count = 0`
+- `realworks_without_strong_evidence_count = 0`
+- `platform_guess_realworks_but_family_custom_js_app_unreviewed_count = 0`
+- `kin_family_conflict_count = 0`
+- `custom_js_app_without_fingerprint_attempt_count = 0`
+- `gemeente_normalization_conflict_count = 0`
 
-The generated local run passed both gates.
+Reported review metrics:
+
+- `missing_domain_queue_count = 136`
+- `office_location_unknown_count = 323`
+- `outside_office_sources_needing_review_count = 323`
+- `review_queue_count = 5`
+
+The final controlled live run passed all hard gates.
 
 ## Output artifacts
 
 Generated locally:
 
-- `tmp/generated/noord_brabant_coverage_source_census_v1.xlsx`
-- `tmp/generated/noord_brabant_coverage_source_census_v1.csv`
-- `tmp/generated/noord_brabant_coverage_source_census_v1_review_queue.csv`
+- `tmp/generated/noord_brabant_coverage_source_census_hardened_v1.xlsx`
+- `tmp/generated/noord_brabant_coverage_source_census_hardened_v1.csv`
+- `tmp/generated/noord_brabant_coverage_source_census_hardened_v1_review_queue.csv`
+- `tmp/generated/noord_brabant_coverage_source_census_hardened_v1_live_run.log`
 
 Workbook sheets:
 
@@ -101,37 +124,32 @@ Workbook sheets:
 - `Investigation Attempts`
 - `Coverage Matrix`
 - `Realworks Candidates`
+- `Realworks Verification`
 - `OGonline Candidates`
 - `Custom Needs Parser`
+- `Custom JS Refingerprint`
+- `Family Conflicts`
 - `Blocked or Legal Review`
 - `Duplicates`
+- `Missing Domain Queue`
+- `Normalization Issues`
 - `Review Queue`
+- `Quality Gates`
 
 Note: Excel does not permit `/` in worksheet names, so the requested `Custom/Needs Parser` sheet is written as `Custom Needs Parser`.
 
 ## Results
 
-Local artifact run:
+Controlled live artifact run:
 
 - total evidence rows: `1812`
-- deduped sources: `363`
-- in-scope Noord-Brabant coverage sources: `363`
-- outside-office sources included because they sell in Noord-Brabant: `0`
-- sources with accepted aanbod URL: `222`
-- sources without public aanbod: `140`
-- blocked/legal-review sources: `5`
-- out-of-scope sources: `0`
-- duplicate source evidence rows: `1449`
-- operational unknown family count: `0`
-- missing aanbod URL without terminal reason count: `0`
+- deduped operational sources: `323`
+- missing-domain queue rows: `136`
+- in-scope Noord-Brabant coverage sources: `323`
+- review queue count: `5`
+- hard quality gates passed: `true`
 
-## Review queue
-
-Review queue count: `5`.
-
-The review queue is intentionally small. Broad custom/needs-parser sources are available in the workbook's `Custom Needs Parser` sheet; the queue focuses on blocked/legal-review or gate-failure records.
-
-## Parser family distribution
+Original v1 parser-family distribution:
 
 - `blocked_or_legal_review`: `5`
 - `custom_js_app`: `126`
@@ -140,11 +158,34 @@ The review queue is intentionally small. Broad custom/needs-parser sources are a
 - `wordpress_json`: `18`
 - `wordpress_static`: `1`
 
+Hardened live parser-family distribution:
+
+- `blocked_or_legal_review`: `5`
+- `custom_html`: `100`
+- `custom_js_app`: `9`
+- `custom_xhr`: `3`
+- `iframe_vendor`: `6`
+- `kolibri`: `1`
+- `no_public_aanbod`: `58`
+- `ogonline_xhr`: `4`
+- `realworks_public`: `91`
+- `skarabee`: `1`
+- `wordpress_json`: `41`
+- `wordpress_static`: `4`
+
+Realworks verification:
+
+- `verified`: `91`
+- `rejected`: `64`
+
+The hardened master contains no exact `aanbod_url` column, no accepted Funda/Pararius operational URL, and no accepted property-detail URL.
+
 ## Recommended next action
 
-1. Manually review the generated census workbook.
-2. Use all confirmed `realworks_public` sources for Noord-Brabant Realworks Audit v1.
-3. Treat `custom_js_app`, WordPress, and other custom groups as parser-family/source-config planning inputs, not as parser-per-makelaar work.
+1. Use only the hardened workbook/CSV as the source-census evidence.
+2. Treat verified `realworks_public` rows as candidates for a later Noord-Brabant Realworks audit.
+3. Treat `custom_html`, `custom_js_app`, WordPress, iframe/vendor, OGonline, Kolibri, and Skarabee groups as parser-family/source-config planning inputs, not parser-per-makelaar work.
+4. Resolve `Missing Domain Queue` rows before using missing-domain source evidence operationally.
 
 ## Constraints confirmation
 
