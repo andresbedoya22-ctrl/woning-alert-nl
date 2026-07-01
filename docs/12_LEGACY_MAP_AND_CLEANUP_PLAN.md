@@ -253,6 +253,11 @@ manual-verification rows, and a family decision. It remains separate from matchi
 migrations, full inventory, `data/raw`, Funda/Pararius operational sourcing, raw persistence, browser automation, LLM
 runtime, parser-per-makelaar work, and global eligibility changes.
 
+Realworks Audit Input Handoff Repair v1 fixed the source-completion handoff schema after the audit runner correctly
+blocked a CSV missing `coverage_province` and `parser_family_candidate`. The producer now emits canonical input columns
+and a reconciliation CSV. The current source-completion run explains the ready count as `62` included Realworks rows and
+`26` verified rows excluded for manual scope check, with no unexplained row-count delta.
+
 ## Parser Family Runner v1
 
 `scraper/src/domek_wonen/parsers/runner.py` adds the first offline connector from

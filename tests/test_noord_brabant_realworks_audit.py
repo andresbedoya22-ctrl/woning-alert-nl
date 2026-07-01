@@ -24,6 +24,7 @@ from domek_wonen.pilots.noord_brabant_realworks_audit import (  # noqa: E402
     decide_noord_brabant_realworks_family,
     load_noord_brabant_realworks_audit_sources,
     run_noord_brabant_realworks_audit,
+    validate_noord_brabant_realworks_audit_input_rows,
 )
 from domek_wonen.pilots.realworks_property_readiness import (  # noqa: E402
     RealworksPropertyReadinessResult,
@@ -213,6 +214,29 @@ def test_reports_duplicate_input_rows(tmp_path: Path) -> None:
     rows[1]["accepted_aanbod_url"] = rows[0]["accepted_aanbod_url"]
     path = _write_input(tmp_path / "input.csv", rows)
     with pytest.raises(NoordBrabantRealworksAuditInputError, match="duplicate domain"):
+        load_noord_brabant_realworks_audit_sources(path)
+
+
+def test_missing_required_columns_are_not_reported_as_non_realworks_rows(tmp_path: Path) -> None:
+    rows = _valid_rows()
+    path = tmp_path / "legacy.csv"
+    columns = [column for column in _input_row().keys() if column not in {"parser_family_candidate", "coverage_province"}]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({column: row.get(column, "") for column in columns})
+
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        loaded = list(reader)
+        validation = validate_noord_brabant_realworks_audit_input_rows(loaded, columns=reader.fieldnames or ())
+
+    assert validation.audit_input_missing_required_columns_count == 2
+    assert validation.audit_input_missing_parser_family_candidate_column == 1
+    assert validation.audit_input_missing_coverage_province_column == 1
+    assert validation.audit_input_non_realworks_count == 0
+    with pytest.raises(NoordBrabantRealworksAuditInputError, match="parser_family_candidate"):
         load_noord_brabant_realworks_audit_sources(path)
 
 

@@ -35,7 +35,7 @@ FAMILY_DECISIONS = (
 )
 RAW_MARKERS = ("<html", "<script", "</", '{"', "{'", '"docs"', "window.__")
 LONG_TEXT_LIMIT = 500
-REQUIRED_INPUT_COLUMNS = (
+REALWORKS_AUDIT_INPUT_REQUIRED_COLUMNS = (
     "source_id",
     "source_name",
     "domain",
@@ -49,6 +49,22 @@ REQUIRED_INPUT_COLUMNS = (
     "audit_input_status",
     "parser_family_candidate",
 )
+REALWORKS_AUDIT_INPUT_OPTIONAL_COLUMNS = (
+    "root_url",
+    "source_quality_status",
+    "access_policy_status",
+    "realworks_evidence_strength",
+    "family_confidence",
+    "manual_check_result",
+    "manual_check_notes",
+    "recommended_next_action",
+    "coverage_province_source",
+)
+REALWORKS_AUDIT_INPUT_CANONICAL_COLUMNS = (
+    *REALWORKS_AUDIT_INPUT_REQUIRED_COLUMNS,
+    *REALWORKS_AUDIT_INPUT_OPTIONAL_COLUMNS,
+)
+REQUIRED_INPUT_COLUMNS = REALWORKS_AUDIT_INPUT_REQUIRED_COLUMNS
 SUMMARY_COLUMNS = (
     "source_id",
     "source_name",
@@ -102,6 +118,21 @@ MANUAL_VERIFICATION_COLUMNS = (
 
 class NoordBrabantRealworksAuditInputError(ValueError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class NoordBrabantRealworksAuditInputValidation:
+    row_count: int
+    missing_required_columns: tuple[str, ...]
+    audit_input_missing_required_columns_count: int
+    audit_input_missing_parser_family_candidate_column: int
+    audit_input_missing_coverage_province_column: int
+    audit_input_non_ready_count: int
+    audit_input_non_realworks_count: int
+    audit_input_kin_count: int
+    audit_input_missing_accepted_aanbod_url_count: int
+    audit_input_property_detail_url_count: int
+    audit_input_funda_pararius_count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,16 +257,18 @@ def load_noord_brabant_realworks_audit_sources(
         rows = list(reader)
         columns = tuple(reader.fieldnames or ())
 
-    missing_columns = [column for column in REQUIRED_INPUT_COLUMNS if column not in columns]
-    if missing_columns:
-        raise NoordBrabantRealworksAuditInputError(f"missing required columns: {', '.join(missing_columns)}")
+    input_validation = validate_noord_brabant_realworks_audit_input_rows(rows, columns=columns)
+    if input_validation.missing_required_columns:
+        raise NoordBrabantRealworksAuditInputError(
+            f"missing required columns: {', '.join(input_validation.missing_required_columns)}"
+        )
     if not rows:
         raise NoordBrabantRealworksAuditInputError("input CSV has no rows")
     if expected_rows is not None and len(rows) != expected_rows:
         raise NoordBrabantRealworksAuditInputError(f"expected {expected_rows} rows, got {len(rows)}")
 
     sources: list[NoordBrabantRealworksAuditSource] = []
-    gate_counts = _input_gate_counts(rows)
+    gate_counts = _input_gate_counts(rows, missing_required_columns=())
     failing_gates = {key: value for key, value in gate_counts.items() if value}
     if failing_gates:
         details = "; ".join(f"{key}={value}" for key, value in sorted(failing_gates.items()))
@@ -258,6 +291,28 @@ def load_noord_brabant_realworks_audit_sources(
     return tuple(sources)
 
 
+def validate_noord_brabant_realworks_audit_input_rows(
+    rows: Sequence[Mapping[str, str]],
+    *,
+    columns: Sequence[str],
+) -> NoordBrabantRealworksAuditInputValidation:
+    missing_columns = tuple(column for column in REQUIRED_INPUT_COLUMNS if column not in columns)
+    gate_counts = _input_gate_counts(rows, missing_required_columns=missing_columns)
+    return NoordBrabantRealworksAuditInputValidation(
+        row_count=len(rows),
+        missing_required_columns=missing_columns,
+        audit_input_missing_required_columns_count=len(missing_columns),
+        audit_input_missing_parser_family_candidate_column=int("parser_family_candidate" in missing_columns),
+        audit_input_missing_coverage_province_column=int("coverage_province" in missing_columns),
+        audit_input_non_ready_count=gate_counts["audit_input_non_ready_count"],
+        audit_input_non_realworks_count=gate_counts["audit_input_non_realworks_count"],
+        audit_input_kin_count=gate_counts["audit_input_kin_count"],
+        audit_input_missing_accepted_aanbod_url_count=gate_counts["audit_input_missing_accepted_aanbod_url_count"],
+        audit_input_property_detail_url_count=gate_counts["audit_input_property_detail_url_count"],
+        audit_input_funda_pararius_count=gate_counts["audit_input_funda_pararius_count"],
+    )
+
+
 def run_noord_brabant_realworks_audit(
     *,
     input_csv: Path,
@@ -274,7 +329,7 @@ def run_noord_brabant_realworks_audit(
     readiness_runner: ReadinessRunner = run_realworks_property_readiness,
 ) -> NoordBrabantRealworksAuditResult:
     observed = _to_utc(observed_at or datetime.now(UTC))
-    sources = load_noord_brabant_realworks_audit_sources(input_csv)
+    sources = load_noord_brabant_realworks_audit_sources(input_csv, expected_rows=None)
     capped_sources = tuple(sources[: max(0, min(max_sources, len(sources)))])
     start = time.monotonic()
     budget_exhausted = False
@@ -650,11 +705,18 @@ def _failure_patterns(readiness: RealworksPropertyReadinessResult, validation_st
     return _dedupe(patterns)
 
 
-def _input_gate_counts(rows: Sequence[Mapping[str, str]]) -> dict[str, int]:
+def _input_gate_counts(
+    rows: Sequence[Mapping[str, str]],
+    *,
+    missing_required_columns: Sequence[str],
+) -> dict[str, int]:
+    missing = set(missing_required_columns)
     return {
         "audit_input_missing_file_count": 0,
         "audit_input_non_ready_count": sum(1 for row in rows if row.get("audit_input_status") != REALWORKS_READY_STATUS),
-        "audit_input_non_realworks_count": sum(1 for row in rows if row.get("parser_family_candidate") != REALWORKS_FAMILY),
+        "audit_input_non_realworks_count": 0
+        if "parser_family_candidate" in missing
+        else sum(1 for row in rows if row.get("parser_family_candidate") != REALWORKS_FAMILY),
         "audit_input_kin_count": sum(1 for row in rows if "kin" in _normalize_key(f"{row.get('domain', '')} {row.get('source_id', '')}")),
         "audit_input_missing_accepted_aanbod_url_count": sum(1 for row in rows if not _clean_text(row.get("accepted_aanbod_url"))),
         "audit_input_property_detail_url_count": sum(1 for row in rows if _looks_like_property_detail_url(_clean_text(row.get("accepted_aanbod_url")))),

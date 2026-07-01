@@ -139,6 +139,7 @@ QUALITY_GATE_NAMES = (
     "realworks_audit_input_kin_count",
     "realworks_audit_input_property_detail_url_count",
     "realworks_audit_input_without_accepted_aanbod_count",
+    "realworks_audit_input_row_count_unexplained_delta",
     "office_location_fabricated_count",
 )
 
@@ -289,18 +290,40 @@ class RealworksAuditInputRecord:
     source_id: str
     source_name: str
     domain: str
+    root_url: str
     accepted_aanbod_url: str
     coverage_city: str
     coverage_gemeente: str
+    coverage_province: str
+    coverage_province_source: str
     url_place_token: str
+    parser_family_candidate: str
+    family_confidence: float
     realworks_verification_status: str
     realworks_evidence_strength: str
     aanbod_scope_status: str
     audit_input_status: str
     audit_input_reason: str
+    source_quality_status: str
+    access_policy_status: str
     recommended_next_action: str
     manual_check_result: str = ""
     manual_check_notes: str = ""
+
+
+@dataclass(slots=True)
+class RealworksAuditInputReconciliationRecord:
+    source_id: str
+    domain: str
+    accepted_aanbod_url: str
+    in_source_completion_ready: bool
+    in_audit_input_csv: bool
+    audit_input_status: str
+    parser_family_candidate: str
+    realworks_verification_status: str
+    aanbod_scope_status: str
+    reason_if_excluded: str
+    resolution: str
 
 
 @dataclass(slots=True)
@@ -412,6 +435,7 @@ class CoverageCensusResult:
     no_public_verification: tuple[NoPublicVerificationRecord, ...] = ()
     aanbod_scope_checks: tuple[AanbodScopeCheckRecord, ...] = ()
     realworks_audit_input: tuple[RealworksAuditInputRecord, ...] = ()
+    realworks_audit_input_reconciliation: tuple[RealworksAuditInputReconciliationRecord, ...] = ()
     office_location_verification: tuple[OfficeLocationVerificationRecord, ...] = ()
     normalization_issues: tuple[NormalizationIssueRecord, ...] = ()
     initial_source_count: int = 0
@@ -420,6 +444,7 @@ class CoverageCensusResult:
     master_csv_path: Path | None = None
     review_queue_csv_path: Path | None = None
     realworks_audit_input_csv_path: Path | None = None
+    realworks_audit_input_reconciliation_csv_path: Path | None = None
     warnings: tuple[str, ...] = ()
 
     @property
@@ -473,6 +498,7 @@ def run_noord_brabant_coverage_source_census(
     no_public_verification = build_no_public_verification_records(records)
     aanbod_scope_checks = build_aanbod_scope_checks(records)
     realworks_audit_input = build_realworks_audit_input_records(records, aanbod_scope_checks)
+    realworks_reconciliation = build_realworks_audit_input_reconciliation(realworks_audit_input)
     office_location_verification = build_office_location_verification_records(records)
     result = CoverageCensusResult(
         records=tuple(records),
@@ -482,6 +508,7 @@ def run_noord_brabant_coverage_source_census(
         no_public_verification=tuple(no_public_verification),
         aanbod_scope_checks=tuple(aanbod_scope_checks),
         realworks_audit_input=tuple(realworks_audit_input),
+        realworks_audit_input_reconciliation=tuple(realworks_reconciliation),
         office_location_verification=tuple(office_location_verification),
         normalization_issues=tuple(normalization_issues),
         initial_source_count=len(rows),
@@ -499,9 +526,14 @@ def run_noord_brabant_coverage_source_census(
     master_csv_path = output_dir / f"{stem}.csv"
     review_queue_csv_path = output_dir / f"{stem}_review_queue.csv"
     realworks_audit_input_csv_path = output_dir / "noord_brabant_realworks_audit_input_v1.csv"
+    realworks_reconciliation_csv_path = output_dir / "noord_brabant_realworks_audit_input_reconciliation_v1.csv"
     write_coverage_census_outputs(result, workbook_path, master_csv_path, review_queue_csv_path)
     if completion_scope_verification:
         write_realworks_audit_input_csv(result.realworks_audit_input, realworks_audit_input_csv_path)
+        write_realworks_audit_input_reconciliation_csv(
+            result.realworks_audit_input_reconciliation,
+            realworks_reconciliation_csv_path,
+        )
     return CoverageCensusResult(
         records=result.records,
         duplicate_records=result.duplicate_records,
@@ -510,6 +542,7 @@ def run_noord_brabant_coverage_source_census(
         no_public_verification=result.no_public_verification,
         aanbod_scope_checks=result.aanbod_scope_checks,
         realworks_audit_input=result.realworks_audit_input,
+        realworks_audit_input_reconciliation=result.realworks_audit_input_reconciliation,
         office_location_verification=result.office_location_verification,
         normalization_issues=result.normalization_issues,
         initial_source_count=result.initial_source_count,
@@ -518,6 +551,7 @@ def run_noord_brabant_coverage_source_census(
         master_csv_path=master_csv_path,
         review_queue_csv_path=review_queue_csv_path,
         realworks_audit_input_csv_path=realworks_audit_input_csv_path if completion_scope_verification else None,
+        realworks_audit_input_reconciliation_csv_path=realworks_reconciliation_csv_path if completion_scope_verification else None,
         warnings=result.warnings,
     )
 
@@ -1305,12 +1339,16 @@ def build_realworks_audit_input_records(
         scope = scope_by_source.get(record.source_id)
         scope_status = scope.aanbod_scope_status if scope else record.aanbod_scope_status
         token = scope.url_place_token if scope else _url_place_token(record.accepted_aanbod_url)
+        coverage_province, coverage_province_source = _audit_input_coverage_province(record, scope_status)
         if _is_kin_record(record):
             status = "exclude_not_realworks"
             reason = "kin_must_remain_ogonline_xhr"
         elif not record.accepted_aanbod_url:
             status = "exclude_no_public_aanbod"
             reason = "missing_accepted_aanbod_url"
+        elif _is_portal_url(record.accepted_aanbod_url):
+            status = "exclude_not_realworks"
+            reason = "funda_pararius_not_audit_input"
         elif _looks_like_property_detail_url(urlsplit(record.accepted_aanbod_url).path):
             status = "exclude_not_realworks"
             reason = "property_detail_url_not_audit_input"
@@ -1328,19 +1366,71 @@ def build_realworks_audit_input_records(
                 source_id=record.source_id,
                 source_name=record.source_name,
                 domain=record.domain,
+                root_url=record.root_url,
                 accepted_aanbod_url=record.accepted_aanbod_url,
                 coverage_city=record.coverage_city,
                 coverage_gemeente=record.coverage_gemeente,
+                coverage_province=coverage_province,
+                coverage_province_source=coverage_province_source,
                 url_place_token=token,
+                parser_family_candidate=record.parser_family_candidate,
+                family_confidence=record.family_confidence,
                 realworks_verification_status=verification.realworks_verification_status,
                 realworks_evidence_strength=verification.realworks_evidence_strength,
                 aanbod_scope_status=scope_status,
                 audit_input_status=status,
                 audit_input_reason=reason,
+                source_quality_status=record.source_quality_status,
+                access_policy_status=record.access_policy_status,
                 recommended_next_action="run_noord_brabant_realworks_audit_v1" if status == "ready_for_noord_brabant_realworks_audit" else "manual_review_before_audit",
             )
         )
     return rows
+
+
+def build_realworks_audit_input_reconciliation(
+    records: Sequence[RealworksAuditInputRecord],
+) -> list[RealworksAuditInputReconciliationRecord]:
+    rows: list[RealworksAuditInputReconciliationRecord] = []
+    for record in records:
+        ready = record.audit_input_status == "ready_for_noord_brabant_realworks_audit"
+        if ready:
+            resolution = "included_in_canonical_audit_input"
+            reason = ""
+        elif record.audit_input_status == "needs_manual_scope_check":
+            resolution = "excluded_pending_manual_scope_check"
+            reason = record.audit_input_reason
+        else:
+            resolution = "excluded_by_hard_gate"
+            reason = record.audit_input_reason
+        rows.append(
+            RealworksAuditInputReconciliationRecord(
+                source_id=record.source_id,
+                domain=record.domain,
+                accepted_aanbod_url=record.accepted_aanbod_url,
+                in_source_completion_ready=ready,
+                in_audit_input_csv=ready,
+                audit_input_status=record.audit_input_status,
+                parser_family_candidate=record.parser_family_candidate,
+                realworks_verification_status=record.realworks_verification_status,
+                aanbod_scope_status=record.aanbod_scope_status,
+                reason_if_excluded=reason,
+                resolution=resolution,
+            )
+        )
+    return rows
+
+
+def _audit_input_coverage_province(record: CoverageSourceRecord, scope_status: str) -> tuple[str, str]:
+    if record.coverage_province:
+        return record.coverage_province, "source_completion_coverage_province"
+    if (
+        record.has_noord_brabant_coverage
+        and scope_status in {"confirmed_nb_scope", "broad_official_index"}
+        and (record.coverage_city or record.coverage_gemeente)
+    ):
+        return "Noord-Brabant", "derived_from_source_completion_nb_scope"
+    return "", ""
 
 
 def build_office_location_verification_records(records: Sequence[CoverageSourceRecord]) -> list[OfficeLocationVerificationRecord]:
@@ -1386,6 +1476,10 @@ def compute_quality_metrics(result: CoverageCensusResult) -> dict[str, Any]:
     no_public_verification = list(result.no_public_verification or build_no_public_verification_records(records))
     aanbod_scope_checks = list(result.aanbod_scope_checks or build_aanbod_scope_checks(records))
     realworks_audit_input = list(result.realworks_audit_input or build_realworks_audit_input_records(records, aanbod_scope_checks))
+    realworks_reconciliation = list(
+        result.realworks_audit_input_reconciliation
+        or build_realworks_audit_input_reconciliation(realworks_audit_input)
+    )
     office_location_verification = list(result.office_location_verification or build_office_location_verification_records(records))
     in_scope = [record for record in records if record.has_noord_brabant_coverage and record.terminal_status not in {CoverageTerminalStatus.CONFIRMED_OUT_OF_SCOPE.value}]
     metrics = {
@@ -1493,6 +1587,10 @@ def compute_quality_metrics(result: CoverageCensusResult) -> dict[str, Any]:
             for row in realworks_audit_input
             if row.audit_input_status == "ready_for_noord_brabant_realworks_audit" and not row.accepted_aanbod_url
         ),
+        "realworks_audit_input_row_count_unexplained_delta": _realworks_audit_input_unexplained_delta(
+            realworks_audit_input,
+            realworks_reconciliation,
+        ),
         "office_location_known_count": sum(1 for record in records if record.office_location_status == "known"),
         "office_location_unknown_count": sum(1 for record in records if record.office_location_status != "known"),
         "outside_office_sources_identified_count": sum(1 for record in records if record.outside_office_coverage_status == "outside_office_source_included"),
@@ -1535,6 +1633,7 @@ def with_completion_verification(result: CoverageCensusResult) -> CoverageCensus
     no_public_verification = result.no_public_verification or tuple(build_no_public_verification_records(records))
     aanbod_scope_checks = result.aanbod_scope_checks or tuple(build_aanbod_scope_checks(records))
     realworks_audit_input = result.realworks_audit_input or tuple(build_realworks_audit_input_records(records, aanbod_scope_checks))
+    realworks_reconciliation = result.realworks_audit_input_reconciliation or tuple(build_realworks_audit_input_reconciliation(realworks_audit_input))
     office_location_verification = result.office_location_verification or tuple(build_office_location_verification_records(records))
     return CoverageCensusResult(
         records=records,
@@ -1544,6 +1643,7 @@ def with_completion_verification(result: CoverageCensusResult) -> CoverageCensus
         no_public_verification=no_public_verification,
         aanbod_scope_checks=aanbod_scope_checks,
         realworks_audit_input=realworks_audit_input,
+        realworks_audit_input_reconciliation=realworks_reconciliation,
         office_location_verification=office_location_verification,
         normalization_issues=result.normalization_issues,
         initial_source_count=result.initial_source_count,
@@ -1552,6 +1652,7 @@ def with_completion_verification(result: CoverageCensusResult) -> CoverageCensus
         master_csv_path=result.master_csv_path,
         review_queue_csv_path=result.review_queue_csv_path,
         realworks_audit_input_csv_path=result.realworks_audit_input_csv_path,
+        realworks_audit_input_reconciliation_csv_path=result.realworks_audit_input_reconciliation_csv_path,
         warnings=result.warnings,
     )
 
@@ -1590,6 +1691,20 @@ def write_realworks_audit_input_csv(records: Sequence[RealworksAuditInputRecord]
     return output_path
 
 
+def write_realworks_audit_input_reconciliation_csv(
+    records: Sequence[RealworksAuditInputReconciliationRecord],
+    output_path: Path,
+) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    columns = tuple(RealworksAuditInputReconciliationRecord.__dataclass_fields__.keys())
+    with output_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        for record in records:
+            writer.writerow({column: _safe_cell(getattr(record, column)) for column in columns})
+    return output_path
+
+
 def write_coverage_census_workbook(result: CoverageCensusResult, output_path: Path) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     workbook = Workbook()
@@ -1599,6 +1714,7 @@ def write_coverage_census_workbook(result: CoverageCensusResult, output_path: Pa
     _write_rows(workbook.create_sheet("No Public Verification"), tuple(NoPublicVerificationRecord.__dataclass_fields__.keys()), [asdict(item) for item in result.no_public_verification])
     _write_rows(workbook.create_sheet("Aanbod Scope Check"), tuple(AanbodScopeCheckRecord.__dataclass_fields__.keys()), [asdict(item) for item in result.aanbod_scope_checks])
     _write_rows(workbook.create_sheet("Realworks Audit Input"), tuple(RealworksAuditInputRecord.__dataclass_fields__.keys()), [asdict(item) for item in result.realworks_audit_input])
+    _write_rows(workbook.create_sheet("Realworks Audit Reconciliation"), tuple(RealworksAuditInputReconciliationRecord.__dataclass_fields__.keys()), [asdict(item) for item in result.realworks_audit_input_reconciliation])
     _write_rows(workbook.create_sheet("Aanbod URL Evidence"), ("source_id", "domain", "candidate_url", "accepted", "rejection_reason", "evidence_type", "evidence_preview", "pass_name"), [_candidate_row(candidate) for record in result.records for candidate in record.aanbod_url_candidates])
     _write_rows(workbook.create_sheet("Family Fingerprints"), ("source_id", "domain", "parser_family_candidate", "delivery_mode", "signal", "confidence", "evidence_preview", "pass_name"), [_fingerprint_row(evidence) for record in result.records for evidence in record.family_fingerprint_evidence])
     _write_rows(workbook.create_sheet("Investigation Attempts"), ("source_id", "domain", "pass_name", "attempted_url", "result", "decision", "reason"), [_attempt_row(attempt) for record in result.records for attempt in record.investigation_attempts])
@@ -2094,6 +2210,30 @@ def _duplicate_record(record: CoverageSourceRecord, existing: CoverageSourceReco
 def _is_inactive(record: CoverageSourceRecord) -> bool:
     text = _normalize_key(" ".join((record.source_quality_status, record.coverage_evidence, record.family_evidence)))
     return "is_active=false" in text or "inactive" in text or "no_longer_trading" in text
+
+
+def _is_portal_url(value: str) -> bool:
+    text = _clean_text(value).casefold()
+    return any(portal in text for portal in PORTAL_DOMAINS)
+
+
+def _realworks_audit_input_unexplained_delta(
+    audit_input: Sequence[RealworksAuditInputRecord],
+    reconciliation: Sequence[RealworksAuditInputReconciliationRecord],
+) -> int:
+    if not reconciliation:
+        return sum(1 for row in audit_input if row.audit_input_status == "ready_for_noord_brabant_realworks_audit")
+    ready_from_input = {
+        row.source_id
+        for row in audit_input
+        if row.audit_input_status == "ready_for_noord_brabant_realworks_audit"
+    }
+    ready_from_reconciliation = {
+        row.source_id
+        for row in reconciliation
+        if row.in_source_completion_ready and row.in_audit_input_csv
+    }
+    return len(ready_from_input.symmetric_difference(ready_from_reconciliation))
 
 
 def _access_blocks(record: CoverageSourceRecord) -> bool:

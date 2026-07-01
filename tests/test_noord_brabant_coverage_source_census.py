@@ -17,6 +17,7 @@ from domek_wonen.sources.coverage_census import (
     build_no_public_verification_records,
     build_office_location_verification_records,
     build_realworks_audit_input_records,
+    build_realworks_audit_input_reconciliation,
     classify_family_from_content,
     compute_quality_metrics,
     consolidate_coverage_source_seeds,
@@ -27,6 +28,7 @@ from domek_wonen.sources.coverage_census import (
     run_investigation_loop,
     run_noord_brabant_coverage_source_census,
     write_realworks_audit_input_csv,
+    write_realworks_audit_input_reconciliation_csv,
     write_coverage_census_outputs,
     _set_accepted_aanbod_url,
 )
@@ -219,6 +221,7 @@ def test_writes_workbook_with_all_required_sheets(tmp_path: Path) -> None:
             "No Public Verification",
             "Aanbod Scope Check",
             "Realworks Audit Input",
+            "Realworks Audit Reconciliation",
             "Aanbod URL Evidence",
             "Family Fingerprints",
             "Investigation Attempts",
@@ -635,6 +638,99 @@ def test_realworks_audit_input_csv_contains_only_ready_records(tmp_path: Path) -
     with output.open(encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
     assert [row["source_id"] for row in rows] == ["alpha.nl__tilburg"]
+
+
+def test_realworks_audit_input_csv_emits_canonical_handoff_columns(tmp_path: Path) -> None:
+    ready = _record(
+        source_id="alpha.nl__tilburg",
+        accepted_aanbod_url="https://alpha.nl/aanbod/woningaanbod/tilburg/koop",
+        parser_family_candidate="realworks_public",
+        family_evidence="aanbodEntry",
+        family_confidence=0.91,
+        access_policy_status="allowed",
+    )
+    records = build_realworks_audit_input_records([ready], build_aanbod_scope_checks([ready]))
+    output = write_realworks_audit_input_csv(records, tmp_path / "audit.csv")
+
+    with output.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert rows[0]["parser_family_candidate"] == "realworks_public"
+    assert rows[0]["coverage_province"] == "Noord-Brabant"
+    assert rows[0]["coverage_province_source"] == "source_completion_coverage_province"
+    assert rows[0]["realworks_verification_status"] == "verified"
+    assert rows[0]["audit_input_status"] == "ready_for_noord_brabant_realworks_audit"
+    assert rows[0]["access_policy_status"] == "allowed"
+
+
+def test_realworks_audit_input_can_derive_nb_coverage_province_when_scope_proves_it(tmp_path: Path) -> None:
+    ready = _record(
+        source_id="alpha.nl__tilburg",
+        coverage_province="",
+        accepted_aanbod_url="https://alpha.nl/aanbod/woningaanbod/tilburg/koop",
+        parser_family_candidate="realworks_public",
+        family_evidence="aanbodEntry",
+    )
+    records = build_realworks_audit_input_records([ready], build_aanbod_scope_checks([ready]))
+    output = write_realworks_audit_input_csv(records, tmp_path / "audit.csv")
+
+    with output.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert rows[0]["coverage_province"] == "Noord-Brabant"
+    assert rows[0]["coverage_province_source"] == "derived_from_source_completion_nb_scope"
+
+
+def test_realworks_audit_input_excludes_funda_or_pararius() -> None:
+    record = _record(
+        accepted_aanbod_url="https://www.funda.nl/koop/tilburg/huis-123",
+        parser_family_candidate="realworks_public",
+        family_evidence="aanbodEntry",
+    )
+    rows = build_realworks_audit_input_records([record], build_aanbod_scope_checks([record]))
+    assert rows[0].audit_input_status == "exclude_not_realworks"
+    assert rows[0].audit_input_reason == "funda_pararius_not_audit_input"
+
+
+def test_realworks_audit_input_reconciliation_detects_and_explains_delta(tmp_path: Path) -> None:
+    ready = _record(
+        source_id="alpha.nl__tilburg",
+        accepted_aanbod_url="https://alpha.nl/aanbod/woningaanbod/tilburg/koop",
+        parser_family_candidate="realworks_public",
+        family_evidence="aanbodEntry",
+    )
+    manual = _record(
+        source_id="beta.nl__tilburg",
+        domain="beta.nl",
+        accepted_aanbod_url="https://beta.nl/aanbod/woningaanbod/amsterdam/koop",
+        parser_family_candidate="realworks_public",
+        family_evidence="aanbodEntry",
+    )
+    audit_records = build_realworks_audit_input_records([ready, manual], build_aanbod_scope_checks([ready, manual]))
+    reconciliation = build_realworks_audit_input_reconciliation(audit_records)
+    output = write_realworks_audit_input_reconciliation_csv(reconciliation, tmp_path / "reconcile.csv")
+
+    with output.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert len(rows) == 2
+    assert rows[0]["in_audit_input_csv"] == "True"
+    assert rows[1]["in_audit_input_csv"] == "False"
+    assert rows[1]["reason_if_excluded"] == "scope_not_confirmed_for_audit_input"
+    assert rows[1]["resolution"] == "excluded_pending_manual_scope_check"
+    metrics = compute_quality_metrics(
+        CoverageCensusResult(
+            records=(ready, manual),
+            aanbod_scope_checks=tuple(build_aanbod_scope_checks([ready, manual])),
+            realworks_audit_input=tuple(audit_records),
+            realworks_audit_input_reconciliation=tuple(reconciliation),
+            initial_source_count=2,
+            deduped_source_count=2,
+        )
+    )
+    assert metrics["realworks_ready_for_audit_count"] == 1
+    assert metrics["realworks_needs_manual_scope_check_count"] == 1
+    assert metrics["realworks_audit_input_row_count_unexplained_delta"] == 0
 
 
 def test_office_location_can_be_confirmed_from_compact_evidence() -> None:

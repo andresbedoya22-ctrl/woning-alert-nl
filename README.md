@@ -494,6 +494,11 @@ The CLI writes local generated artifacts under `tmp/generated/`:
 - `tmp/generated/noord_brabant_realworks_audit_v1_summary.csv`
 - `tmp/generated/noord_brabant_realworks_audit_v1_problem_sources.csv`
 
+The handoff was repaired after an initial audit attempt correctly refused an invalid CSV missing `coverage_province`
+and `parser_family_candidate`. The source-completion producer now emits canonical audit-input columns plus
+`tmp/generated/noord_brabant_realworks_audit_input_reconciliation_v1.csv`. The current reconciled run authorizes `62`
+ready Realworks sources and excludes `26` verified Realworks rows pending manual scope check; KIN remains excluded.
+
 This phase remains audit-only: no matching, alerts, advisor email, n8n, dashboard, DB, migrations, full inventory,
 `data/raw`, Funda/Pararius operational sourcing, raw HTML/JSON persistence, browser automation, LLM runtime, parser per
 makelaar, or global eligibility changes.

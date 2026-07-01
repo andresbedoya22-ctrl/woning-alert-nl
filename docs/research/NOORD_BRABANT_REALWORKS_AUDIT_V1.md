@@ -23,11 +23,27 @@ The runner validates this CSV strictly before live work. It must contain only ro
 `audit_input_status=ready_for_noord_brabant_realworks_audit`, `parser_family_candidate=realworks_public`,
 `realworks_verification_status=verified`, and a present official-domain `accepted_aanbod_url`.
 
-## Why only 65 sources
+The first provincial audit attempt was correctly blocked before live fetch because the regenerated handoff CSV had an
+invalid schema: it was missing `coverage_province` and `parser_family_candidate`. The validator now reports missing
+required columns separately from row-level `non_realworks` counts, so a missing `parser_family_candidate` column cannot
+produce a false non-Realworks count.
 
-The previous completion run separated the 91 verified Realworks sources into 65 ready audit inputs and 26 manual scope
-checks. This audit is intentionally limited to the 65 ready rows. KIN, unclear scope rows, missing accepted URL rows,
-property-detail URLs, Funda/Pararius URLs, and blocked/legal/manual-review rows are hard-gated out.
+## Why only 62 sources
+
+The earlier documented completion run separated 91 verified Realworks sources into 65 ready audit inputs and 26 manual
+scope checks. The repaired handoff was regenerated from the current source-completion run and reconciled to 88 verified
+Realworks rows: 62 ready audit inputs and 26 `needs_manual_scope_check` rows. The current authorized audit count is 62,
+not 65.
+
+The reconciliation artifact is:
+
+```text
+tmp/generated/noord_brabant_realworks_audit_input_reconciliation_v1.csv
+```
+
+It shows `62` rows included as `included_in_canonical_audit_input` and `26` rows excluded as
+`excluded_pending_manual_scope_check`. KIN, unclear scope rows, missing accepted URL rows, property-detail URLs,
+Funda/Pararius URLs, and blocked/legal/manual-review rows remain hard-gated out.
 
 ## Scope and constraints
 
@@ -86,6 +102,12 @@ tmp/generated/noord_brabant_realworks_audit_v1.xlsx
 Required sheets are `Source Summary`, `Realworks Properties`, `Field Gaps`, `Warnings`, `Problem Sources`,
 `Parser Failure Patterns`, `Access Policy`, `Audit Input`, `Family Audit Decision`, and `Manual Verification`.
 
+The repaired run generated:
+
+- `tmp/generated/noord_brabant_realworks_audit_v1.xlsx`
+- `tmp/generated/noord_brabant_realworks_audit_v1_summary.csv`
+- `tmp/generated/noord_brabant_realworks_audit_v1_problem_sources.csv`
+
 ## Source metrics
 
 Per-source metrics include fetch status, robots/access status, parser totals, QA clean/review/rejected counts, detail
@@ -115,6 +137,25 @@ Possible decisions are:
 - `insufficient_successful_sources`
 
 The decision includes confidence, reasons, recommended next action, source exclusions, and hardening targets.
+
+The repaired provincial run attempted all `62` canonical input sources. Results:
+
+- sources passed: `6`
+- sources passed with review gaps: `32`
+- no current listings: `22`
+- listing fetch failed: `2`
+- sources needing hardening: `0`
+- parser rows: `305`
+- QA clean/review/rejected: `303 / 2 / 0`
+- detail attempted/succeeded/failed: `303 / 295 / 8`
+- readiness rows built: `295`
+- export ready/review/blocked: `194 / 98 / 3`
+- family decision: `realworks_partially_ready_with_exclusions`
+
+Top field gaps were `garage`, `plot_area_m2`, `vve_active`, `bathrooms`, and `parking`. Top warnings were
+`description_not_stored`, `missing_coordinates`, `source_published_at_missing`, `cv_ketel_ownership_not_clear`, and
+`missing_vve_for_apartment`. Parser failure patterns were `no_current_listings`, `no_realworks_detail_urls_found`, and
+`listing_fetch_failed`.
 
 ## Recommended next action
 

@@ -257,8 +257,24 @@ Generated local artifacts:
 - `tmp/generated/noord_brabant_source_completion_scope_verification_v1.csv`
 - `tmp/generated/noord_brabant_source_completion_scope_verification_v1_review_queue.csv`
 - `tmp/generated/noord_brabant_realworks_audit_input_v1.csv`
+- `tmp/generated/noord_brabant_realworks_audit_input_reconciliation_v1.csv`
 
 Generated artifacts remain local and must not be committed.
+
+### Realworks audit handoff repair
+
+The first Noord-Brabant Realworks Audit v1 attempt found that the handoff CSV could be regenerated with an incomplete
+schema: `coverage_province` and `parser_family_candidate` were missing from
+`tmp/generated/noord_brabant_realworks_audit_input_v1.csv`. The source-completion master already had those fields, so
+the defect was in the handoff producer, not in the Realworks parser or live audit.
+
+The handoff producer now emits the canonical audit-input schema, including `coverage_province`,
+`coverage_province_source`, `parser_family_candidate`, `root_url`, `source_quality_status`, `access_policy_status`, and
+`family_confidence`. It also writes `tmp/generated/noord_brabant_realworks_audit_input_reconciliation_v1.csv`.
+
+The current regenerated completion run reconciles to `88` verified Realworks rows: `62` ready audit inputs and `26`
+`needs_manual_scope_check` exclusions. The previous documented `65` ready count is therefore stale for the current
+source-completion run. The unexplained row-count delta gate is `realworks_audit_input_row_count_unexplained_delta = 0`.
 
 ## Constraints confirmation
 
