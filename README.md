@@ -481,6 +481,23 @@ The Realworks audit input CSV contains only verified `realworks_public` records 
 scope status ready for the later Noord-Brabant Realworks audit. KIN remains classified as `ogonline_xhr` and is excluded
 from Realworks audit input.
 
+## Noord-Brabant Realworks Audit v1
+
+`scraper/src/domek_wonen/pilots/noord_brabant_realworks_audit.py` audits only the ready
+`tmp/generated/noord_brabant_realworks_audit_input_v1.csv` handoff set. The runner validates the 65-source input
+strictly, rejects KIN, unclear scope, missing accepted URL, Funda/Pararius, property-detail, blocked/legal/manual-review,
+and non-Realworks rows, then reuses the existing Realworks readiness path for sequential bounded listing/detail checks.
+
+The CLI writes local generated artifacts under `tmp/generated/`:
+
+- `tmp/generated/noord_brabant_realworks_audit_v1.xlsx`
+- `tmp/generated/noord_brabant_realworks_audit_v1_summary.csv`
+- `tmp/generated/noord_brabant_realworks_audit_v1_problem_sources.csv`
+
+This phase remains audit-only: no matching, alerts, advisor email, n8n, dashboard, DB, migrations, full inventory,
+`data/raw`, Funda/Pararius operational sourcing, raw HTML/JSON persistence, browser automation, LLM runtime, parser per
+makelaar, or global eligibility changes.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`

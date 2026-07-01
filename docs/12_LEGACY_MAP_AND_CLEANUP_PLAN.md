@@ -241,6 +241,18 @@ apply-to-all Realworks execution, property inventory parsing, `data/raw` changes
 raw HTML/JSON persistence, long descriptions, images, browser automation, proxies, bypass behavior, LLM runtime,
 parser-per-makelaar logic, or global eligibility changes.
 
+## Noord-Brabant Realworks Audit v1
+
+`scraper/src/domek_wonen/pilots/noord_brabant_realworks_audit.py` is the bounded provincial wrapper around the existing
+Realworks parser, QA, detail facts, readiness, and lifecycle path. It consumes only the strict
+`tmp/generated/noord_brabant_realworks_audit_input_v1.csv` handoff, expects the 65 ready Realworks sources, and writes a
+local workbook plus summary/problem-source CSVs under `tmp/generated/`.
+
+The audit reports per-source validation status, field gaps, warnings, parser failure patterns, access policy outcomes,
+manual-verification rows, and a family decision. It remains separate from matching, advisor email, n8n, dashboard, DB,
+migrations, full inventory, `data/raw`, Funda/Pararius operational sourcing, raw persistence, browser automation, LLM
+runtime, parser-per-makelaar work, and global eligibility changes.
+
 ## Parser Family Runner v1
 
 `scraper/src/domek_wonen/parsers/runner.py` adds the first offline connector from
