@@ -23,6 +23,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Enable bounded standard-library HTTP. Default uses local evidence only.",
     )
+    parser.add_argument(
+        "--completion-scope-verification",
+        action="store_true",
+        help="Write Source Completion & Scope Verification v1 artifacts.",
+    )
     parser.add_argument("--timeout-seconds", type=float, default=10.0, help="Per-request timeout when live HTTP is enabled.")
     parser.add_argument("--max-passes", type=int, default=8, help="Maximum bounded investigation passes.")
     parser.add_argument(
@@ -44,11 +49,14 @@ def main(argv: list[str] | None = None) -> int:
         max_passes=args.max_passes,
         max_requests_per_domain=args.max_requests_per_domain,
         timeout_seconds=args.timeout_seconds,
+        completion_scope_verification=args.completion_scope_verification,
     )
     metrics = result.quality_metrics
     print(result.workbook_path, flush=True)
     print(result.master_csv_path, flush=True)
     print(result.review_queue_csv_path, flush=True)
+    if result.realworks_audit_input_csv_path:
+        print(result.realworks_audit_input_csv_path, flush=True)
     print(f"total_sources={metrics['total_sources']}", flush=True)
     print(f"deduped_sources={metrics['deduped_sources']}", flush=True)
     print(f"in_scope_noord_brabant_coverage_sources={metrics['in_scope_noord_brabant_coverage_sources']}", flush=True)
@@ -71,6 +79,30 @@ def main(argv: list[str] | None = None) -> int:
         "missing_domain_queue_count",
         "office_location_unknown_count",
         "outside_office_sources_needing_review_count",
+        "missing_domain_initial_count",
+        "missing_domain_resolved_count",
+        "missing_domain_remaining_count",
+        "missing_domain_needs_manual_research_count",
+        "missing_domain_without_resolution_attempt_count",
+        "no_public_initial_count",
+        "no_public_reclassified_count",
+        "no_public_confirmed_count",
+        "no_public_without_full_attempt_history_count",
+        "accepted_aanbod_total_count",
+        "accepted_aanbod_confirmed_nb_scope_count",
+        "accepted_aanbod_broad_official_index_count",
+        "accepted_aanbod_official_scope_unclear_count",
+        "accepted_aanbod_out_of_scope_needs_review_count",
+        "accepted_aanbod_out_of_scope_unreviewed_count",
+        "realworks_verified_total_count",
+        "realworks_ready_for_audit_count",
+        "realworks_needs_manual_scope_check_count",
+        "realworks_excluded_from_audit_count",
+        "realworks_audit_input_without_scope_confirmation_count",
+        "realworks_audit_input_kin_count",
+        "realworks_audit_input_property_detail_url_count",
+        "realworks_audit_input_without_accepted_aanbod_count",
+        "office_location_fabricated_count",
         "review_queue_count",
     ):
         print(f"{key}={metrics[key]}", flush=True)

@@ -34,6 +34,15 @@ COMMON_AANBOD_PATHS = (
     "/aanbod/koop",
     "/te-koop",
     "/huis-kopen",
+    "/koop",
+    "/woning-kopen",
+)
+COMMON_CONTACT_PATHS = (
+    "/contact",
+    "/over-ons",
+    "/vestigingen",
+    "/team",
+    "/makelaars",
 )
 LOCAL_EVIDENCE_PATHS = (
     Path("data/processed/sources_seed_noord_brabant.csv"),
@@ -97,6 +106,7 @@ MASTER_COLUMNS = (
     "accepted_aanbod_url",
     "aanbod_url_status",
     "aanbod_url_confidence",
+    "aanbod_scope_status",
     "platform_guess",
     "delivery_mode",
     "parser_family_candidate",
@@ -122,7 +132,17 @@ QUALITY_GATE_NAMES = (
     "kin_family_conflict_count",
     "custom_js_app_without_fingerprint_attempt_count",
     "gemeente_normalization_conflict_count",
+    "missing_domain_without_resolution_attempt_count",
+    "no_public_without_full_attempt_history_count",
+    "accepted_aanbod_out_of_scope_unreviewed_count",
+    "realworks_audit_input_without_scope_confirmation_count",
+    "realworks_audit_input_kin_count",
+    "realworks_audit_input_property_detail_url_count",
+    "realworks_audit_input_without_accepted_aanbod_count",
+    "office_location_fabricated_count",
 )
+
+NO_PUBLIC_REQUIRED_PASSES = ("pass_2_homepage_links", "pass_4_sitemap", "pass_5_common_paths")
 
 GEMEENTE_NORMALIZATION_MAP = {
     "bergen_op_zoom": "Bergen op Zoom",
@@ -212,6 +232,94 @@ class MissingDomainQueueRecord:
 
 
 @dataclass(slots=True)
+class DomainResolutionRecord:
+    raw_source_name: str
+    raw_source_id: str
+    raw_gemeente: str
+    raw_province: str
+    evidence_file: str
+    resolution_status: str
+    resolved_domain: str = ""
+    resolved_source_id: str = ""
+    matched_existing_source: str = ""
+    confidence: float = 0.0
+    evidence_preview: str = ""
+    attempt_count: int = 0
+    suggested_next_action: str = ""
+    manual_check_result: str = ""
+    manual_check_notes: str = ""
+
+
+@dataclass(slots=True)
+class NoPublicVerificationRecord:
+    source_id: str
+    domain: str
+    previous_status: str
+    final_status: str
+    homepage_checked: str
+    sitemap_checked: str
+    common_paths_checked: str
+    third_party_only_detected: str
+    official_aanbod_found: str
+    accepted_aanbod_url: str
+    evidence_preview: str
+    decision: str
+    reason: str
+
+
+@dataclass(slots=True)
+class AanbodScopeCheckRecord:
+    source_id: str
+    domain: str
+    accepted_aanbod_url: str
+    coverage_city: str
+    coverage_gemeente: str
+    coverage_province: str
+    url_place_token: str
+    url_scope_status: str
+    aanbod_scope_status: str
+    reason: str
+    evidence_preview: str
+    manual_check_result: str = ""
+    manual_check_notes: str = ""
+
+
+@dataclass(slots=True)
+class RealworksAuditInputRecord:
+    source_id: str
+    source_name: str
+    domain: str
+    accepted_aanbod_url: str
+    coverage_city: str
+    coverage_gemeente: str
+    url_place_token: str
+    realworks_verification_status: str
+    realworks_evidence_strength: str
+    aanbod_scope_status: str
+    audit_input_status: str
+    audit_input_reason: str
+    recommended_next_action: str
+    manual_check_result: str = ""
+    manual_check_notes: str = ""
+
+
+@dataclass(slots=True)
+class OfficeLocationVerificationRecord:
+    source_id: str
+    domain: str
+    office_location_status: str
+    office_city: str
+    office_gemeente: str
+    office_province: str
+    office_evidence_type: str
+    office_evidence_preview: str
+    outside_office_coverage_status: str
+    reason: str
+    manual_check_result: str = ""
+    manual_check_notes: str = ""
+
+
+@dataclass(slots=True)
 class NormalizationIssueRecord:
     source_id: str
     domain: str
@@ -259,6 +367,7 @@ class CoverageSourceRecord:
     accepted_aanbod_url_source: str = ""
     accepted_aanbod_url_confidence: float = 0.0
     accepted_aanbod_url_evidence: str = ""
+    aanbod_scope_status: str = ""
     rejected_aanbod_url_count: int = 0
     best_rejected_candidate_url: str = ""
     best_rejected_candidate_reason: str = ""
@@ -299,12 +408,18 @@ class CoverageCensusResult:
     records: tuple[CoverageSourceRecord, ...]
     duplicate_records: tuple[CoverageSourceRecord, ...] = ()
     missing_domain_queue: tuple[MissingDomainQueueRecord, ...] = ()
+    domain_resolution: tuple[DomainResolutionRecord, ...] = ()
+    no_public_verification: tuple[NoPublicVerificationRecord, ...] = ()
+    aanbod_scope_checks: tuple[AanbodScopeCheckRecord, ...] = ()
+    realworks_audit_input: tuple[RealworksAuditInputRecord, ...] = ()
+    office_location_verification: tuple[OfficeLocationVerificationRecord, ...] = ()
     normalization_issues: tuple[NormalizationIssueRecord, ...] = ()
     initial_source_count: int = 0
     deduped_source_count: int = 0
     workbook_path: Path | None = None
     master_csv_path: Path | None = None
     review_queue_csv_path: Path | None = None
+    realworks_audit_input_csv_path: Path | None = None
     warnings: tuple[str, ...] = ()
 
     @property
@@ -326,6 +441,7 @@ def run_noord_brabant_coverage_source_census(
     max_passes: int = 8,
     max_requests_per_domain: int = 3,
     timeout_seconds: float = 10.0,
+    completion_scope_verification: bool = False,
     fetch_text: FetchText | None = None,
     can_fetch: CanFetch = robots_gate.can_fetch,
 ) -> CoverageCensusResult:
@@ -353,10 +469,20 @@ def run_noord_brabant_coverage_source_census(
             max_passes=max_passes,
         )
 
+    domain_resolution = build_domain_resolution_records(missing_domain_queue, records)
+    no_public_verification = build_no_public_verification_records(records)
+    aanbod_scope_checks = build_aanbod_scope_checks(records)
+    realworks_audit_input = build_realworks_audit_input_records(records, aanbod_scope_checks)
+    office_location_verification = build_office_location_verification_records(records)
     result = CoverageCensusResult(
         records=tuple(records),
         duplicate_records=tuple(duplicates),
         missing_domain_queue=tuple(missing_domain_queue),
+        domain_resolution=tuple(domain_resolution),
+        no_public_verification=tuple(no_public_verification),
+        aanbod_scope_checks=tuple(aanbod_scope_checks),
+        realworks_audit_input=tuple(realworks_audit_input),
+        office_location_verification=tuple(office_location_verification),
         normalization_issues=tuple(normalization_issues),
         initial_source_count=len(rows),
         deduped_source_count=len(records),
@@ -365,20 +491,33 @@ def run_noord_brabant_coverage_source_census(
     if output_dir is None:
         return result
 
-    workbook_path = output_dir / "noord_brabant_coverage_source_census_hardened_v1.xlsx"
-    master_csv_path = output_dir / "noord_brabant_coverage_source_census_hardened_v1.csv"
-    review_queue_csv_path = output_dir / "noord_brabant_coverage_source_census_hardened_v1_review_queue.csv"
+    if completion_scope_verification:
+        stem = "noord_brabant_source_completion_scope_verification_v1"
+    else:
+        stem = "noord_brabant_coverage_source_census_hardened_v1"
+    workbook_path = output_dir / f"{stem}.xlsx"
+    master_csv_path = output_dir / f"{stem}.csv"
+    review_queue_csv_path = output_dir / f"{stem}_review_queue.csv"
+    realworks_audit_input_csv_path = output_dir / "noord_brabant_realworks_audit_input_v1.csv"
     write_coverage_census_outputs(result, workbook_path, master_csv_path, review_queue_csv_path)
+    if completion_scope_verification:
+        write_realworks_audit_input_csv(result.realworks_audit_input, realworks_audit_input_csv_path)
     return CoverageCensusResult(
         records=result.records,
         duplicate_records=result.duplicate_records,
         missing_domain_queue=result.missing_domain_queue,
+        domain_resolution=result.domain_resolution,
+        no_public_verification=result.no_public_verification,
+        aanbod_scope_checks=result.aanbod_scope_checks,
+        realworks_audit_input=result.realworks_audit_input,
+        office_location_verification=result.office_location_verification,
         normalization_issues=result.normalization_issues,
         initial_source_count=result.initial_source_count,
         deduped_source_count=result.deduped_source_count,
         workbook_path=workbook_path,
         master_csv_path=master_csv_path,
         review_queue_csv_path=review_queue_csv_path,
+        realworks_audit_input_csv_path=realworks_audit_input_csv_path if completion_scope_verification else None,
         warnings=result.warnings,
     )
 
@@ -557,6 +696,7 @@ def run_investigation_loop(
         can_fetch=can_fetch,
         request_counts=request_counts,
         max_requests_per_domain=max_requests_per_domain,
+        max_passes=max_passes,
     )
     if accepted:
         fingerprint_source_family(
@@ -577,6 +717,7 @@ def discover_aanbod_url(
     can_fetch: CanFetch = robots_gate.can_fetch,
     request_counts: dict[str, int] | None = None,
     max_requests_per_domain: int = 3,
+    max_passes: int = 8,
 ) -> bool:
     request_counts = request_counts if request_counts is not None else defaultdict(int)
     explicit_url = _clean_text(record.accepted_aanbod_url or record.aanbod_url or record.raw_aanbod_url_candidate)
@@ -623,18 +764,23 @@ def discover_aanbod_url(
                     return True
 
     if fetch_text is None:
-        record.investigation_attempts.append(
-            CoverageInvestigationAttempt(
-                record.source_id,
-                record.domain,
-                "pass_2_homepage_links",
-                record.root_url,
-                "skipped",
-                "live_http_disabled",
-                "no_homepage_fetch",
-                "fetcher not supplied",
+        for pass_name, url, decision in (
+            ("pass_2_homepage_links", record.root_url, "no_homepage_fetch"),
+            ("pass_4_sitemap", _root_url_for_path(record.domain, "/sitemap.xml"), "no_sitemap_fetch"),
+            ("pass_5_common_paths", _root_url_for_path(record.domain, COMMON_AANBOD_PATHS[0]), "no_common_path_fetch"),
+        ):
+            record.investigation_attempts.append(
+                CoverageInvestigationAttempt(
+                    record.source_id,
+                    record.domain,
+                    pass_name,
+                    url,
+                    "skipped",
+                    "live_http_disabled",
+                    decision,
+                    "fetcher not supplied",
+                )
             )
-        )
         return False
 
     homepage_html = _guarded_fetch(
@@ -670,7 +816,10 @@ def discover_aanbod_url(
             if _accept_candidate(record, url, "sitemap_url", url, "pass_4_sitemap", confidence=0.70, require_listing_evidence=False):
                 return True
 
-    for path in COMMON_AANBOD_PATHS:
+    common_path_limit = len(COMMON_AANBOD_PATHS)
+    if max_passes > 0:
+        common_path_limit = max(1, min(common_path_limit, max_passes - 3))
+    for path in COMMON_AANBOD_PATHS[:common_path_limit]:
         url = _root_url_for_path(record.domain, path)
         html = _guarded_fetch(
             record,
@@ -985,8 +1134,259 @@ def collect_normalization_issues(records: Sequence[CoverageSourceRecord]) -> lis
     return issues
 
 
+def build_domain_resolution_records(
+    missing_domain_queue: Sequence[MissingDomainQueueRecord],
+    records: Sequence[CoverageSourceRecord],
+    *,
+    official_domain_lookup: Mapping[str, str] | None = None,
+) -> list[DomainResolutionRecord]:
+    lookup = {_normalize_key(key): _normalize_domain(value) for key, value in (official_domain_lookup or {}).items()}
+    by_name: dict[str, CoverageSourceRecord] = {}
+    for record in records:
+        for name in (record.source_name, *record.aliases):
+            key = _normalize_party_name(name)
+            if key:
+                by_name.setdefault(key, record)
+
+    rows: list[DomainResolutionRecord] = []
+    for item in missing_domain_queue:
+        key = _normalize_party_name(item.source_name)
+        matched = by_name.get(key)
+        if matched is not None:
+            rows.append(
+                DomainResolutionRecord(
+                    raw_source_name=item.source_name,
+                    raw_source_id=item.raw_source_id,
+                    raw_gemeente=item.gemeente,
+                    raw_province=item.province,
+                    evidence_file=item.evidence_file,
+                    resolution_status="resolved_to_existing_source",
+                    resolved_domain=matched.domain,
+                    resolved_source_id=matched.source_id,
+                    matched_existing_source=matched.source_name,
+                    confidence=0.88,
+                    evidence_preview=_preview(f"normalized_name_match:{matched.source_name}"),
+                    attempt_count=1,
+                    suggested_next_action="use_existing_source_record",
+                )
+            )
+            continue
+
+        resolved_domain = lookup.get(_normalize_key(item.source_name)) or lookup.get(key)
+        if resolved_domain:
+            rows.append(
+                DomainResolutionRecord(
+                    raw_source_name=item.source_name,
+                    raw_source_id=item.raw_source_id,
+                    raw_gemeente=item.gemeente,
+                    raw_province=item.province,
+                    evidence_file=item.evidence_file,
+                    resolution_status="resolved_to_new_source",
+                    resolved_domain=resolved_domain,
+                    resolved_source_id=_source_id(resolved_domain, item.source_name, item.gemeente),
+                    confidence=0.72,
+                    evidence_preview="manual_or_local_official_domain_lookup",
+                    attempt_count=1,
+                    suggested_next_action="add_source_record_after_manual_review",
+                )
+            )
+            continue
+
+        rows.append(
+            DomainResolutionRecord(
+                raw_source_name=item.source_name,
+                raw_source_id=item.raw_source_id,
+                raw_gemeente=item.gemeente,
+                raw_province=item.province,
+                evidence_file=item.evidence_file,
+                resolution_status="needs_manual_domain_research",
+                confidence=0.0,
+                evidence_preview=_preview(item.suggested_search_query),
+                attempt_count=1,
+                suggested_next_action="manual_official_domain_research_required",
+            )
+        )
+    return rows
+
+
+def build_no_public_verification_records(records: Sequence[CoverageSourceRecord]) -> list[NoPublicVerificationRecord]:
+    rows: list[NoPublicVerificationRecord] = []
+    for record in records:
+        if record.parser_family_candidate != "no_public_aanbod" and record.terminal_status != CoverageTerminalStatus.CONFIRMED_NO_PUBLIC_AANBOD.value:
+            continue
+        passes = {attempt.pass_name for attempt in record.investigation_attempts}
+        third_party_only = any(
+            any(portal in candidate.candidate_url for portal in PORTAL_DOMAINS)
+            for candidate in record.aanbod_url_candidates
+        )
+        found = bool(record.accepted_aanbod_url)
+        full_history = all(name in passes for name in NO_PUBLIC_REQUIRED_PASSES)
+        rows.append(
+            NoPublicVerificationRecord(
+                source_id=record.source_id,
+                domain=record.domain,
+                previous_status="no_public_aanbod",
+                final_status="official_aanbod_found" if found else "confirmed_no_public_aanbod",
+                homepage_checked="yes" if "pass_2_homepage_links" in passes else "no",
+                sitemap_checked="yes" if "pass_4_sitemap" in passes else "no",
+                common_paths_checked="yes" if "pass_5_common_paths" in passes else "no",
+                third_party_only_detected="yes" if third_party_only else "no",
+                official_aanbod_found="yes" if found else "no",
+                accepted_aanbod_url=record.accepted_aanbod_url,
+                evidence_preview=_preview(record.aanbod_url_evidence or record.coverage_evidence),
+                decision="reclassify_to_official_aanbod" if found else "keep_confirmed_no_public_aanbod",
+                reason="full_attempt_history" if full_history else "missing_attempt_history",
+            )
+        )
+    return rows
+
+
+def build_aanbod_scope_checks(records: Sequence[CoverageSourceRecord]) -> list[AanbodScopeCheckRecord]:
+    known_nb_tokens = {
+        _slug_token(value)
+        for record in records
+        for value in (record.coverage_city, record.coverage_gemeente)
+        if _clean_text(value)
+    }
+    known_nb_tokens.update(_slug_token(value) for value in GEMEENTE_NORMALIZATION_MAP.values())
+    known_nb_tokens.discard("")
+
+    rows: list[AanbodScopeCheckRecord] = []
+    for record in records:
+        if not record.accepted_aanbod_url:
+            record.aanbod_scope_status = ""
+            continue
+        token = _url_place_token(record.accepted_aanbod_url)
+        coverage_tokens = {
+            _slug_token(record.coverage_city),
+            _slug_token(record.coverage_gemeente),
+        }
+        if not token:
+            status = "broad_official_index"
+            url_scope_status = "broad_index"
+            reason = "no_place_token_in_listing_index_path"
+        elif token in coverage_tokens or token in known_nb_tokens:
+            status = "confirmed_nb_scope"
+            url_scope_status = "place_token_in_noord_brabant"
+            reason = "url_place_token_matches_known_noord_brabant_place_or_gemeente"
+        else:
+            status = "needs_scope_review"
+            url_scope_status = "outside_or_unknown_place_token"
+            reason = "url_place_token_not_in_noord_brabant_evidence"
+        record.aanbod_scope_status = status
+        rows.append(
+            AanbodScopeCheckRecord(
+                source_id=record.source_id,
+                domain=record.domain,
+                accepted_aanbod_url=record.accepted_aanbod_url,
+                coverage_city=record.coverage_city,
+                coverage_gemeente=record.coverage_gemeente,
+                coverage_province=record.coverage_province,
+                url_place_token=token,
+                url_scope_status=url_scope_status,
+                aanbod_scope_status=status,
+                reason=reason,
+                evidence_preview=_preview(record.accepted_aanbod_url_evidence or record.coverage_evidence),
+            )
+        )
+    return rows
+
+
+def build_realworks_audit_input_records(
+    records: Sequence[CoverageSourceRecord],
+    scope_checks: Sequence[AanbodScopeCheckRecord] | None = None,
+) -> list[RealworksAuditInputRecord]:
+    scope_by_source = {row.source_id: row for row in (scope_checks or build_aanbod_scope_checks(records))}
+    rows: list[RealworksAuditInputRecord] = []
+    for record in records:
+        if record.parser_family_candidate != "realworks_public":
+            continue
+        verification = verify_realworks_candidate(record)
+        scope = scope_by_source.get(record.source_id)
+        scope_status = scope.aanbod_scope_status if scope else record.aanbod_scope_status
+        token = scope.url_place_token if scope else _url_place_token(record.accepted_aanbod_url)
+        if _is_kin_record(record):
+            status = "exclude_not_realworks"
+            reason = "kin_must_remain_ogonline_xhr"
+        elif not record.accepted_aanbod_url:
+            status = "exclude_no_public_aanbod"
+            reason = "missing_accepted_aanbod_url"
+        elif _looks_like_property_detail_url(urlsplit(record.accepted_aanbod_url).path):
+            status = "exclude_not_realworks"
+            reason = "property_detail_url_not_audit_input"
+        elif verification.realworks_verification_status != "verified":
+            status = "exclude_not_realworks"
+            reason = "realworks_strong_evidence_missing"
+        elif scope_status in {"confirmed_nb_scope", "broad_official_index"}:
+            status = "ready_for_noord_brabant_realworks_audit"
+            reason = "verified_realworks_with_accepted_official_scope"
+        else:
+            status = "needs_manual_scope_check"
+            reason = "scope_not_confirmed_for_audit_input"
+        rows.append(
+            RealworksAuditInputRecord(
+                source_id=record.source_id,
+                source_name=record.source_name,
+                domain=record.domain,
+                accepted_aanbod_url=record.accepted_aanbod_url,
+                coverage_city=record.coverage_city,
+                coverage_gemeente=record.coverage_gemeente,
+                url_place_token=token,
+                realworks_verification_status=verification.realworks_verification_status,
+                realworks_evidence_strength=verification.realworks_evidence_strength,
+                aanbod_scope_status=scope_status,
+                audit_input_status=status,
+                audit_input_reason=reason,
+                recommended_next_action="run_noord_brabant_realworks_audit_v1" if status == "ready_for_noord_brabant_realworks_audit" else "manual_review_before_audit",
+            )
+        )
+    return rows
+
+
+def build_office_location_verification_records(records: Sequence[CoverageSourceRecord]) -> list[OfficeLocationVerificationRecord]:
+    rows: list[OfficeLocationVerificationRecord] = []
+    for record in records:
+        province = _normalize_key(record.office_province)
+        if record.office_gemeente and province == NOORD_BRABANT:
+            status = "office_confirmed_noord_brabant"
+            evidence_type = "local_office_fields"
+            reason = "office_gemeente_and_province_present"
+        elif record.office_gemeente and province and province != NOORD_BRABANT:
+            status = "office_confirmed_outside_noord_brabant"
+            evidence_type = "local_office_fields"
+            reason = "office_province_is_not_noord_brabant"
+        elif record.office_gemeente or record.office_province:
+            status = "office_inactive_or_unclear"
+            evidence_type = "partial_local_office_fields"
+            reason = "partial_office_location_only"
+        else:
+            status = "office_unknown"
+            evidence_type = "none"
+            reason = "no_explicit_office_location_evidence"
+        rows.append(
+            OfficeLocationVerificationRecord(
+                source_id=record.source_id,
+                domain=record.domain,
+                office_location_status=status,
+                office_city=record.office_city,
+                office_gemeente=record.office_gemeente,
+                office_province=record.office_province,
+                office_evidence_type=evidence_type,
+                office_evidence_preview=_preview(record.coverage_evidence),
+                outside_office_coverage_status=record.outside_office_coverage_status,
+                reason=reason,
+            )
+        )
+    return rows
+
+
 def compute_quality_metrics(result: CoverageCensusResult) -> dict[str, Any]:
     records = list(result.records)
+    domain_resolution = list(result.domain_resolution or build_domain_resolution_records(result.missing_domain_queue, records))
+    no_public_verification = list(result.no_public_verification or build_no_public_verification_records(records))
+    aanbod_scope_checks = list(result.aanbod_scope_checks or build_aanbod_scope_checks(records))
+    realworks_audit_input = list(result.realworks_audit_input or build_realworks_audit_input_records(records, aanbod_scope_checks))
+    office_location_verification = list(result.office_location_verification or build_office_location_verification_records(records))
     in_scope = [record for record in records if record.has_noord_brabant_coverage and record.terminal_status not in {CoverageTerminalStatus.CONFIRMED_OUT_OF_SCOPE.value}]
     metrics = {
         "total_sources": result.initial_source_count,
@@ -1052,10 +1452,58 @@ def compute_quality_metrics(result: CoverageCensusResult) -> dict[str, Any]:
         ),
         "gemeente_normalization_conflict_count": 0,
         "missing_domain_queue_count": len(result.missing_domain_queue),
+        "missing_domain_initial_count": len(result.missing_domain_queue),
+        "missing_domain_resolved_count": sum(1 for row in domain_resolution if row.resolution_status in {"resolved_to_existing_source", "resolved_to_new_source", "confirmed_duplicate"}),
+        "missing_domain_remaining_count": sum(1 for row in domain_resolution if row.resolution_status in {"confirmed_no_official_domain_found", "needs_manual_domain_research"}),
+        "missing_domain_needs_manual_research_count": sum(1 for row in domain_resolution if row.resolution_status == "needs_manual_domain_research"),
+        "missing_domain_without_resolution_attempt_count": sum(1 for row in domain_resolution if row.attempt_count <= 0),
+        "no_public_initial_count": len(no_public_verification),
+        "no_public_reclassified_count": sum(1 for row in no_public_verification if row.final_status == "official_aanbod_found"),
+        "no_public_confirmed_count": sum(1 for row in no_public_verification if row.final_status == "confirmed_no_public_aanbod"),
+        "no_public_without_full_attempt_history_count": sum(1 for row in no_public_verification if row.reason != "full_attempt_history"),
+        "accepted_aanbod_total_count": len(aanbod_scope_checks),
+        "accepted_aanbod_confirmed_nb_scope_count": sum(1 for row in aanbod_scope_checks if row.aanbod_scope_status == "confirmed_nb_scope"),
+        "accepted_aanbod_broad_official_index_count": sum(1 for row in aanbod_scope_checks if row.aanbod_scope_status == "broad_official_index"),
+        "accepted_aanbod_official_scope_unclear_count": sum(1 for row in aanbod_scope_checks if row.aanbod_scope_status == "official_scope_unclear"),
+        "accepted_aanbod_out_of_scope_needs_review_count": sum(1 for row in aanbod_scope_checks if row.aanbod_scope_status == "needs_scope_review"),
+        "accepted_aanbod_out_of_scope_unreviewed_count": sum(1 for row in aanbod_scope_checks if row.aanbod_scope_status == "needs_scope_review" and not row.reason),
+        "realworks_verified_total_count": sum(1 for row in realworks_audit_input if row.realworks_verification_status == "verified"),
+        "realworks_ready_for_audit_count": sum(1 for row in realworks_audit_input if row.audit_input_status == "ready_for_noord_brabant_realworks_audit"),
+        "realworks_needs_manual_scope_check_count": sum(1 for row in realworks_audit_input if row.audit_input_status == "needs_manual_scope_check"),
+        "realworks_excluded_from_audit_count": sum(1 for row in realworks_audit_input if row.audit_input_status.startswith("exclude_")),
+        "realworks_audit_input_without_scope_confirmation_count": sum(
+            1
+            for row in realworks_audit_input
+            if row.audit_input_status == "ready_for_noord_brabant_realworks_audit"
+            and row.aanbod_scope_status not in {"confirmed_nb_scope", "broad_official_index"}
+        ),
+        "realworks_audit_input_kin_count": sum(
+            1
+            for row in realworks_audit_input
+            if row.audit_input_status == "ready_for_noord_brabant_realworks_audit" and "kinmakelaars" in _normalize_key(row.source_id + " " + row.domain)
+        ),
+        "realworks_audit_input_property_detail_url_count": sum(
+            1
+            for row in realworks_audit_input
+            if row.audit_input_status == "ready_for_noord_brabant_realworks_audit"
+            and _looks_like_property_detail_url(urlsplit(row.accepted_aanbod_url).path)
+        ),
+        "realworks_audit_input_without_accepted_aanbod_count": sum(
+            1
+            for row in realworks_audit_input
+            if row.audit_input_status == "ready_for_noord_brabant_realworks_audit" and not row.accepted_aanbod_url
+        ),
         "office_location_known_count": sum(1 for record in records if record.office_location_status == "known"),
         "office_location_unknown_count": sum(1 for record in records if record.office_location_status != "known"),
         "outside_office_sources_identified_count": sum(1 for record in records if record.outside_office_coverage_status == "outside_office_source_included"),
+        "outside_office_sources_confirmed_count": sum(1 for row in office_location_verification if row.office_location_status == "office_confirmed_outside_noord_brabant"),
         "outside_office_sources_needing_review_count": sum(1 for record in records if record.outside_office_coverage_status == "office_location_unknown"),
+        "office_location_fabricated_count": sum(
+            1
+            for row in office_location_verification
+            if row.office_location_status == "office_confirmed_noord_brabant"
+            and (_normalize_key(row.office_province) != NOORD_BRABANT or not row.office_gemeente)
+        ),
         "custom_js_app_initial_count": sum(1 for record in records if any(item.initial_family == "custom_js_app" for item in record.custom_js_refingerprint_attempts)) or sum(1 for record in records if record.parser_family_candidate == "custom_js_app"),
         "custom_js_app_after_refingerprint_count": sum(1 for record in records if record.parser_family_candidate == "custom_js_app"),
         "custom_js_app_reclassified_to_realworks": sum(1 for record in records for item in record.custom_js_refingerprint_attempts if item.final_family == "realworks_public"),
@@ -1074,10 +1522,38 @@ def write_coverage_census_outputs(
     master_csv_path: Path,
     review_queue_csv_path: Path,
 ) -> tuple[Path, Path, Path]:
+    result = with_completion_verification(result)
     write_master_csv(result.records, master_csv_path)
     write_review_queue_csv(review_queue_records(result.records), review_queue_csv_path)
     write_coverage_census_workbook(result, workbook_path)
     return workbook_path, master_csv_path, review_queue_csv_path
+
+
+def with_completion_verification(result: CoverageCensusResult) -> CoverageCensusResult:
+    records = result.records
+    domain_resolution = result.domain_resolution or tuple(build_domain_resolution_records(result.missing_domain_queue, records))
+    no_public_verification = result.no_public_verification or tuple(build_no_public_verification_records(records))
+    aanbod_scope_checks = result.aanbod_scope_checks or tuple(build_aanbod_scope_checks(records))
+    realworks_audit_input = result.realworks_audit_input or tuple(build_realworks_audit_input_records(records, aanbod_scope_checks))
+    office_location_verification = result.office_location_verification or tuple(build_office_location_verification_records(records))
+    return CoverageCensusResult(
+        records=records,
+        duplicate_records=result.duplicate_records,
+        missing_domain_queue=result.missing_domain_queue,
+        domain_resolution=domain_resolution,
+        no_public_verification=no_public_verification,
+        aanbod_scope_checks=aanbod_scope_checks,
+        realworks_audit_input=realworks_audit_input,
+        office_location_verification=office_location_verification,
+        normalization_issues=result.normalization_issues,
+        initial_source_count=result.initial_source_count,
+        deduped_source_count=result.deduped_source_count,
+        workbook_path=result.workbook_path,
+        master_csv_path=result.master_csv_path,
+        review_queue_csv_path=result.review_queue_csv_path,
+        realworks_audit_input_csv_path=result.realworks_audit_input_csv_path,
+        warnings=result.warnings,
+    )
 
 
 def write_master_csv(records: Sequence[CoverageSourceRecord], output_path: Path) -> Path:
@@ -1101,11 +1577,28 @@ def write_review_queue_csv(records: Sequence[CoverageSourceRecord], output_path:
     return output_path
 
 
+def write_realworks_audit_input_csv(records: Sequence[RealworksAuditInputRecord], output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    columns = tuple(RealworksAuditInputRecord.__dataclass_fields__.keys())
+    with output_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        for record in records:
+            if record.audit_input_status != "ready_for_noord_brabant_realworks_audit":
+                continue
+            writer.writerow({column: _safe_cell(getattr(record, column)) for column in columns})
+    return output_path
+
+
 def write_coverage_census_workbook(result: CoverageCensusResult, output_path: Path) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     workbook = Workbook()
     workbook.active.title = "Master Sources"
     _write_rows(workbook["Master Sources"], MASTER_COLUMNS, [_master_row(record) for record in result.records])
+    _write_rows(workbook.create_sheet("Domain Resolution"), tuple(DomainResolutionRecord.__dataclass_fields__.keys()), [asdict(item) for item in result.domain_resolution])
+    _write_rows(workbook.create_sheet("No Public Verification"), tuple(NoPublicVerificationRecord.__dataclass_fields__.keys()), [asdict(item) for item in result.no_public_verification])
+    _write_rows(workbook.create_sheet("Aanbod Scope Check"), tuple(AanbodScopeCheckRecord.__dataclass_fields__.keys()), [asdict(item) for item in result.aanbod_scope_checks])
+    _write_rows(workbook.create_sheet("Realworks Audit Input"), tuple(RealworksAuditInputRecord.__dataclass_fields__.keys()), [asdict(item) for item in result.realworks_audit_input])
     _write_rows(workbook.create_sheet("Aanbod URL Evidence"), ("source_id", "domain", "candidate_url", "accepted", "rejection_reason", "evidence_type", "evidence_preview", "pass_name"), [_candidate_row(candidate) for record in result.records for candidate in record.aanbod_url_candidates])
     _write_rows(workbook.create_sheet("Family Fingerprints"), ("source_id", "domain", "parser_family_candidate", "delivery_mode", "signal", "confidence", "evidence_preview", "pass_name"), [_fingerprint_row(evidence) for record in result.records for evidence in record.family_fingerprint_evidence])
     _write_rows(workbook.create_sheet("Investigation Attempts"), ("source_id", "domain", "pass_name", "attempted_url", "result", "decision", "reason"), [_attempt_row(attempt) for record in result.records for attempt in record.investigation_attempts])
@@ -1116,6 +1609,7 @@ def write_coverage_census_workbook(result: CoverageCensusResult, output_path: Pa
     _write_rows(workbook.create_sheet("Custom Needs Parser"), MASTER_COLUMNS, [_master_row(record) for record in result.records if record.terminal_status == CoverageTerminalStatus.CONFIRMED_SOURCE_NEEDS_PARSER_FAMILY.value])
     _write_rows(workbook.create_sheet("Custom JS Refingerprint"), ("source_id", "domain", "initial_family", "final_family", "signal", "evidence_preview", "decision"), [asdict(item) for record in result.records for item in record.custom_js_refingerprint_attempts])
     _write_rows(workbook.create_sheet("Family Conflicts"), ("source_id", "domain", "old_family", "new_family", "conflict_type", "evidence", "resolution", "remaining_action"), [asdict(item) for record in result.records for item in record.family_conflicts])
+    _write_rows(workbook.create_sheet("Office Location Verification"), tuple(OfficeLocationVerificationRecord.__dataclass_fields__.keys()), [asdict(item) for item in result.office_location_verification])
     _write_rows(workbook.create_sheet("Blocked or Legal Review"), MASTER_COLUMNS, [_master_row(record) for record in result.records if record.parser_family_candidate == "blocked_or_legal_review"])
     _write_rows(workbook.create_sheet("Duplicates"), ("duplicate_group_id", "source_id", "source_name", "domain", "duplicate_reason"), [_duplicate_row(record) for record in result.duplicate_records])
     _write_rows(workbook.create_sheet("Missing Domain Queue"), ("source_name", "raw_source_id", "gemeente", "province", "evidence_file", "reason", "suggested_search_query", "suggested_next_action"), [asdict(item) for item in result.missing_domain_queue])
@@ -1388,8 +1882,25 @@ def _quality_gate_rows(metrics: Mapping[str, Any]) -> list[dict[str, object]]:
         value = int(metrics.get(name, 0))
         rows.append({"metric": name, "value": value, "gate_type": "hard", "passed": "yes" if value == 0 else "no"})
     for name in (
+        "missing_domain_initial_count",
+        "missing_domain_resolved_count",
+        "missing_domain_remaining_count",
+        "missing_domain_needs_manual_research_count",
         "missing_domain_queue_count",
+        "no_public_initial_count",
+        "no_public_reclassified_count",
+        "no_public_confirmed_count",
+        "accepted_aanbod_total_count",
+        "accepted_aanbod_confirmed_nb_scope_count",
+        "accepted_aanbod_broad_official_index_count",
+        "accepted_aanbod_official_scope_unclear_count",
+        "accepted_aanbod_out_of_scope_needs_review_count",
+        "realworks_verified_total_count",
+        "realworks_ready_for_audit_count",
+        "realworks_needs_manual_scope_check_count",
+        "realworks_excluded_from_audit_count",
         "office_location_unknown_count",
+        "outside_office_sources_confirmed_count",
         "outside_office_sources_needing_review_count",
         "review_queue_count",
     ):
@@ -1491,6 +2002,47 @@ def _looks_like_property_detail_url(path: str) -> bool:
         or re.search(r"/(?:koop|huur)/[^/]+/[^/]*\d", normalized)
         or re.search(r"/woningen/[^/]*\d", normalized)
     )
+
+
+def _url_place_token(url: str) -> str:
+    parts = urlsplit(url if "://" in url else f"https://{url}")
+    ignored = {
+        "aanbod",
+        "woningaanbod",
+        "woningen",
+        "koopwoningen",
+        "koop",
+        "huur",
+        "te-koop",
+        "huis-kopen",
+        "woning-kopen",
+        "wonen",
+        "objects",
+        "objecten",
+        "properties",
+        "nl",
+    }
+    for segment in (part for part in parts.path.split("/") if part):
+        token = _slug_token(segment)
+        if not token or token in ignored:
+            continue
+        if any(char.isdigit() for char in token):
+            continue
+        return token
+    return ""
+
+
+def _slug_token(value: object) -> str:
+    text = _normalize_key(value)
+    text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    return text
+
+
+def _normalize_party_name(value: object) -> str:
+    text = _normalize_key(value)
+    text = re.sub(r"\b(?:b_v|bv|n_v|nv|makelaars?|makelaardij|o_g|og|vastgoed|wonen)\b", " ", text)
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return " ".join(part for part in text.split() if part)
 
 
 def _url_with_segments(parts: Any, segments: Sequence[str]) -> str:

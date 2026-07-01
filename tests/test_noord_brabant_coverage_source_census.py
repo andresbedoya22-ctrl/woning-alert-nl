@@ -10,6 +10,13 @@ from domek_wonen.sources.coverage_census import (
     CoverageCensusResult,
     CoverageSourceRecord,
     CoverageTerminalStatus,
+    DomainResolutionRecord,
+    MissingDomainQueueRecord,
+    build_aanbod_scope_checks,
+    build_domain_resolution_records,
+    build_no_public_verification_records,
+    build_office_location_verification_records,
+    build_realworks_audit_input_records,
     classify_family_from_content,
     compute_quality_metrics,
     consolidate_coverage_source_seeds,
@@ -19,6 +26,7 @@ from domek_wonen.sources.coverage_census import (
     finalize_coverage_record,
     run_investigation_loop,
     run_noord_brabant_coverage_source_census,
+    write_realworks_audit_input_csv,
     write_coverage_census_outputs,
     _set_accepted_aanbod_url,
 )
@@ -207,6 +215,10 @@ def test_writes_workbook_with_all_required_sheets(tmp_path: Path) -> None:
     try:
         assert workbook.sheetnames == [
             "Master Sources",
+            "Domain Resolution",
+            "No Public Verification",
+            "Aanbod Scope Check",
+            "Realworks Audit Input",
             "Aanbod URL Evidence",
             "Family Fingerprints",
             "Investigation Attempts",
@@ -217,6 +229,7 @@ def test_writes_workbook_with_all_required_sheets(tmp_path: Path) -> None:
             "Custom Needs Parser",
             "Custom JS Refingerprint",
             "Family Conflicts",
+            "Office Location Verification",
             "Blocked or Legal Review",
             "Duplicates",
             "Missing Domain Queue",
@@ -505,3 +518,162 @@ def test_hardened_workbook_uses_accepted_aanbod_url_not_ambiguous_aanbod_url(tmp
     columns = master.read_text(encoding="utf-8").splitlines()[0].split(",")
     assert "accepted_aanbod_url" in columns
     assert "aanbod_url" not in columns
+
+
+def test_missing_domain_rows_get_resolution_attempts() -> None:
+    missing = MissingDomainQueueRecord("Alpha Makelaars", "raw-1", "Tilburg", "Noord-Brabant", "seed.csv", "missing_official_domain", "Alpha Tilburg makelaar", "manual")
+    rows = build_domain_resolution_records([missing], [_record(source_name="Alpha Makelaars", domain="alpha.nl")])
+    assert rows[0].attempt_count == 1
+    assert rows[0].resolution_status == "resolved_to_existing_source"
+    assert rows[0].resolved_domain == "alpha.nl"
+
+
+def test_missing_domain_can_resolve_to_new_source_from_official_lookup() -> None:
+    missing = MissingDomainQueueRecord("Beta Wonen", "raw-2", "Breda", "Noord-Brabant", "seed.csv", "missing_official_domain", "Beta Breda makelaar", "manual")
+    rows = build_domain_resolution_records([missing], [], official_domain_lookup={"Beta Wonen": "beta.nl"})
+    assert rows[0].resolution_status == "resolved_to_new_source"
+    assert rows[0].resolved_domain == "beta.nl"
+
+
+def test_missing_domain_unresolved_row_has_suggested_next_action() -> None:
+    missing = MissingDomainQueueRecord("Unknown Office", "raw-3", "Breda", "Noord-Brabant", "seed.csv", "missing_official_domain", "Unknown Office Breda makelaar", "manual")
+    rows = build_domain_resolution_records([missing], [])
+    assert rows[0].resolution_status == "needs_manual_domain_research"
+    assert rows[0].suggested_next_action
+
+
+def test_no_public_source_requires_full_attempt_history() -> None:
+    record = _record(aanbod_url="")
+    run_investigation_loop(record, fetch_text=None)
+    rows = build_no_public_verification_records([record])
+    assert rows[0].homepage_checked == "yes"
+    assert rows[0].sitemap_checked == "yes"
+    assert rows[0].common_paths_checked == "yes"
+    assert rows[0].reason == "full_attempt_history"
+
+
+def test_no_public_source_is_reclassified_when_official_aanbod_is_found() -> None:
+    record = _record(parser_family_candidate="no_public_aanbod", accepted_aanbod_url="https://alpha.nl/aanbod")
+    rows = build_no_public_verification_records([record])
+    assert rows[0].final_status == "official_aanbod_found"
+
+
+def test_accepted_aanbod_scope_detects_broad_official_index() -> None:
+    record = _record(accepted_aanbod_url="https://alpha.nl/aanbod")
+    rows = build_aanbod_scope_checks([record])
+    assert rows[0].aanbod_scope_status == "broad_official_index"
+
+
+def test_accepted_aanbod_scope_detects_matching_nb_place() -> None:
+    record = _record(accepted_aanbod_url="https://alpha.nl/aanbod/woningaanbod/tilburg/koop")
+    rows = build_aanbod_scope_checks([record])
+    assert rows[0].url_place_token == "tilburg"
+    assert rows[0].aanbod_scope_status == "confirmed_nb_scope"
+
+
+def test_accepted_aanbod_scope_flags_outside_place_for_review() -> None:
+    record = _record(accepted_aanbod_url="https://alpha.nl/aanbod/woningaanbod/amsterdam/koop")
+    rows = build_aanbod_scope_checks([record])
+    assert rows[0].aanbod_scope_status == "needs_scope_review"
+    assert rows[0].reason
+
+
+def test_out_of_scope_looking_url_cannot_be_silently_ready_for_audit() -> None:
+    record = _record(
+        accepted_aanbod_url="https://alpha.nl/aanbod/woningaanbod/amsterdam/koop",
+        parser_family_candidate="realworks_public",
+        family_evidence="aanbodEntry",
+    )
+    rows = build_realworks_audit_input_records([record], build_aanbod_scope_checks([record]))
+    assert rows[0].audit_input_status == "needs_manual_scope_check"
+
+
+def test_realworks_audit_input_excludes_kin() -> None:
+    record = _record(
+        source_id="kinmakelaars-nl__breda",
+        domain="kinmakelaars.nl",
+        accepted_aanbod_url="https://kinmakelaars.nl/aanbod/woningaanbod/breda/koop",
+        parser_family_candidate="realworks_public",
+        family_evidence="aanbodEntry",
+    )
+    rows = build_realworks_audit_input_records([record], build_aanbod_scope_checks([record]))
+    assert rows[0].audit_input_status == "exclude_not_realworks"
+
+
+def test_realworks_audit_input_excludes_missing_accepted_aanbod_url() -> None:
+    record = _record(parser_family_candidate="realworks_public", family_evidence="aanbodEntry")
+    rows = build_realworks_audit_input_records([record])
+    assert rows[0].audit_input_status == "exclude_no_public_aanbod"
+
+
+def test_realworks_audit_input_excludes_property_detail_url() -> None:
+    record = _record(
+        accepted_aanbod_url="https://alpha.nl/aanbod/woningaanbod/tilburg/koop/huis-123-main",
+        parser_family_candidate="realworks_public",
+        family_evidence="aanbodEntry",
+    )
+    rows = build_realworks_audit_input_records([record], build_aanbod_scope_checks([record]))
+    assert rows[0].audit_input_status == "exclude_not_realworks"
+
+
+def test_realworks_audit_input_requires_strong_realworks_evidence() -> None:
+    record = _record(accepted_aanbod_url="https://alpha.nl/woningen", parser_family_candidate="realworks_public")
+    rows = build_realworks_audit_input_records([record], build_aanbod_scope_checks([record]))
+    assert rows[0].audit_input_status == "exclude_not_realworks"
+
+
+def test_realworks_audit_input_csv_contains_only_ready_records(tmp_path: Path) -> None:
+    ready = _record(
+        source_id="alpha.nl__tilburg",
+        accepted_aanbod_url="https://alpha.nl/aanbod/woningaanbod/tilburg/koop",
+        parser_family_candidate="realworks_public",
+        family_evidence="aanbodEntry",
+    )
+    excluded = _record(source_id="beta.nl__tilburg", domain="beta.nl", parser_family_candidate="realworks_public")
+    records = build_realworks_audit_input_records([ready, excluded], build_aanbod_scope_checks([ready, excluded]))
+    output = write_realworks_audit_input_csv(records, tmp_path / "audit.csv")
+    with output.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert [row["source_id"] for row in rows] == ["alpha.nl__tilburg"]
+
+
+def test_office_location_can_be_confirmed_from_compact_evidence() -> None:
+    record = _record(office_gemeente="Tilburg", office_province="Noord-Brabant")
+    rows = build_office_location_verification_records([record])
+    assert rows[0].office_location_status == "office_confirmed_noord_brabant"
+
+
+def test_office_location_is_not_fabricated_gate() -> None:
+    record = _record()
+    rows = build_office_location_verification_records([record])
+    assert rows[0].office_location_status == "office_unknown"
+    metrics = compute_quality_metrics(CoverageCensusResult(records=(record,), office_location_verification=tuple(rows), initial_source_count=1, deduped_source_count=1))
+    assert metrics["office_location_fabricated_count"] == 0
+
+
+def test_new_quality_gate_fails_when_missing_domain_has_no_attempt() -> None:
+    row = DomainResolutionRecord("Alpha", "raw", "Tilburg", "Noord-Brabant", "seed.csv", "needs_manual_domain_research", attempt_count=0)
+    metrics = compute_quality_metrics(CoverageCensusResult(records=(), domain_resolution=(row,), initial_source_count=1, deduped_source_count=0))
+    assert metrics["missing_domain_without_resolution_attempt_count"] == 1
+    assert metrics["quality_gate_passed"] is False
+
+
+def test_completion_runner_writes_expected_artifacts(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data" / "processed"
+    data_dir.mkdir(parents=True)
+    seed = data_dir / "sources_seed_noord_brabant.csv"
+    seed.write_text(
+        "source_id,office_name,root_domain,website,gemeente,province,aanbod_url,aanbod_url_quality,legal_status,parser_family_candidate,evidence\n"
+        "alpha.nl__tilburg,Alpha,alpha.nl,https://alpha.nl,Tilburg,Noord-Brabant,https://alpha.nl/aanbod/woningaanbod/tilburg/koop,valid,allowed_official_source,realworks_public,aanbodEntry\n",
+        encoding="utf-8",
+    )
+    result = run_noord_brabant_coverage_source_census(
+        repo_root=tmp_path,
+        evidence_paths=(Path("data/processed/sources_seed_noord_brabant.csv"),),
+        output_dir=tmp_path / "tmp" / "generated",
+        completion_scope_verification=True,
+    )
+    assert result.workbook_path and result.workbook_path.name == "noord_brabant_source_completion_scope_verification_v1.xlsx"
+    assert result.master_csv_path and result.master_csv_path.name == "noord_brabant_source_completion_scope_verification_v1.csv"
+    assert result.review_queue_csv_path and result.review_queue_csv_path.name == "noord_brabant_source_completion_scope_verification_v1_review_queue.csv"
+    assert result.realworks_audit_input_csv_path and result.realworks_audit_input_csv_path.exists()

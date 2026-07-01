@@ -458,6 +458,29 @@ queue, verifies Realworks with strong structural evidence, resolves KIN to `ogon
 dashboard, DB/migrations, property inventory parsing, raw HTML/JSON persistence, images, LLM runtime, a parser per
 makelaar, or global eligibility changes.
 
+## Noord-Brabant Source Completion & Scope Verification v1
+
+The coverage census runner now has an explicit completion mode:
+
+```powershell
+python scripts/run_noord_brabant_coverage_source_census.py --allow-live-http --completion-scope-verification --max-passes 8 --max-requests-per-domain 10 --timeout-seconds 15
+```
+
+This mode keeps the same source-intelligence scope, but adds final verification tables for missing-domain rows,
+`no_public_aanbod` decisions, accepted aanbod URL scope, Realworks audit readiness, and office location evidence. Live
+HTTP remains opt-in, sequential, capped, standard-library based, and guarded by `robots_gate.can_fetch(domain, path)`.
+
+Generated local artifacts:
+
+- `tmp/generated/noord_brabant_source_completion_scope_verification_v1.xlsx`
+- `tmp/generated/noord_brabant_source_completion_scope_verification_v1.csv`
+- `tmp/generated/noord_brabant_source_completion_scope_verification_v1_review_queue.csv`
+- `tmp/generated/noord_brabant_realworks_audit_input_v1.csv`
+
+The Realworks audit input CSV contains only verified `realworks_public` records with accepted official aanbod URLs and
+scope status ready for the later Noord-Brabant Realworks audit. KIN remains classified as `ogonline_xhr` and is excluded
+from Realworks audit input.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`

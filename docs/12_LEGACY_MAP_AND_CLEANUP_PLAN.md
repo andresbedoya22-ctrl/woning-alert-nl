@@ -221,6 +221,26 @@ only: no matching, advisor email, n8n, dashboard, DB, migrations, property inven
 source, raw HTML/JSON persistence, browser automation, LLM runtime, parser per makelaar, or global eligibility change is
 introduced.
 
+## Noord-Brabant Source Completion & Scope Verification v1
+
+The same census module now owns the final completion and scope-verification pass for the Noord-Brabant source master.
+The runner flag `--completion-scope-verification` writes a separate local workbook, master CSV, review queue CSV, and
+Realworks audit input CSV under `tmp/generated/`.
+
+This is still source intelligence only. It adds review sheets for Missing Domain resolution, `no_public_aanbod`
+verification, accepted aanbod URL scope, Realworks audit input readiness, and office location verification. It keeps
+office location separate from coverage location and leaves unknown office data unknown instead of inventing it.
+
+The Realworks audit input CSV is a narrow handoff artifact for a later Noord-Brabant Realworks audit. It includes only
+verified `realworks_public` rows with accepted official aanbod URLs and confirmed or broad official scope. Rows with
+scope review needs stay in the workbook but are excluded from the ready CSV. KIN remains `ogonline_xhr` and is not a
+Realworks input.
+
+This completion pass does not add matching, client alerts, advisor email, n8n, dashboard, DB, migrations,
+apply-to-all Realworks execution, property inventory parsing, `data/raw` changes, Funda/Pararius operational sourcing,
+raw HTML/JSON persistence, long descriptions, images, browser automation, proxies, bypass behavior, LLM runtime,
+parser-per-makelaar logic, or global eligibility changes.
+
 ## Parser Family Runner v1
 
 `scraper/src/domek_wonen/parsers/runner.py` adds the first offline connector from
