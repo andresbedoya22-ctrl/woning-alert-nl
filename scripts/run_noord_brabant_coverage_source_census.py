@@ -28,6 +28,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Write Source Completion & Scope Verification v1 artifacts.",
     )
+    parser.add_argument(
+        "--missing-domain-external-resolution",
+        action="store_true",
+        help="Write Missing Domain External Resolution v1 artifacts and Source Completion v2 outputs.",
+    )
     parser.add_argument("--timeout-seconds", type=float, default=10.0, help="Per-request timeout when live HTTP is enabled.")
     parser.add_argument("--max-passes", type=int, default=8, help="Maximum bounded investigation passes.")
     parser.add_argument(
@@ -35,6 +40,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         default=3,
         help="Conservative per-domain request cap when live HTTP is enabled.",
+    )
+    parser.add_argument(
+        "--missing-domain-external-http-budget",
+        type=int,
+        default=20,
+        help="Global HTTP request budget for Missing Domain External Resolution.",
     )
     return parser.parse_args(argv)
 
@@ -50,6 +61,8 @@ def main(argv: list[str] | None = None) -> int:
         max_requests_per_domain=args.max_requests_per_domain,
         timeout_seconds=args.timeout_seconds,
         completion_scope_verification=args.completion_scope_verification,
+        missing_domain_external_resolution=args.missing_domain_external_resolution,
+        missing_domain_external_http_budget=args.missing_domain_external_http_budget,
     )
     metrics = result.quality_metrics
     print(result.workbook_path, flush=True)
@@ -59,6 +72,12 @@ def main(argv: list[str] | None = None) -> int:
         print(result.realworks_audit_input_csv_path, flush=True)
     if result.realworks_audit_input_reconciliation_csv_path:
         print(result.realworks_audit_input_reconciliation_csv_path, flush=True)
+    if result.missing_domain_resolution_workbook_path:
+        print(result.missing_domain_resolution_workbook_path, flush=True)
+    if result.missing_domain_resolution_csv_path:
+        print(result.missing_domain_resolution_csv_path, flush=True)
+    if result.missing_domain_resolution_review_queue_csv_path:
+        print(result.missing_domain_resolution_review_queue_csv_path, flush=True)
     print(f"total_sources={metrics['total_sources']}", flush=True)
     print(f"deduped_sources={metrics['deduped_sources']}", flush=True)
     print(f"in_scope_noord_brabant_coverage_sources={metrics['in_scope_noord_brabant_coverage_sources']}", flush=True)
@@ -82,10 +101,31 @@ def main(argv: list[str] | None = None) -> int:
         "office_location_unknown_count",
         "outside_office_sources_needing_review_count",
         "missing_domain_initial_count",
+        "missing_domain_attempted_count",
+        "missing_domain_resolved_existing_count",
+        "missing_domain_resolved_new_count",
+        "missing_domain_confirmed_duplicate_count",
+        "missing_domain_confirmed_inactive_count",
+        "missing_domain_confirmed_no_official_domain_count",
         "missing_domain_resolved_count",
         "missing_domain_remaining_count",
         "missing_domain_needs_manual_research_count",
         "missing_domain_without_resolution_attempt_count",
+        "candidate_domains_generated_count",
+        "candidate_domains_verified_official_count",
+        "candidate_domains_rejected_count",
+        "candidate_domains_fetch_failed_count",
+        "candidate_domains_blocked_by_robots_count",
+        "new_sources_added_count",
+        "existing_sources_updated_count",
+        "accepted_aanbod_urls_added_count",
+        "no_public_aanbod_confirmed_count",
+        "resolved_domain_third_party_count",
+        "resolved_domain_without_official_evidence_count",
+        "duplicate_domain_created_count",
+        "property_detail_url_as_accepted_aanbod_url_count",
+        "raw_html_json_persisted_count",
+        "long_descriptions_exported_count",
         "no_public_initial_count",
         "no_public_reclassified_count",
         "no_public_confirmed_count",

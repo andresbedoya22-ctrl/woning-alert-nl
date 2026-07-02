@@ -12,6 +12,7 @@ from domek_wonen.sources.coverage_census import (
     CoverageTerminalStatus,
     DomainResolutionRecord,
     MissingDomainQueueRecord,
+    build_missing_domain_resolution_candidates,
     build_aanbod_scope_checks,
     build_domain_resolution_records,
     build_no_public_verification_records,
@@ -27,8 +28,10 @@ from domek_wonen.sources.coverage_census import (
     finalize_coverage_record,
     run_investigation_loop,
     run_noord_brabant_coverage_source_census,
+    verify_official_domain_candidate,
     write_realworks_audit_input_csv,
     write_realworks_audit_input_reconciliation_csv,
+    write_missing_domain_external_resolution_outputs,
     write_coverage_census_outputs,
     _set_accepted_aanbod_url,
 )
@@ -773,3 +776,116 @@ def test_completion_runner_writes_expected_artifacts(tmp_path: Path) -> None:
     assert result.master_csv_path and result.master_csv_path.name == "noord_brabant_source_completion_scope_verification_v1.csv"
     assert result.review_queue_csv_path and result.review_queue_csv_path.name == "noord_brabant_source_completion_scope_verification_v1_review_queue.csv"
     assert result.realworks_audit_input_csv_path and result.realworks_audit_input_csv_path.exists()
+
+
+def test_missing_domain_external_candidate_generation_is_capped() -> None:
+    missing = MissingDomainQueueRecord(
+        "Alpha Beta Gamma Delta Epsilon Makelaars",
+        "raw-1",
+        "Tilburg",
+        "Noord-Brabant",
+        "alpha.nl beta.nl gamma.nl delta.nl epsilon.nl zeta.nl eta.nl theta.nl iota.nl",
+        "missing_official_domain",
+        "Alpha Beta Gamma Delta Epsilon Tilburg makelaar",
+        "manual",
+    )
+    rows = build_missing_domain_resolution_candidates(missing, [], max_candidates=8)
+    assert len(rows) == 8
+
+
+def test_missing_domain_external_rejects_third_party_social_and_directory_domains() -> None:
+    missing = MissingDomainQueueRecord("Alpha Makelaars", "raw", "Tilburg", "Noord-Brabant", "seed.csv", "missing", "manual", "manual")
+    for domain in ("funda.nl", "pararius.nl", "facebook.com", "telefoonboek.nl"):
+        row = verify_official_domain_candidate(missing, domain, fetch_text=lambda _url: "Alpha Makelaars woningen")
+        assert row.official_domain_status == "candidate_rejected_third_party"
+
+
+def test_missing_domain_external_requires_name_evidence_for_official_domain() -> None:
+    missing = MissingDomainQueueRecord("Alpha Makelaars", "raw", "Tilburg", "Noord-Brabant", "seed.csv", "missing", "manual", "manual")
+    row = verify_official_domain_candidate(
+        missing,
+        "alpha.nl",
+        fetch_text=lambda _url: "Welkom bij woningen en makelaardij in Tilburg",
+        can_fetch=lambda _domain, _path: True,
+    )
+    assert row.official_domain_status != "official_domain_verified"
+
+
+def test_missing_domain_external_verifies_official_domain_with_compact_evidence() -> None:
+    missing = MissingDomainQueueRecord("Alpha Makelaars", "raw", "Tilburg", "Noord-Brabant", "seed.csv", "missing", "manual", "manual")
+    row = verify_official_domain_candidate(
+        missing,
+        "alpha.nl",
+        fetch_text=lambda _url: "Alpha Makelaars Tilburg contact woningen te koop",
+        can_fetch=lambda _domain, _path: True,
+    )
+    assert row.official_domain_status == "official_domain_verified"
+    assert row.evidence_preview
+    assert "<html" not in row.evidence_preview
+
+
+def test_missing_domain_external_checks_robots_before_candidate_path_fetch() -> None:
+    missing = MissingDomainQueueRecord("Alpha Makelaars", "raw", "Tilburg", "Noord-Brabant", "seed.csv", "missing", "manual", "manual")
+    calls: list[str] = []
+
+    def can_fetch(_domain: str, path: str) -> bool:
+        calls.append(path)
+        return path == "/"
+
+    row = verify_official_domain_candidate(
+        missing,
+        "alpha.nl",
+        fetch_text=lambda _url: "Alpha Makelaars woningen",
+        can_fetch=can_fetch,
+    )
+    assert "/contact" in calls
+    assert row.official_domain_status == "candidate_blocked_by_access_policy"
+
+
+def test_missing_domain_external_runner_writes_v2_and_resolution_artifacts(tmp_path: Path) -> None:
+    seed = tmp_path / "seed.csv"
+    seed.write_text(
+        "source_id,office_name,root_domain,website,gemeente,province,aanbod_url,aanbod_url_quality,legal_status\n"
+        "raw-1,Alpha Makelaars,,,Tilburg,Noord-Brabant,,missing,allowed_official_source\n",
+        encoding="utf-8",
+    )
+    result = run_noord_brabant_coverage_source_census(
+        repo_root=tmp_path,
+        evidence_paths=(Path("seed.csv"),),
+        output_dir=tmp_path / "tmp" / "generated",
+        completion_scope_verification=True,
+        missing_domain_external_resolution=True,
+        fetch_text=lambda _url: "Alpha Makelaars Tilburg contact woningen te koop",
+        can_fetch=lambda _domain, _path: True,
+    )
+    assert result.master_csv_path and result.master_csv_path.name == "noord_brabant_source_completion_scope_verification_v2.csv"
+    assert result.workbook_path and result.workbook_path.name == "noord_brabant_source_completion_scope_verification_v2.xlsx"
+    assert result.missing_domain_resolution_workbook_path and result.missing_domain_resolution_workbook_path.exists()
+    assert result.missing_domain_resolution_csv_path and result.missing_domain_resolution_csv_path.exists()
+    assert result.missing_domain_resolution_review_queue_csv_path and result.missing_domain_resolution_review_queue_csv_path.exists()
+    assert result.quality_metrics["missing_domain_without_resolution_attempt_count"] == 0
+
+
+def test_missing_domain_external_workbook_contains_required_sheets(tmp_path: Path) -> None:
+    row = DomainResolutionRecord(
+        "Alpha",
+        "raw",
+        "Tilburg",
+        "Noord-Brabant",
+        "seed.csv",
+        "needs_manual_domain_research",
+        attempt_count=1,
+        initial_reason="missing_official_domain",
+        candidate_count=1,
+        resolution_reason="insufficient_official_domain_evidence",
+    )
+    result = CoverageCensusResult(records=(), domain_resolution=(row,), initial_source_count=1, deduped_source_count=0)
+    write_missing_domain_external_resolution_outputs(result, tmp_path / "resolution.xlsx", tmp_path / "resolution.csv", tmp_path / "review.csv")
+    workbook = load_workbook(tmp_path / "resolution.xlsx")
+    try:
+        assert "Missing Domain Resolution" in workbook.sheetnames
+        assert "Candidate Domains" in workbook.sheetnames
+        assert "Master Sources Delta" in workbook.sheetnames
+        assert "Quality Gates" in workbook.sheetnames
+    finally:
+        workbook.close()

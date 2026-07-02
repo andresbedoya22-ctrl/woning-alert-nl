@@ -44,6 +44,37 @@ COMMON_CONTACT_PATHS = (
     "/team",
     "/makelaars",
 )
+MAX_DOMAIN_CANDIDATES_PER_MISSING_ROW = 8
+DEFAULT_MISSING_DOMAIN_EXTERNAL_HTTP_BUDGET = 20
+THIRD_PARTY_OFFICIAL_DOMAIN_SUFFIXES = (
+    "funda.nl",
+    "pararius.nl",
+    "facebook.com",
+    "instagram.com",
+    "linkedin.com",
+    "google.com",
+    "google.nl",
+    "huispedia.nl",
+    "jaap.nl",
+)
+DIRECTORY_DOMAIN_TOKENS = (
+    "bedrijfsgids",
+    "telefoonboek",
+    "openingstijden",
+    "drimble",
+    "oozo",
+    "allebedrijven",
+    "nederlandinbedrijf",
+    "makelaarzoeker",
+    "makelaars-in",
+    "vergelijk",
+)
+PARKED_DOMAIN_SIGNALS = (
+    "domain is parked",
+    "domein is geparkeerd",
+    "buy this domain",
+    "this domain may be for sale",
+)
 LOCAL_EVIDENCE_PATHS = (
     Path("data/processed/sources_seed_noord_brabant.csv"),
     Path("data/discovery/reference/property_discovery_source_overrides.csv"),
@@ -133,6 +164,12 @@ QUALITY_GATE_NAMES = (
     "custom_js_app_without_fingerprint_attempt_count",
     "gemeente_normalization_conflict_count",
     "missing_domain_without_resolution_attempt_count",
+    "resolved_domain_third_party_count",
+    "resolved_domain_without_official_evidence_count",
+    "duplicate_domain_created_count",
+    "property_detail_url_as_accepted_aanbod_url_count",
+    "raw_html_json_persisted_count",
+    "long_descriptions_exported_count",
     "no_public_without_full_attempt_history_count",
     "accepted_aanbod_out_of_scope_unreviewed_count",
     "realworks_audit_input_without_scope_confirmation_count",
@@ -249,6 +286,43 @@ class DomainResolutionRecord:
     suggested_next_action: str = ""
     manual_check_result: str = ""
     manual_check_notes: str = ""
+    initial_reason: str = ""
+    created_new_source: str = ""
+    candidate_count: int = 0
+    resolution_reason: str = ""
+
+
+@dataclass(slots=True)
+class CandidateDomainRecord:
+    raw_source_name: str
+    candidate_domain: str
+    candidate_source: str
+    candidate_rank: int
+    http_status: str = ""
+    robots_allowed: str = ""
+    official_domain_status: str = ""
+    official_signal_score: float = 0.0
+    matched_name_signal: str = ""
+    matched_location_signal: str = ""
+    third_party_rejected: str = ""
+    evidence_preview: str = ""
+    decision: str = ""
+    reason: str = ""
+
+
+@dataclass(slots=True)
+class MasterSourcesDeltaRecord:
+    source_id: str
+    source_name: str
+    domain: str
+    delta_type: str
+    previous_status: str
+    new_status: str
+    accepted_aanbod_url: str
+    parser_family_candidate: str
+    family_terminal_status: str
+    resolution_source: str
+    evidence_preview: str
 
 
 @dataclass(slots=True)
@@ -432,6 +506,9 @@ class CoverageCensusResult:
     duplicate_records: tuple[CoverageSourceRecord, ...] = ()
     missing_domain_queue: tuple[MissingDomainQueueRecord, ...] = ()
     domain_resolution: tuple[DomainResolutionRecord, ...] = ()
+    candidate_domains: tuple[CandidateDomainRecord, ...] = ()
+    official_domain_verification: tuple[CandidateDomainRecord, ...] = ()
+    master_sources_delta: tuple[MasterSourcesDeltaRecord, ...] = ()
     no_public_verification: tuple[NoPublicVerificationRecord, ...] = ()
     aanbod_scope_checks: tuple[AanbodScopeCheckRecord, ...] = ()
     realworks_audit_input: tuple[RealworksAuditInputRecord, ...] = ()
@@ -445,6 +522,9 @@ class CoverageCensusResult:
     review_queue_csv_path: Path | None = None
     realworks_audit_input_csv_path: Path | None = None
     realworks_audit_input_reconciliation_csv_path: Path | None = None
+    missing_domain_resolution_workbook_path: Path | None = None
+    missing_domain_resolution_csv_path: Path | None = None
+    missing_domain_resolution_review_queue_csv_path: Path | None = None
     warnings: tuple[str, ...] = ()
 
     @property
@@ -467,6 +547,8 @@ def run_noord_brabant_coverage_source_census(
     max_requests_per_domain: int = 3,
     timeout_seconds: float = 10.0,
     completion_scope_verification: bool = False,
+    missing_domain_external_resolution: bool = False,
+    missing_domain_external_http_budget: int = DEFAULT_MISSING_DOMAIN_EXTERNAL_HTTP_BUDGET,
     fetch_text: FetchText | None = None,
     can_fetch: CanFetch = robots_gate.can_fetch,
 ) -> CoverageCensusResult:
@@ -494,7 +576,22 @@ def run_noord_brabant_coverage_source_census(
             max_passes=max_passes,
         )
 
-    domain_resolution = build_domain_resolution_records(missing_domain_queue, records)
+    candidate_domains: list[CandidateDomainRecord] = []
+    master_sources_delta: list[MasterSourcesDeltaRecord] = []
+    if missing_domain_external_resolution:
+        domain_resolution = build_missing_domain_external_resolution_records(
+            missing_domain_queue,
+            records,
+            fetch_text=fetcher,
+            can_fetch=can_fetch,
+            request_counts=request_counts,
+            max_requests_per_domain=max_requests_per_domain,
+            max_external_http_requests=missing_domain_external_http_budget,
+            candidate_records=candidate_domains,
+            master_sources_delta=master_sources_delta,
+        )
+    else:
+        domain_resolution = build_domain_resolution_records(missing_domain_queue, records)
     no_public_verification = build_no_public_verification_records(records)
     aanbod_scope_checks = build_aanbod_scope_checks(records)
     realworks_audit_input = build_realworks_audit_input_records(records, aanbod_scope_checks)
@@ -505,6 +602,9 @@ def run_noord_brabant_coverage_source_census(
         duplicate_records=tuple(duplicates),
         missing_domain_queue=tuple(missing_domain_queue),
         domain_resolution=tuple(domain_resolution),
+        candidate_domains=tuple(candidate_domains),
+        official_domain_verification=tuple(candidate_domains),
+        master_sources_delta=tuple(master_sources_delta),
         no_public_verification=tuple(no_public_verification),
         aanbod_scope_checks=tuple(aanbod_scope_checks),
         realworks_audit_input=tuple(realworks_audit_input),
@@ -518,16 +618,28 @@ def run_noord_brabant_coverage_source_census(
     if output_dir is None:
         return result
 
-    if completion_scope_verification:
+    if missing_domain_external_resolution:
+        stem = "noord_brabant_source_completion_scope_verification_v2"
+    elif completion_scope_verification:
         stem = "noord_brabant_source_completion_scope_verification_v1"
     else:
         stem = "noord_brabant_coverage_source_census_hardened_v1"
     workbook_path = output_dir / f"{stem}.xlsx"
     master_csv_path = output_dir / f"{stem}.csv"
     review_queue_csv_path = output_dir / f"{stem}_review_queue.csv"
+    resolution_workbook_path = output_dir / "noord_brabant_missing_domain_external_resolution_v1.xlsx"
+    resolution_csv_path = output_dir / "noord_brabant_missing_domain_external_resolution_v1.csv"
+    resolution_review_queue_path = output_dir / "noord_brabant_missing_domain_external_resolution_v1_review_queue.csv"
     realworks_audit_input_csv_path = output_dir / "noord_brabant_realworks_audit_input_v1.csv"
     realworks_reconciliation_csv_path = output_dir / "noord_brabant_realworks_audit_input_reconciliation_v1.csv"
     write_coverage_census_outputs(result, workbook_path, master_csv_path, review_queue_csv_path)
+    if missing_domain_external_resolution:
+        write_missing_domain_external_resolution_outputs(
+            result,
+            resolution_workbook_path,
+            resolution_csv_path,
+            resolution_review_queue_path,
+        )
     if completion_scope_verification:
         write_realworks_audit_input_csv(result.realworks_audit_input, realworks_audit_input_csv_path)
         write_realworks_audit_input_reconciliation_csv(
@@ -539,6 +651,9 @@ def run_noord_brabant_coverage_source_census(
         duplicate_records=result.duplicate_records,
         missing_domain_queue=result.missing_domain_queue,
         domain_resolution=result.domain_resolution,
+        candidate_domains=result.candidate_domains,
+        official_domain_verification=result.official_domain_verification,
+        master_sources_delta=result.master_sources_delta,
         no_public_verification=result.no_public_verification,
         aanbod_scope_checks=result.aanbod_scope_checks,
         realworks_audit_input=result.realworks_audit_input,
@@ -552,6 +667,9 @@ def run_noord_brabant_coverage_source_census(
         review_queue_csv_path=review_queue_csv_path,
         realworks_audit_input_csv_path=realworks_audit_input_csv_path if completion_scope_verification else None,
         realworks_audit_input_reconciliation_csv_path=realworks_reconciliation_csv_path if completion_scope_verification else None,
+        missing_domain_resolution_workbook_path=resolution_workbook_path if missing_domain_external_resolution else None,
+        missing_domain_resolution_csv_path=resolution_csv_path if missing_domain_external_resolution else None,
+        missing_domain_resolution_review_queue_csv_path=resolution_review_queue_path if missing_domain_external_resolution else None,
         warnings=result.warnings,
     )
 
@@ -1243,6 +1361,315 @@ def build_domain_resolution_records(
     return rows
 
 
+def build_missing_domain_external_resolution_records(
+    missing_domain_queue: Sequence[MissingDomainQueueRecord],
+    records: list[CoverageSourceRecord],
+    *,
+    fetch_text: FetchText | None = None,
+    can_fetch: CanFetch = robots_gate.can_fetch,
+    request_counts: dict[str, int] | None = None,
+    max_requests_per_domain: int = 3,
+    max_external_http_requests: int = DEFAULT_MISSING_DOMAIN_EXTERNAL_HTTP_BUDGET,
+    candidate_records: list[CandidateDomainRecord] | None = None,
+    master_sources_delta: list[MasterSourcesDeltaRecord] | None = None,
+) -> list[DomainResolutionRecord]:
+    rows: list[DomainResolutionRecord] = []
+    existing_domains = {_normalize_domain(record.domain): record for record in records if record.domain}
+    for item in missing_domain_queue:
+        resolution, new_record = resolve_missing_domain_row(
+            item,
+            records,
+            fetch_text=fetch_text,
+            can_fetch=can_fetch,
+            request_counts=request_counts if request_counts is not None else defaultdict(int),
+            max_requests_per_domain=max_requests_per_domain,
+            max_external_http_requests=max_external_http_requests,
+            candidate_records=candidate_records,
+        )
+        rows.append(resolution)
+        if new_record is None:
+            continue
+        existing = existing_domains.get(new_record.domain)
+        if existing is not None:
+            resolution.resolution_status = "resolved_to_existing_source"
+            resolution.resolved_source_id = existing.source_id
+            resolution.matched_existing_source = existing.source_name
+            resolution.created_new_source = "False"
+            continue
+        apply_missing_domain_resolution_to_master(new_record, records, master_sources_delta)
+        existing_domains[new_record.domain] = new_record
+    return rows
+
+
+def resolve_missing_domain_row(
+    item: MissingDomainQueueRecord,
+    records: Sequence[CoverageSourceRecord],
+    *,
+    fetch_text: FetchText | None = None,
+    can_fetch: CanFetch = robots_gate.can_fetch,
+    request_counts: dict[str, int] | None = None,
+    max_requests_per_domain: int = 3,
+    max_external_http_requests: int = DEFAULT_MISSING_DOMAIN_EXTERNAL_HTTP_BUDGET,
+    candidate_records: list[CandidateDomainRecord] | None = None,
+) -> tuple[DomainResolutionRecord, CoverageSourceRecord | None]:
+    existing = _match_existing_source_for_missing_domain(item, records)
+    if existing is not None:
+        return (
+            DomainResolutionRecord(
+                raw_source_name=item.source_name,
+                raw_source_id=item.raw_source_id,
+                raw_gemeente=item.gemeente,
+                raw_province=item.province,
+                evidence_file=item.evidence_file,
+                resolution_status="resolved_to_existing_source",
+                resolved_domain=existing.domain,
+                resolved_source_id=existing.source_id,
+                matched_existing_source=existing.source_name,
+                confidence=0.88,
+                evidence_preview=_preview(f"normalized_name_match:{existing.source_name}"),
+                attempt_count=1,
+                suggested_next_action="use_existing_source_record",
+                initial_reason=item.reason,
+                created_new_source="False",
+                candidate_count=0,
+                resolution_reason="matched_existing_source_name_or_alias",
+            ),
+            None,
+        )
+
+    candidates = build_missing_domain_resolution_candidates(item, records)
+    attempts = 0
+    best: CandidateDomainRecord | None = None
+    for candidate in candidates:
+        attempts += 1
+        verification = verify_official_domain_candidate(
+            item,
+            candidate.candidate_domain,
+            candidate_source=candidate.candidate_source,
+            candidate_rank=candidate.candidate_rank,
+            fetch_text=fetch_text,
+            can_fetch=can_fetch,
+            request_counts=request_counts if request_counts is not None else defaultdict(int),
+            max_requests_per_domain=max_requests_per_domain,
+            max_external_http_requests=max_external_http_requests,
+        )
+        if candidate_records is not None:
+            candidate_records.append(verification)
+        if verification.official_domain_status == "official_domain_verified":
+            best = verification
+            break
+        if best is None or verification.official_signal_score > best.official_signal_score:
+            best = verification
+
+    status, reason, next_action, confidence = classify_missing_domain_resolution(best, attempts)
+    new_record: CoverageSourceRecord | None = None
+    resolved_domain = ""
+    resolved_source_id = ""
+    created_new_source = "False"
+    if status == "resolved_to_new_source" and best is not None:
+        resolved_domain = best.candidate_domain
+        resolved_source_id = _source_id(resolved_domain, item.source_name, item.gemeente)
+        created_new_source = "True"
+        new_record = CoverageSourceRecord(
+            source_id=resolved_source_id,
+            source_name=item.source_name,
+            domain=resolved_domain,
+            root_url=f"https://{resolved_domain}",
+            coverage_city=item.gemeente,
+            coverage_gemeente=item.gemeente,
+            coverage_province=item.province,
+            has_noord_brabant_coverage=_normalize_key(item.province) == NOORD_BRABANT,
+            access_policy_status="allowed",
+            parser_family_candidate="no_public_aanbod",
+            delivery_mode="no_public_aanbod",
+            terminal_status=CoverageTerminalStatus.CONFIRMED_NO_PUBLIC_AANBOD.value,
+            source_quality_status="official_domain_verified_missing_public_aanbod",
+            remaining_review_reason="resolved_domain_needs_aanbod_and_family_verification",
+            recommended_next_action="run_source_completion_aanbod_and_family_verification",
+        )
+
+    return (
+        DomainResolutionRecord(
+            raw_source_name=item.source_name,
+            raw_source_id=item.raw_source_id,
+            raw_gemeente=item.gemeente,
+            raw_province=item.province,
+            evidence_file=item.evidence_file,
+            resolution_status=status,
+            resolved_domain=resolved_domain,
+            resolved_source_id=resolved_source_id,
+            confidence=confidence,
+            evidence_preview=_preview(best.evidence_preview if best else item.suggested_search_query),
+            attempt_count=max(1, attempts),
+            suggested_next_action=next_action,
+            initial_reason=item.reason,
+            created_new_source=created_new_source,
+            candidate_count=len(candidates),
+            resolution_reason=reason,
+        ),
+        new_record,
+    )
+
+
+def build_missing_domain_resolution_candidates(
+    item: MissingDomainQueueRecord,
+    records: Sequence[CoverageSourceRecord],
+    *,
+    max_candidates: int = MAX_DOMAIN_CANDIDATES_PER_MISSING_ROW,
+) -> list[CandidateDomainRecord]:
+    candidates: list[tuple[str, str]] = []
+    normalized_name = _normalize_party_name(item.source_name)
+    for record in records:
+        if normalized_name and any(normalized_name == _normalize_party_name(name) for name in (record.source_name, *record.aliases)):
+            candidates.append((record.domain, "existing_source_name_match"))
+
+    evidence_text = " ".join((item.raw_source_id, item.evidence_file, item.suggested_search_query))
+    for domain in re.findall(r"\b(?:https?://)?(?:www\.)?([a-z0-9-]+\.[a-z0-9.-]+\.[a-z]{2,}|[a-z0-9-]+\.[a-z]{2,})\b", evidence_text, flags=re.IGNORECASE):
+        candidates.append((_normalize_domain(domain), "local_evidence_domain_hint"))
+
+    slug = _domain_slug_from_source_name(item.source_name)
+    if slug:
+        candidates.extend(
+            [
+                (f"{slug}.nl", "deterministic_name_nl"),
+                (f"{slug}makelaars.nl", "deterministic_makelaars_nl"),
+                (f"{slug}makelaardij.nl", "deterministic_makelaardij_nl"),
+            ]
+        )
+    compact = slug.replace("-", "") if slug else ""
+    if compact and compact != slug:
+        candidates.append((f"{compact}.nl", "deterministic_compact_name_nl"))
+
+    rows: list[CandidateDomainRecord] = []
+    seen: set[str] = set()
+    for domain, source in candidates:
+        normalized = _normalize_domain(domain)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        rows.append(
+            CandidateDomainRecord(
+                raw_source_name=item.source_name,
+                candidate_domain=normalized,
+                candidate_source=source,
+                candidate_rank=len(rows) + 1,
+            )
+        )
+        if len(rows) >= max_candidates:
+            break
+    return rows
+
+
+def verify_official_domain_candidate(
+    item: MissingDomainQueueRecord,
+    candidate_domain: str,
+    *,
+    candidate_source: str = "",
+    candidate_rank: int = 0,
+    fetch_text: FetchText | None = None,
+    can_fetch: CanFetch = robots_gate.can_fetch,
+    request_counts: dict[str, int] | None = None,
+    max_requests_per_domain: int = 3,
+    max_external_http_requests: int = DEFAULT_MISSING_DOMAIN_EXTERNAL_HTTP_BUDGET,
+) -> CandidateDomainRecord:
+    domain = _normalize_domain(candidate_domain)
+    if _is_rejected_third_party_domain(domain, item.source_name):
+        return CandidateDomainRecord(item.source_name, domain, candidate_source, candidate_rank, third_party_rejected="True", official_domain_status="candidate_rejected_third_party", decision="reject", reason="third_party_or_directory_domain")
+    if fetch_text is None:
+        return CandidateDomainRecord(item.source_name, domain, candidate_source, candidate_rank, official_domain_status="candidate_rejected_insufficient_evidence", decision="manual", reason="live_http_not_enabled")
+    total_key = "__missing_domain_external_total__"
+    if request_counts is not None and request_counts[total_key] >= max_external_http_requests:
+        return CandidateDomainRecord(item.source_name, domain, candidate_source, candidate_rank, official_domain_status="candidate_fetch_failed", decision="defer", reason="external_http_budget_exhausted")
+
+    root_url = f"https://{domain}"
+    if not _domain_fetch_allowed(domain, "/", can_fetch=can_fetch):
+        return CandidateDomainRecord(item.source_name, domain, candidate_source, candidate_rank, robots_allowed="False", official_domain_status="candidate_blocked_by_access_policy", decision="blocked", reason="root_blocked_by_robots")
+    if request_counts is not None and request_counts[domain] >= max_requests_per_domain:
+        return CandidateDomainRecord(item.source_name, domain, candidate_source, candidate_rank, robots_allowed="True", official_domain_status="candidate_fetch_failed", decision="defer", reason="max_requests_per_domain_reached")
+    if request_counts is not None:
+        request_counts[domain] += 1
+        request_counts[total_key] += 1
+    try:
+        root_content = fetch_text(root_url)
+    except Exception as exc:
+        return CandidateDomainRecord(item.source_name, domain, candidate_source, candidate_rank, robots_allowed="True", official_domain_status="candidate_fetch_failed", decision="defer", reason=exc.__class__.__name__)
+
+    root_score, name_signal, location_signal, root_preview, root_status = _official_domain_signal_score(item, root_content)
+    if root_status != "candidate_needs_more_evidence":
+        return CandidateDomainRecord(item.source_name, domain, candidate_source, candidate_rank, http_status="fetched", robots_allowed="True", official_domain_status=root_status, official_signal_score=root_score, matched_name_signal=name_signal, matched_location_signal=location_signal, evidence_preview=root_preview, decision="reject", reason=root_status)
+
+    best_score = root_score
+    best_preview = root_preview
+    best_name_signal = name_signal
+    best_location_signal = location_signal
+    for path in COMMON_CONTACT_PATHS + COMMON_AANBOD_PATHS:
+        if not _domain_fetch_allowed(domain, path, can_fetch=can_fetch):
+            return CandidateDomainRecord(item.source_name, domain, candidate_source, candidate_rank, http_status="fetched", robots_allowed="False", official_domain_status="candidate_blocked_by_access_policy", official_signal_score=best_score, matched_name_signal=best_name_signal, matched_location_signal=best_location_signal, evidence_preview=best_preview, decision="blocked", reason=f"robots_disallowed:{path}")
+        if request_counts is not None and request_counts[domain] >= max_requests_per_domain:
+            break
+        if request_counts is not None and request_counts[total_key] >= max_external_http_requests:
+            break
+        if request_counts is not None:
+            request_counts[domain] += 1
+            request_counts[total_key] += 1
+        try:
+            content = fetch_text(f"https://{domain}{path}")
+        except Exception:
+            continue
+        score, path_name_signal, path_location_signal, preview, status = _official_domain_signal_score(item, content)
+        if score > best_score:
+            best_score = score
+            best_preview = preview
+            best_name_signal = path_name_signal
+            best_location_signal = path_location_signal
+        if status == "official_domain_verified":
+            return CandidateDomainRecord(item.source_name, domain, candidate_source, candidate_rank, http_status="fetched", robots_allowed="True", official_domain_status=status, official_signal_score=score, matched_name_signal=path_name_signal, matched_location_signal=path_location_signal, evidence_preview=preview, decision="accept", reason="official_name_and_real_estate_signals")
+
+    final_status = "official_domain_verified" if best_score >= 0.75 and best_name_signal else "official_domain_probable_needs_manual_check" if best_score >= 0.55 else "candidate_rejected_insufficient_evidence"
+    return CandidateDomainRecord(item.source_name, domain, candidate_source, candidate_rank, http_status="fetched", robots_allowed="True", official_domain_status=final_status, official_signal_score=round(best_score, 2), matched_name_signal=best_name_signal, matched_location_signal=best_location_signal, evidence_preview=best_preview, decision="accept" if final_status == "official_domain_verified" else "manual", reason="official_signal_score")
+
+
+def classify_missing_domain_resolution(
+    best: CandidateDomainRecord | None,
+    attempts: int,
+) -> tuple[str, str, str, float]:
+    if best is None:
+        return "needs_manual_domain_research", "no_candidates_generated", "manual_official_domain_research_required", 0.0
+    if best.official_domain_status == "official_domain_verified":
+        return "resolved_to_new_source", "verified_official_domain", "verify_aanbod_url_and_parser_family", min(0.92, max(0.72, best.official_signal_score))
+    if best.reason in {"live_http_not_enabled", "external_http_budget_exhausted"}:
+        return "needs_manual_domain_research", best.reason, "manual_official_domain_research_required", 0.0
+    if attempts > 0 and best.official_domain_status == "candidate_rejected_parked_or_inactive":
+        return "confirmed_inactive_or_no_longer_trading", "parked_or_inactive_candidate", "manual_business_status_review", 0.45
+    if attempts > 0 and best.official_signal_score <= 0.1:
+        return "confirmed_no_official_domain_found", "candidate_attempts_without_official_signal", "manual_official_domain_research_required", 0.2
+    return "needs_manual_domain_research", "insufficient_official_domain_evidence", "manual_official_domain_research_required", round(best.official_signal_score, 2)
+
+
+def apply_missing_domain_resolution_to_master(
+    record: CoverageSourceRecord,
+    records: list[CoverageSourceRecord],
+    master_sources_delta: list[MasterSourcesDeltaRecord] | None = None,
+) -> None:
+    records.append(record)
+    if master_sources_delta is not None:
+        master_sources_delta.append(
+            MasterSourcesDeltaRecord(
+                source_id=record.source_id,
+                source_name=record.source_name,
+                domain=record.domain,
+                delta_type="new_source_candidate",
+                previous_status="missing_domain_queue",
+                new_status=record.source_quality_status,
+                accepted_aanbod_url=record.accepted_aanbod_url,
+                parser_family_candidate=record.parser_family_candidate,
+                family_terminal_status=record.terminal_status,
+                resolution_source="missing_domain_external_resolution",
+                evidence_preview="official_domain_verified",
+            )
+        )
+
+
 def build_no_public_verification_records(records: Sequence[CoverageSourceRecord]) -> list[NoPublicVerificationRecord]:
     rows: list[NoPublicVerificationRecord] = []
     for record in records:
@@ -1547,10 +1974,33 @@ def compute_quality_metrics(result: CoverageCensusResult) -> dict[str, Any]:
         "gemeente_normalization_conflict_count": 0,
         "missing_domain_queue_count": len(result.missing_domain_queue),
         "missing_domain_initial_count": len(result.missing_domain_queue),
+        "missing_domain_attempted_count": sum(1 for row in domain_resolution if row.attempt_count > 0),
+        "missing_domain_resolved_existing_count": sum(1 for row in domain_resolution if row.resolution_status == "resolved_to_existing_source"),
+        "missing_domain_resolved_new_count": sum(1 for row in domain_resolution if row.resolution_status == "resolved_to_new_source"),
+        "missing_domain_confirmed_duplicate_count": sum(1 for row in domain_resolution if row.resolution_status == "confirmed_duplicate"),
+        "missing_domain_confirmed_inactive_count": sum(1 for row in domain_resolution if row.resolution_status == "confirmed_inactive_or_no_longer_trading"),
+        "missing_domain_confirmed_no_official_domain_count": sum(1 for row in domain_resolution if row.resolution_status == "confirmed_no_official_domain_found"),
         "missing_domain_resolved_count": sum(1 for row in domain_resolution if row.resolution_status in {"resolved_to_existing_source", "resolved_to_new_source", "confirmed_duplicate"}),
         "missing_domain_remaining_count": sum(1 for row in domain_resolution if row.resolution_status in {"confirmed_no_official_domain_found", "needs_manual_domain_research"}),
         "missing_domain_needs_manual_research_count": sum(1 for row in domain_resolution if row.resolution_status == "needs_manual_domain_research"),
         "missing_domain_without_resolution_attempt_count": sum(1 for row in domain_resolution if row.attempt_count <= 0),
+        "candidate_domains_generated_count": len(result.candidate_domains),
+        "candidate_domains_verified_official_count": sum(1 for row in result.candidate_domains if row.official_domain_status == "official_domain_verified"),
+        "candidate_domains_rejected_count": sum(1 for row in result.candidate_domains if row.official_domain_status.startswith("candidate_rejected")),
+        "candidate_domains_fetch_failed_count": sum(1 for row in result.candidate_domains if row.official_domain_status == "candidate_fetch_failed"),
+        "candidate_domains_blocked_by_robots_count": sum(1 for row in result.candidate_domains if row.official_domain_status == "candidate_blocked_by_access_policy"),
+        "new_sources_added_count": sum(1 for row in result.master_sources_delta if row.delta_type == "new_source_candidate"),
+        "existing_sources_updated_count": sum(1 for row in result.master_sources_delta if row.delta_type == "existing_source_update"),
+        "accepted_aanbod_urls_added_count": sum(1 for row in result.master_sources_delta if row.accepted_aanbod_url),
+        "no_public_aanbod_confirmed_count": sum(1 for row in result.master_sources_delta if row.family_terminal_status == CoverageTerminalStatus.CONFIRMED_NO_PUBLIC_AANBOD.value),
+        "resolved_domain_third_party_count": sum(1 for row in domain_resolution if row.resolved_domain and _is_rejected_third_party_domain(row.resolved_domain, row.raw_source_name)),
+        "resolved_domain_without_official_evidence_count": sum(1 for row in domain_resolution if row.resolution_status in {"resolved_to_existing_source", "resolved_to_new_source"} and not row.evidence_preview),
+        "duplicate_domain_created_count": _duplicate_domain_created_count(records),
+        "property_detail_url_as_accepted_aanbod_url_count": sum(
+            1 for record in records if record.accepted_aanbod_url and _looks_like_property_detail_url(urlsplit(record.accepted_aanbod_url).path)
+        ),
+        "raw_html_json_persisted_count": _raw_payload_marker_count(result),
+        "long_descriptions_exported_count": _long_description_marker_count(result),
         "no_public_initial_count": len(no_public_verification),
         "no_public_reclassified_count": sum(1 for row in no_public_verification if row.final_status == "official_aanbod_found"),
         "no_public_confirmed_count": sum(1 for row in no_public_verification if row.final_status == "confirmed_no_public_aanbod"),
@@ -1627,6 +2077,52 @@ def write_coverage_census_outputs(
     return workbook_path, master_csv_path, review_queue_csv_path
 
 
+def write_missing_domain_external_resolution_outputs(
+    result: CoverageCensusResult,
+    workbook_path: Path,
+    resolution_csv_path: Path,
+    review_queue_csv_path: Path,
+) -> tuple[Path, Path, Path]:
+    result = with_completion_verification(result)
+    workbook_path.parent.mkdir(parents=True, exist_ok=True)
+    columns = _missing_domain_resolution_columns()
+    with resolution_csv_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        for row in result.domain_resolution:
+            writer.writerow(_domain_resolution_export_row(row))
+    with review_queue_csv_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        for row in result.domain_resolution:
+            if row.resolution_status == "needs_manual_domain_research":
+                writer.writerow(_domain_resolution_export_row(row))
+    write_missing_domain_external_resolution_workbook(result, workbook_path)
+    return workbook_path, resolution_csv_path, review_queue_csv_path
+
+
+def write_missing_domain_external_resolution_workbook(result: CoverageCensusResult, output_path: Path) -> Path:
+    workbook = Workbook()
+    workbook.active.title = "Missing Domain Resolution"
+    _write_rows(workbook["Missing Domain Resolution"], _missing_domain_resolution_columns(), [_domain_resolution_export_row(row) for row in result.domain_resolution])
+    _write_rows(workbook.create_sheet("Resolved Existing Sources"), _missing_domain_resolution_columns(), [_domain_resolution_export_row(row) for row in result.domain_resolution if row.resolution_status == "resolved_to_existing_source"])
+    _write_rows(workbook.create_sheet("Resolved New Sources"), _missing_domain_resolution_columns(), [_domain_resolution_export_row(row) for row in result.domain_resolution if row.resolution_status == "resolved_to_new_source"])
+    _write_rows(workbook.create_sheet("Confirmed Duplicates"), _missing_domain_resolution_columns(), [_domain_resolution_export_row(row) for row in result.domain_resolution if row.resolution_status == "confirmed_duplicate"])
+    _write_rows(workbook.create_sheet("Inactive Or No Official Domain"), _missing_domain_resolution_columns(), [_domain_resolution_export_row(row) for row in result.domain_resolution if row.resolution_status in {"confirmed_inactive_or_no_longer_trading", "confirmed_no_official_domain_found"}])
+    _write_rows(workbook.create_sheet("Needs Manual Research"), _missing_domain_resolution_columns(), [_domain_resolution_export_row(row) for row in result.domain_resolution if row.resolution_status == "needs_manual_domain_research"])
+    _write_rows(workbook.create_sheet("Candidate Domains"), tuple(CandidateDomainRecord.__dataclass_fields__.keys()), [asdict(row) for row in result.candidate_domains])
+    _write_rows(workbook.create_sheet("Official Domain Verification"), tuple(CandidateDomainRecord.__dataclass_fields__.keys()), [asdict(row) for row in result.official_domain_verification])
+    _write_rows(workbook.create_sheet("Master Sources Delta"), tuple(MasterSourcesDeltaRecord.__dataclass_fields__.keys()), [asdict(row) for row in result.master_sources_delta])
+    _write_rows(workbook.create_sheet("Accepted Aanbod Delta"), tuple(MasterSourcesDeltaRecord.__dataclass_fields__.keys()), [asdict(row) for row in result.master_sources_delta if row.accepted_aanbod_url])
+    _write_rows(workbook.create_sheet("Family Fingerprint Delta"), tuple(MasterSourcesDeltaRecord.__dataclass_fields__.keys()), [asdict(row) for row in result.master_sources_delta])
+    _write_rows(workbook.create_sheet("Quality Gates"), ("metric", "value", "gate_type", "passed"), _quality_gate_rows(result.quality_metrics))
+    _write_rows(workbook.create_sheet("Review Queue"), _missing_domain_resolution_columns(), [_domain_resolution_export_row(row) for row in result.domain_resolution if row.resolution_status == "needs_manual_domain_research"])
+    for worksheet in workbook.worksheets:
+        _format_sheet(worksheet)
+    workbook.save(output_path)
+    return output_path
+
+
 def with_completion_verification(result: CoverageCensusResult) -> CoverageCensusResult:
     records = result.records
     domain_resolution = result.domain_resolution or tuple(build_domain_resolution_records(result.missing_domain_queue, records))
@@ -1640,6 +2136,9 @@ def with_completion_verification(result: CoverageCensusResult) -> CoverageCensus
         duplicate_records=result.duplicate_records,
         missing_domain_queue=result.missing_domain_queue,
         domain_resolution=domain_resolution,
+        candidate_domains=result.candidate_domains,
+        official_domain_verification=result.official_domain_verification,
+        master_sources_delta=result.master_sources_delta,
         no_public_verification=no_public_verification,
         aanbod_scope_checks=aanbod_scope_checks,
         realworks_audit_input=realworks_audit_input,
@@ -1653,8 +2152,40 @@ def with_completion_verification(result: CoverageCensusResult) -> CoverageCensus
         review_queue_csv_path=result.review_queue_csv_path,
         realworks_audit_input_csv_path=result.realworks_audit_input_csv_path,
         realworks_audit_input_reconciliation_csv_path=result.realworks_audit_input_reconciliation_csv_path,
+        missing_domain_resolution_workbook_path=result.missing_domain_resolution_workbook_path,
+        missing_domain_resolution_csv_path=result.missing_domain_resolution_csv_path,
+        missing_domain_resolution_review_queue_csv_path=result.missing_domain_resolution_review_queue_csv_path,
         warnings=result.warnings,
     )
+
+
+def _missing_domain_resolution_columns() -> tuple[str, ...]:
+    return (
+        "raw_source_name",
+        "raw_source_id",
+        "raw_gemeente",
+        "raw_province",
+        "evidence_file",
+        "initial_reason",
+        "resolution_status",
+        "resolved_domain",
+        "resolved_source_id",
+        "matched_existing_source",
+        "created_new_source",
+        "confidence",
+        "attempt_count",
+        "candidate_count",
+        "evidence_preview",
+        "resolution_reason",
+        "suggested_next_action",
+        "manual_check_result",
+        "manual_check_notes",
+    )
+
+
+def _domain_resolution_export_row(row: DomainResolutionRecord) -> dict[str, object]:
+    data = asdict(row)
+    return {column: _safe_cell(data.get(column, "")) for column in _missing_domain_resolution_columns()}
 
 
 def write_master_csv(records: Sequence[CoverageSourceRecord], output_path: Path) -> Path:
@@ -2184,6 +2715,82 @@ def _outside_office_status(office_province: str, coverage_province: str) -> str:
     return "not_outside_office"
 
 
+def _match_existing_source_for_missing_domain(
+    item: MissingDomainQueueRecord,
+    records: Sequence[CoverageSourceRecord],
+) -> CoverageSourceRecord | None:
+    key = _normalize_party_name(item.source_name)
+    raw_id = _normalize_key(item.raw_source_id)
+    for record in records:
+        names = (record.source_name, *record.aliases)
+        if key and any(key == _normalize_party_name(name) for name in names):
+            return record
+        if raw_id and raw_id in {_normalize_key(value) for value in record.source_ids}:
+            return record
+    return None
+
+
+def _domain_slug_from_source_name(value: str) -> str:
+    text = _normalize_key(value)
+    legal_suffixes = {"bv", "b", "v", "vof", "nv", "makelaar", "makelaars", "makelaardij", "vastgoed", "wonen"}
+    tokens = [token for token in re.split(r"[^a-z0-9]+", text) if token and token not in legal_suffixes]
+    return "-".join(tokens[:3])
+
+
+def _is_rejected_third_party_domain(domain: str, source_name: str = "") -> bool:
+    normalized = _normalize_domain(domain)
+    if not normalized:
+        return True
+    if normalized == "makelaarsland.nl" and "makelaarsland" not in _normalize_key(source_name):
+        return True
+    if normalized.startswith("maps.google.") or normalized.startswith("google.") or ".google." in normalized:
+        return True
+    if any(normalized == suffix or normalized.endswith(f".{suffix}") for suffix in THIRD_PARTY_OFFICIAL_DOMAIN_SUFFIXES):
+        return True
+    return any(token in normalized for token in DIRECTORY_DOMAIN_TOKENS)
+
+
+def _domain_fetch_allowed(domain: str, path: str, *, can_fetch: CanFetch) -> bool:
+    try:
+        return bool(can_fetch(domain, path or "/"))
+    except Exception:
+        return False
+
+
+def _official_domain_signal_score(item: MissingDomainQueueRecord, content: str) -> tuple[float, str, str, str, str]:
+    text = _visible_text(content).casefold()
+    preview = _preview(text)
+    if any(signal in text for signal in PARKED_DOMAIN_SIGNALS):
+        return 0.0, "", "", preview, "candidate_rejected_parked_or_inactive"
+    if not text:
+        return 0.0, "", "", "", "candidate_rejected_insufficient_evidence"
+
+    name_tokens = [token for token in re.split(r"[^a-z0-9]+", _normalize_key(item.source_name)) if len(token) >= 4]
+    matched_name_tokens = [token for token in name_tokens if token in text]
+    name_signal = ",".join(matched_name_tokens[:4])
+    location_key = _normalize_key(item.gemeente)
+    location_signal = item.gemeente if location_key and location_key in text else ""
+    real_estate_signal = _contains_any(text, ("makelaar", "makelaardij", "woning", "woningen", "koopwoning", "vastgoed"))
+
+    score = 0.0
+    if name_signal:
+        score += 0.45
+    if real_estate_signal:
+        score += 0.25
+    if location_signal:
+        score += 0.15
+    if _contains_any(text, ("contact", "vestiging", "over ons", "team")):
+        score += 0.1
+    score = round(max(0.0, min(score, 1.0)), 2)
+    if score >= 0.75 and name_signal and real_estate_signal:
+        status = "official_domain_verified"
+    elif not name_signal:
+        status = "candidate_rejected_insufficient_evidence"
+    else:
+        status = "candidate_needs_more_evidence"
+    return score, name_signal, location_signal, preview, status
+
+
 def _is_kin_record(record: CoverageSourceRecord) -> bool:
     return "kinmakelaars.nl" in _normalize_domain(record.domain) or "kinmakelaars" in _normalize_key(record.source_id)
 
@@ -2234,6 +2841,27 @@ def _realworks_audit_input_unexplained_delta(
         if row.in_source_completion_ready and row.in_audit_input_csv
     }
     return len(ready_from_input.symmetric_difference(ready_from_reconciliation))
+
+
+def _duplicate_domain_created_count(records: Sequence[CoverageSourceRecord]) -> int:
+    counts = Counter(_normalize_domain(record.domain) for record in records if record.domain)
+    return sum(count - 1 for count in counts.values() if count > 1)
+
+
+def _raw_payload_marker_count(result: CoverageCensusResult) -> int:
+    text_values: list[str] = []
+    text_values.extend(row.evidence_preview for row in result.domain_resolution)
+    text_values.extend(row.evidence_preview for row in result.candidate_domains)
+    text_values.extend(row.evidence_preview for row in result.master_sources_delta)
+    return sum(1 for value in text_values if any(marker in _clean_text(value).casefold() for marker in RAW_MARKERS))
+
+
+def _long_description_marker_count(result: CoverageCensusResult) -> int:
+    text_values: list[str] = []
+    text_values.extend(row.evidence_preview for row in result.domain_resolution)
+    text_values.extend(row.evidence_preview for row in result.candidate_domains)
+    text_values.extend(row.evidence_preview for row in result.master_sources_delta)
+    return sum(1 for value in text_values if len(_clean_text(value)) > LONG_TEXT_LIMIT)
 
 
 def _access_blocks(record: CoverageSourceRecord) -> bool:

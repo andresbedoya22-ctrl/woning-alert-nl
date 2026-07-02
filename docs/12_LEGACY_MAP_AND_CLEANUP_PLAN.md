@@ -266,6 +266,18 @@ candidates, and `304` readiness rows. Property-row QA found no hard-gate failure
 status consistency, source attribution, raw persistence, or long-description export. The decision remains
 `realworks_partially_ready_with_exclusions`; no Realworks Hardening v2 is justified from this run.
 
+## Missing Domain External Resolution v1
+
+`scraper/src/domek_wonen/sources/coverage_census.py` now has a bounded Missing Domain External Resolution mode for the
+remaining Source Completion missing-domain queue. It preserves the source-intelligence phase boundary: no matching,
+advisor email, n8n, dashboard, DB/migrations, full inventory, `data/raw`, browser automation, proxies, bypass behavior,
+LLM runtime, or parser-per-makelaar work is introduced.
+
+The mode resolves existing-source duplicates first, generates at most eight conservative official-domain candidates per
+missing row, rejects third-party/social/search/directory evidence, checks robots before HTTP, writes only compact
+evidence previews, dedupes verified new domains, and leaves weak cases in an explicit manual research queue. New source
+candidates remain conservative until accepted aanbod URL and parser-family verification prove operational readiness.
+
 ## Parser Family Runner v1
 
 `scraper/src/domek_wonen/parsers/runner.py` adds the first offline connector from
