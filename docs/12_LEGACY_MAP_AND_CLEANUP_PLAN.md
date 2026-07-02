@@ -266,6 +266,17 @@ candidates, and `304` readiness rows. Property-row QA found no hard-gate failure
 status consistency, source attribution, raw persistence, or long-description export. The decision remains
 `realworks_partially_ready_with_exclusions`; no Realworks Hardening v2 is justified from this run.
 
+## Noord-Brabant Makelaar Universe v1
+
+`scraper/src/domek_wonen/sources/makelaar_universe.py` adds a manual-input bridge from observed Funda result-page
+makelaar names into the source-intelligence layer. It is intentionally not a property-source ingestion path: no detail
+pages, no property fields, no raw HTML/JSON persistence, no browser automation, and no invented official domains.
+
+The universe runner consumes `tmp/manual_inputs/funda_makelaar_names/funda_nb_makelaar_names_raw.csv`, enriches it with
+optional local source-completion, missing-domain-resolution, source-master, platform-fingerprint, and seed evidence,
+then writes only local/generated outputs under `tmp/generated/`. Slogans stay as aliases, truncated names stay in
+manual review, and generic buckets such as `Meerdere makelaars` remain non-operational placeholders.
+
 ## Missing Domain External Resolution v1
 
 `scraper/src/domek_wonen/sources/coverage_census.py` now has a bounded Missing Domain External Resolution mode for the

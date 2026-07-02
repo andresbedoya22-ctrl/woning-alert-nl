@@ -530,6 +530,18 @@ source-attribution, raw-persistence, or long-description hard-gate failures. The
 `realworks_partially_ready_with_exclusions`: merge is appropriate after manual review, while no-current-listing and
 fetch-failed sources remain excluded or monitored.
 
+## Noord-Brabant Makelaar Universe v1
+
+`scraper/src/domek_wonen/sources/makelaar_universe.py` builds a conservative Noord-Brabant Makelaar Universe from
+manual Funda result-page observations plus existing local source evidence. This is not an operational Funda property
+source: it uses only observed makelaar names, keeps slogans as aliases, preserves truncated names for manual review,
+and never invents official domains from portal-only evidence.
+
+`scripts/run_noord_brabant_makelaar_universe.py` reads the manual input CSV under
+`tmp/manual_inputs/funda_makelaar_names/`, joins optional local evidence from source completion, missing-domain
+resolution, source master, platform fingerprint, and seed artifacts, then writes local/generated universe outputs under
+`tmp/generated/`. Manual inputs and generated outputs remain uncommitted artifacts.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`
