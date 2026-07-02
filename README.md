@@ -481,6 +481,36 @@ The Realworks audit input CSV contains only verified `realworks_public` records 
 scope status ready for the later Noord-Brabant Realworks audit. KIN remains classified as `ogonline_xhr` and is excluded
 from Realworks audit input.
 
+## Noord-Brabant Realworks Audit v1
+
+`scraper/src/domek_wonen/pilots/noord_brabant_realworks_audit.py` audits only the ready
+`tmp/generated/noord_brabant_realworks_audit_input_v1.csv` handoff set. The runner validates the 65-source input
+strictly, rejects KIN, unclear scope, missing accepted URL, Funda/Pararius, property-detail, blocked/legal/manual-review,
+and non-Realworks rows, then reuses the existing Realworks readiness path for sequential bounded listing/detail checks.
+
+The CLI writes local generated artifacts under `tmp/generated/`:
+
+- `tmp/generated/noord_brabant_realworks_audit_v1.xlsx`
+- `tmp/generated/noord_brabant_realworks_audit_v1_summary.csv`
+- `tmp/generated/noord_brabant_realworks_audit_v1_problem_sources.csv`
+
+The handoff was repaired after an initial audit attempt correctly refused an invalid CSV missing `coverage_province`
+and `parser_family_candidate`. The source-completion producer now emits canonical audit-input columns plus
+`tmp/generated/noord_brabant_realworks_audit_input_reconciliation_v1.csv`. The regenerated reconciled run authorizes
+`65` ready Realworks sources and excludes `26` verified Realworks rows pending manual scope check; KIN remains excluded.
+
+This phase remains audit-only: no matching, alerts, advisor email, n8n, dashboard, DB, migrations, full inventory,
+`data/raw`, Funda/Pararius operational sourcing, raw HTML/JSON persistence, browser automation, LLM runtime, parser per
+makelaar, or global eligibility changes.
+
+Realworks Audit Resolution v1 regenerated a stale local handoff artifact from the repaired source-completion producer,
+then reran the provincial audit on the canonical `65` ready Realworks sources. The regenerated run produced `5` passed,
+`34` passed with review gaps, `24` no-current-listings monitor sources, and `2` isolated fetch failures, with `0`
+hardening candidates. Property-level QA reviewed `304` readiness rows and found no duplicate, readiness-label, status,
+source-attribution, raw-persistence, or long-description hard-gate failures. The final decision is
+`realworks_partially_ready_with_exclusions`: merge is appropriate after manual review, while no-current-listing and
+fetch-failed sources remain excluded or monitored.
+
 ## Recommended next PRs
 
 - `PR 2: Source Intelligence Conversion v1`

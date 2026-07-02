@@ -57,6 +57,8 @@ def main(argv: list[str] | None = None) -> int:
     print(result.review_queue_csv_path, flush=True)
     if result.realworks_audit_input_csv_path:
         print(result.realworks_audit_input_csv_path, flush=True)
+    if result.realworks_audit_input_reconciliation_csv_path:
+        print(result.realworks_audit_input_reconciliation_csv_path, flush=True)
     print(f"total_sources={metrics['total_sources']}", flush=True)
     print(f"deduped_sources={metrics['deduped_sources']}", flush=True)
     print(f"in_scope_noord_brabant_coverage_sources={metrics['in_scope_noord_brabant_coverage_sources']}", flush=True)
@@ -102,6 +104,7 @@ def main(argv: list[str] | None = None) -> int:
         "realworks_audit_input_kin_count",
         "realworks_audit_input_property_detail_url_count",
         "realworks_audit_input_without_accepted_aanbod_count",
+        "realworks_audit_input_row_count_unexplained_delta",
         "office_location_fabricated_count",
         "review_queue_count",
     ):
