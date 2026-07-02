@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
+from openpyxl import load_workbook
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
@@ -35,6 +36,30 @@ FAMILY_DECISIONS = (
 )
 RAW_MARKERS = ("<html", "<script", "</", '{"', "{'", '"docs"', "window.__")
 LONG_TEXT_LIMIT = 500
+RESOLUTION_DECISIONS = (
+    "realworks_ready_for_nb_family_coverage",
+    "realworks_partially_ready_with_exclusions",
+    "realworks_needs_hardening_v2",
+)
+SOURCE_RESOLUTION_STATUSES = (
+    "ready_for_realworks_family_coverage",
+    "ready_with_review_gaps",
+    "monitor_no_current_listings",
+    "exclude_fetch_failed",
+    "exclude_access_blocked",
+    "exclude_not_realworks",
+    "exclude_scope_issue",
+    "needs_realworks_hardening",
+    "needs_manual_review",
+)
+PROPERTY_QA_STATUSES = (
+    "qa_ok",
+    "qa_review",
+    "qa_duplicate_review",
+    "qa_blocked_inconsistent_label",
+    "qa_blocked_missing_source",
+    "qa_blocked_invalid_value",
+)
 REALWORKS_AUDIT_INPUT_REQUIRED_COLUMNS = (
     "source_id",
     "source_name",
@@ -238,6 +263,73 @@ class NoordBrabantRealworksAuditResult:
     summary_csv_path: Path | None = None
     problem_sources_csv_path: Path | None = None
     warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class RealworksAuditSourceResolution:
+    source_id: str
+    source_name: str
+    domain: str
+    accepted_aanbod_url: str
+    audit_source_status: str
+    parser_total: int
+    qa_clean: int
+    detail_succeeded: int
+    readiness_rows: int
+    export_ready: int
+    export_review: int
+    export_blocked: int
+    source_resolution_status: str
+    resolution_reason: str
+    recommended_next_action: str
+    manual_check_result: str = ""
+    manual_check_notes: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class RealworksPropertyQAResult:
+    source_id: str
+    domain: str
+    accepted_aanbod_url: str
+    canonical_url: str
+    property_link: str
+    address: str
+    city: str
+    postcode: str
+    asking_price: str
+    status: str
+    property_type: str
+    export_readiness: str
+    quality_status: str
+    active_inventory_eligible: str
+    missing_key_fields: str
+    warnings: str
+    property_qa_status: str
+    property_qa_reason: str
+    manual_check_result: str = ""
+    manual_check_notes: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class RealworksAuditResolutionDecision:
+    final_decision: str
+    merge_recommended: bool
+    decision_reasons: tuple[str, ...]
+    recommended_next_action: str
+
+
+@dataclass(frozen=True, slots=True)
+class RealworksAuditResolutionResult:
+    sources: tuple[RealworksAuditSourceResolution, ...]
+    property_qa_rows: tuple[RealworksPropertyQAResult, ...]
+    duplicate_rows: tuple[dict[str, object], ...]
+    readiness_label_checks: tuple[dict[str, object], ...]
+    status_consistency_checks: tuple[dict[str, object], ...]
+    field_sanity_checks: tuple[dict[str, object], ...]
+    decision: RealworksAuditResolutionDecision
+    metrics: dict[str, int | str | bool]
+    output_csv_path: Path | None = None
+    output_workbook_path: Path | None = None
 
 
 ReadinessRunner = Callable[..., RealworksPropertyReadinessResult]
@@ -578,6 +670,98 @@ def write_noord_brabant_realworks_problem_sources_csv(
     return output_path
 
 
+def resolve_noord_brabant_realworks_audit(
+    *,
+    audit_summary_csv: Path,
+    audit_workbook: Path,
+    output_csv: Path | None = None,
+    output_workbook: Path | None = None,
+) -> RealworksAuditResolutionResult:
+    summary_rows = _read_csv_dicts(audit_summary_csv)
+    workbook_rows = _read_workbook_rows(audit_workbook)
+    source_rows = workbook_rows.get("Source Summary", summary_rows)
+    manual_rows = workbook_rows.get("Manual Verification", ())
+    property_rows = workbook_rows.get("Realworks Properties", ())
+    accepted_by_source = {
+        _clean_text(row.get("source_id")): _clean_text(row.get("accepted_aanbod_url"))
+        for row in source_rows
+    }
+    sources = tuple(_source_resolution_from_row(row) for row in source_rows)
+    property_qa, duplicates, label_checks, status_checks, field_checks = _build_property_qa(
+        manual_rows=manual_rows,
+        property_rows=property_rows,
+        accepted_by_source=accepted_by_source,
+    )
+    metrics = _resolution_metrics(sources, property_qa, duplicates, label_checks, status_checks, field_checks)
+    decision = _resolution_decision(metrics)
+    result = RealworksAuditResolutionResult(
+        sources=sources,
+        property_qa_rows=property_qa,
+        duplicate_rows=duplicates,
+        readiness_label_checks=label_checks,
+        status_consistency_checks=status_checks,
+        field_sanity_checks=field_checks,
+        decision=decision,
+        metrics=metrics,
+    )
+    csv_path = write_noord_brabant_realworks_audit_resolution_csv(result, output_csv) if output_csv else None
+    workbook_path = write_noord_brabant_realworks_audit_resolution_workbook(result, output_workbook) if output_workbook else None
+    return RealworksAuditResolutionResult(
+        sources=result.sources,
+        property_qa_rows=result.property_qa_rows,
+        duplicate_rows=result.duplicate_rows,
+        readiness_label_checks=result.readiness_label_checks,
+        status_consistency_checks=result.status_consistency_checks,
+        field_sanity_checks=result.field_sanity_checks,
+        decision=result.decision,
+        metrics=result.metrics,
+        output_csv_path=csv_path,
+        output_workbook_path=workbook_path,
+    )
+
+
+def write_noord_brabant_realworks_audit_resolution_csv(
+    result: RealworksAuditResolutionResult,
+    output_path: Path,
+) -> Path:
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    columns = tuple(RealworksAuditSourceResolution.__dataclass_fields__)
+    with output_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        for row in result.sources:
+            writer.writerow({column: _safe_cell(getattr(row, column)) for column in columns})
+    return output_path
+
+
+def write_noord_brabant_realworks_audit_resolution_workbook(
+    result: RealworksAuditResolutionResult,
+    output_path: Path,
+) -> Path:
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    workbook = Workbook()
+    workbook.active.title = "Source Resolution"
+    _write_dataclass_rows(workbook["Source Resolution"], result.sources)
+    _write_dataclass_rows(workbook.create_sheet("Ready Sources"), [row for row in result.sources if row.source_resolution_status == "ready_for_realworks_family_coverage"])
+    _write_dataclass_rows(workbook.create_sheet("Ready With Review Gaps"), [row for row in result.sources if row.source_resolution_status == "ready_with_review_gaps"])
+    _write_dataclass_rows(workbook.create_sheet("No Current Listings"), [row for row in result.sources if row.source_resolution_status == "monitor_no_current_listings"])
+    _write_dataclass_rows(workbook.create_sheet("Excluded Sources"), [row for row in result.sources if row.source_resolution_status.startswith("exclude_")])
+    _write_dataclass_rows(workbook.create_sheet("Manual Review"), [row for row in result.sources if row.source_resolution_status == "needs_manual_review"])
+    _write_dataclass_rows(workbook.create_sheet("Hardening Candidates"), [row for row in result.sources if row.source_resolution_status == "needs_realworks_hardening"])
+    _write_dataclass_rows(workbook.create_sheet("Property QA"), result.property_qa_rows)
+    _write_dict_rows(workbook.create_sheet("Duplicate Properties"), result.duplicate_rows)
+    _write_dict_rows(workbook.create_sheet("Readiness Label Checks"), result.readiness_label_checks)
+    _write_dict_rows(workbook.create_sheet("Status Consistency"), result.status_consistency_checks)
+    _write_dict_rows(workbook.create_sheet("Field Sanity"), result.field_sanity_checks)
+    _write_decision_summary(workbook.create_sheet("Decision Summary"), result)
+    for worksheet in workbook.worksheets:
+        _format_sheet(worksheet)
+    workbook.save(output_path)
+    return output_path
+
+
 def _metrics_for_source(
     source: NoordBrabantRealworksAuditSource,
     readiness: RealworksPropertyReadinessResult,
@@ -817,6 +1001,348 @@ def _empty_readiness_result(
     )
 
 
+def _source_resolution_from_row(row: Mapping[str, object]) -> RealworksAuditSourceResolution:
+    audit_status = _clean_text(row.get("validation_status"))
+    status = _source_resolution_status(audit_status)
+    return RealworksAuditSourceResolution(
+        source_id=_clean_text(row.get("source_id")),
+        source_name=_clean_text(row.get("source_name")),
+        domain=_normalize_domain(row.get("domain")),
+        accepted_aanbod_url=_clean_text(row.get("accepted_aanbod_url")),
+        audit_source_status=audit_status,
+        parser_total=_int_value(row.get("parser_total")),
+        qa_clean=_int_value(row.get("parser_qa_clean")),
+        detail_succeeded=_int_value(row.get("detail_succeeded")),
+        readiness_rows=_int_value(row.get("readiness_rows_built")),
+        export_ready=_int_value(row.get("export_ready")),
+        export_review=_int_value(row.get("export_review")),
+        export_blocked=_int_value(row.get("export_blocked")),
+        source_resolution_status=status,
+        resolution_reason=_resolution_reason(audit_status, row),
+        recommended_next_action=_resolution_next_action(status),
+    )
+
+
+def _source_resolution_status(audit_status: str) -> str:
+    return {
+        "passed": "ready_for_realworks_family_coverage",
+        "passed_with_review_gaps": "ready_with_review_gaps",
+        "no_current_listings": "monitor_no_current_listings",
+        "listing_fetch_failed": "exclude_fetch_failed",
+        "blocked_by_robots": "exclude_access_blocked",
+        "blocked_by_http_status": "exclude_access_blocked",
+        "needs_realworks_hardening": "needs_realworks_hardening",
+        "detail_fetch_failures": "needs_manual_review",
+    }.get(audit_status, "needs_manual_review")
+
+
+def _resolution_reason(audit_status: str, row: Mapping[str, object]) -> str:
+    if audit_status == "no_current_listings":
+        return "listing page fetched but no current listings were parsed; not a parser failure"
+    if audit_status == "listing_fetch_failed":
+        return "isolated listing fetch failure excluded from next phase"
+    if audit_status == "passed_with_review_gaps":
+        return "source produced readiness rows with explicit review gaps"
+    if audit_status == "passed":
+        return "source passed reusable Realworks family audit"
+    if audit_status == "needs_realworks_hardening":
+        return "parser/detail/readiness failure pattern requires Realworks hardening"
+    if audit_status.startswith("blocked"):
+        return "source excluded by access or robots status"
+    return _clean_text(row.get("validation_decision")) or "manual review required"
+
+
+def _resolution_next_action(status: str) -> str:
+    return {
+        "ready_for_realworks_family_coverage": "include in Realworks family coverage candidate set",
+        "ready_with_review_gaps": "include with manual workbook review before operational promotion",
+        "monitor_no_current_listings": "monitor and rerun if listings reappear",
+        "exclude_fetch_failed": "exclude from next phase until source access is reviewed",
+        "exclude_access_blocked": "do not fetch until access policy changes",
+        "needs_realworks_hardening": "include in Realworks Hardening v2",
+        "needs_manual_review": "manual review before promotion",
+    }.get(status, "manual review before promotion")
+
+
+def _build_property_qa(
+    *,
+    manual_rows: Sequence[Mapping[str, object]],
+    property_rows: Sequence[Mapping[str, object]],
+    accepted_by_source: Mapping[str, str],
+) -> tuple[
+    tuple[RealworksPropertyQAResult, ...],
+    tuple[dict[str, object], ...],
+    tuple[dict[str, object], ...],
+    tuple[dict[str, object], ...],
+    tuple[dict[str, object], ...],
+]:
+    properties_by_key = {
+        (_clean_text(row.get("source_id")), _clean_text(row.get("canonical_url"))): row
+        for row in property_rows
+    }
+    canonical_counts = Counter(_normalize_url(row.get("canonical_url")) for row in manual_rows if _clean_text(row.get("canonical_url")))
+    property_link_counts = Counter(
+        _normalize_url(_effective_property_link(row))
+        for row in manual_rows
+        if _effective_property_link(row)
+    )
+    source_canonical_counts = Counter(
+        (_clean_text(row.get("source_id")), _normalize_url(row.get("canonical_url")))
+        for row in manual_rows
+        if _clean_text(row.get("canonical_url"))
+    )
+    domain_canonical_counts = Counter(
+        (_normalize_domain(row.get("domain")), _normalize_url(row.get("canonical_url")))
+        for row in manual_rows
+        if _clean_text(row.get("canonical_url"))
+    )
+    same_source_key_counts = Counter(_property_duplicate_key(row, include_source=True) for row in manual_rows)
+    cross_source_key_counts = Counter(_property_duplicate_key(row, include_source=False) for row in manual_rows)
+
+    qa_rows: list[RealworksPropertyQAResult] = []
+    duplicate_rows: list[dict[str, object]] = []
+    label_checks: list[dict[str, object]] = []
+    status_checks: list[dict[str, object]] = []
+    field_checks: list[dict[str, object]] = []
+
+    for row in manual_rows:
+        source_id = _clean_text(row.get("source_id"))
+        canonical_url = _clean_text(row.get("canonical_url"))
+        property_row = properties_by_key.get((source_id, canonical_url), {})
+        domain = _normalize_domain(row.get("domain"))
+        property_link = _effective_property_link(row)
+        accepted_url = _clean_text(row.get("accepted_aanbod_url")) or accepted_by_source.get(source_id, "")
+        export_readiness = _clean_text(row.get("export_readiness"))
+        quality_status = _clean_text(row.get("quality_status"))
+        missing = _clean_text(row.get("missing_key_fields"))
+        warnings = _clean_text(row.get("warnings"))
+        status = _clean_text(row.get("status")) or _clean_text(property_row.get("status_bucket"))
+        residential = _clean_text(property_row.get("residential_classification"))
+        active = _clean_text(property_row.get("active_inventory_eligible"))
+        field_reason = _field_sanity_reason(row, property_row)
+        label_reason = _label_check_reason(export_readiness, quality_status, missing, warnings)
+        status_reason = _status_check_reason(status, residential, export_readiness, active)
+        is_duplicate = (
+            canonical_counts[_normalize_url(canonical_url)] > 1
+            or property_link_counts[_normalize_url(property_link)] > 1
+            or source_canonical_counts[(source_id, _normalize_url(canonical_url))] > 1
+            or domain_canonical_counts[(domain, _normalize_url(canonical_url))] > 1
+            or same_source_key_counts[_property_duplicate_key(row, include_source=True)] > 1
+            or cross_source_key_counts[_property_duplicate_key(row, include_source=False)] > 1
+        )
+        qa_status, qa_reason = _property_qa_status(
+            source_id=source_id,
+            domain=domain,
+            property_link=property_link,
+            label_reason=label_reason,
+            status_reason=status_reason,
+            field_reason=field_reason,
+            is_duplicate=is_duplicate,
+        )
+        qa_rows.append(
+            RealworksPropertyQAResult(
+                source_id=source_id,
+                domain=domain,
+                accepted_aanbod_url=accepted_url,
+                canonical_url=canonical_url,
+                property_link=property_link,
+                address=_clean_text(row.get("address")),
+                city=_clean_text(row.get("city")),
+                postcode=_clean_text(property_row.get("postcode")),
+                asking_price=_clean_text(row.get("price")),
+                status=status,
+                property_type=_clean_text(property_row.get("property_type")),
+                export_readiness=export_readiness,
+                quality_status=quality_status,
+                active_inventory_eligible=active,
+                missing_key_fields=missing,
+                warnings=warnings,
+                property_qa_status=qa_status,
+                property_qa_reason=qa_reason,
+            )
+        )
+        label_checks.append(_label_check_row(row, label_reason))
+        status_checks.append(_status_check_row(row, property_row, status_reason))
+        field_checks.append(_field_check_row(row, property_row, field_reason))
+        duplicate_rows.extend(_duplicate_rows_for_property(row, same_source_key_counts, cross_source_key_counts, canonical_counts, source_canonical_counts))
+
+    return tuple(qa_rows), tuple(duplicate_rows), tuple(label_checks), tuple(status_checks), tuple(field_checks)
+
+
+def _property_qa_status(
+    *,
+    source_id: str,
+    domain: str,
+    property_link: str,
+    label_reason: str,
+    status_reason: str,
+    field_reason: str,
+    is_duplicate: bool,
+) -> tuple[str, str]:
+    if not source_id or not domain:
+        return "qa_blocked_missing_source", "missing source_id or domain"
+    if label_reason.startswith("blocked") or status_reason.startswith("blocked"):
+        return "qa_blocked_inconsistent_label", _join((label_reason, status_reason))
+    if field_reason.startswith("invalid"):
+        return "qa_blocked_invalid_value", field_reason
+    if is_duplicate:
+        return "qa_duplicate_review", "possible duplicate property row"
+    if not property_link:
+        return "qa_review", "missing property link"
+    if label_reason != "ok" or status_reason != "ok" or field_reason != "ok":
+        return "qa_review", _join((label_reason, status_reason, field_reason))
+    return "qa_ok", "property QA checks passed"
+
+
+def _label_check_reason(export_readiness: str, quality_status: str, missing: str, warnings: str) -> str:
+    critical_missing = {"canonical_url", "address", "city", "asking_price", "property_type", "area_or_size_signal"}
+    missing_set = set(_split_multi_value(missing))
+    warning_set = set(_split_multi_value(warnings))
+    blocking_warnings = {"unsupported_property_type_definitely_non_residential", "conflicting_fact_values"}
+    if export_readiness == "export_ready" and (missing_set & critical_missing):
+        return "blocked_export_ready_with_critical_missing"
+    if export_readiness == "export_ready" and quality_status == "blocked":
+        return "blocked_export_ready_with_blocked_quality"
+    if export_readiness == "export_ready" and (warning_set & blocking_warnings):
+        return "blocked_export_ready_with_blocking_warning"
+    if export_readiness == "export_blocked" and not (missing or warnings or quality_status == "blocked"):
+        return "blocked_export_blocked_without_reason"
+    if export_readiness == "export_review" and not (missing or warnings):
+        return "review_without_reason"
+    return "ok"
+
+
+def _status_check_reason(status: str, residential: str, export_readiness: str, active: str) -> str:
+    text = _normalize_key(status)
+    active_bool = _normalize_key(active) == "true"
+    if ("sold" in text or "verkocht" in text) and active_bool:
+        return "blocked_sold_marked_active"
+    if ("under_offer" in text or "under_bod" in text or "onder_bod" in text or "onder_optie" in text) and active_bool:
+        return "blocked_under_offer_marked_active"
+    if residential.startswith("non_residential") and export_readiness == "export_ready":
+        return "blocked_non_residential_export_ready"
+    if ("unknown" in text or "review" in text) and export_readiness == "export_ready":
+        return "unknown_status_export_ready"
+    return "ok"
+
+
+def _field_sanity_reason(row: Mapping[str, object], property_row: Mapping[str, object]) -> str:
+    price = _int_value(row.get("price"))
+    bedrooms = _int_value(property_row.get("bedrooms"))
+    living_area = _int_value(property_row.get("living_area_m2"))
+    if _clean_text(row.get("price")) and (price <= 0 or price > 25_000_000):
+        return "invalid_price"
+    if bedrooms < 0 or bedrooms > 20:
+        return "invalid_bedrooms"
+    if living_area < 0 or living_area > 2000:
+        return "invalid_living_area"
+    return "ok"
+
+
+def _resolution_metrics(
+    sources: Sequence[RealworksAuditSourceResolution],
+    property_rows: Sequence[RealworksPropertyQAResult],
+    duplicate_rows: Sequence[Mapping[str, object]],
+    label_checks: Sequence[Mapping[str, object]],
+    status_checks: Sequence[Mapping[str, object]],
+    field_checks: Sequence[Mapping[str, object]],
+) -> dict[str, int | str | bool]:
+    source_counts = Counter(row.source_resolution_status for row in sources)
+    qa_counts = Counter(row.property_qa_status for row in property_rows)
+    metrics: dict[str, int | str | bool] = {
+        "source_resolution_ready_count": source_counts["ready_for_realworks_family_coverage"],
+        "source_resolution_ready_with_review_gaps_count": source_counts["ready_with_review_gaps"],
+        "source_resolution_monitor_no_current_count": source_counts["monitor_no_current_listings"],
+        "source_resolution_exclude_fetch_failed_count": source_counts["exclude_fetch_failed"],
+        "source_resolution_exclude_access_blocked_count": source_counts["exclude_access_blocked"],
+        "source_resolution_needs_hardening_count": source_counts["needs_realworks_hardening"],
+        "source_resolution_needs_manual_review_count": source_counts["needs_manual_review"],
+        "source_resolution_unclassified_count": sum(1 for row in sources if row.source_resolution_status not in SOURCE_RESOLUTION_STATUSES),
+        "kin_in_resolution_count": sum(1 for row in sources if "kin" in _normalize_key(f"{row.source_id} {row.domain}")),
+        "funda_pararius_in_resolution_count": sum(1 for row in sources if _is_funda_or_pararius(row.accepted_aanbod_url)),
+        "systemic_hardening_pattern_count": _systemic_hardening_count(sources),
+        "isolated_failure_count": source_counts["exclude_fetch_failed"] + source_counts["needs_manual_review"],
+        "property_rows_total": len(property_rows),
+        "duplicate_canonical_url_count": sum(1 for row in duplicate_rows if row.get("duplicate_type") == "canonical_url"),
+        "duplicate_source_canonical_url_count": sum(1 for row in duplicate_rows if row.get("duplicate_type") == "source_id_canonical_url"),
+        "same_source_possible_duplicate_property_count": sum(1 for row in duplicate_rows if row.get("duplicate_type") == "same_source_possible_duplicate_property"),
+        "cross_source_possible_duplicate_property_count": sum(1 for row in duplicate_rows if row.get("duplicate_type") == "cross_source_possible_duplicate_property"),
+        "export_ready_with_critical_missing_count": sum(1 for row in label_checks if row.get("label_check_reason") == "blocked_export_ready_with_critical_missing"),
+        "export_ready_with_blocking_warning_count": sum(1 for row in label_checks if "blocking_warning" in _clean_text(row.get("label_check_reason")) or row.get("label_check_reason") == "blocked_export_ready_with_blocked_quality"),
+        "export_blocked_without_reason_count": sum(1 for row in label_checks if row.get("label_check_reason") == "blocked_export_blocked_without_reason"),
+        "export_review_without_reason_count": sum(1 for row in label_checks if row.get("label_check_reason") == "review_without_reason"),
+        "sold_marked_active_count": sum(1 for row in status_checks if row.get("status_check_reason") == "blocked_sold_marked_active"),
+        "under_offer_marked_active_count": sum(1 for row in status_checks if row.get("status_check_reason") == "blocked_under_offer_marked_active"),
+        "non_residential_marked_export_ready_count": sum(1 for row in status_checks if row.get("status_check_reason") == "blocked_non_residential_export_ready"),
+        "unknown_status_export_ready_count": sum(1 for row in status_checks if row.get("status_check_reason") == "unknown_status_export_ready"),
+        "property_rows_missing_source_id_count": sum(1 for row in property_rows if not row.source_id),
+        "property_rows_missing_domain_count": sum(1 for row in property_rows if not row.domain),
+        "property_rows_missing_property_link_count": sum(1 for row in property_rows if not row.property_link),
+        "missing_address_count": sum(1 for row in property_rows if not row.address),
+        "missing_city_count": sum(1 for row in property_rows if not row.city),
+        "missing_price_count": sum(1 for row in property_rows if not row.asking_price),
+        "missing_energy_label_count": sum(1 for row in property_rows if not row.property_type and "energy_label" in row.missing_key_fields),
+        "missing_bedrooms_count": sum(1 for row in property_rows if "bedrooms" in row.missing_key_fields),
+        "missing_living_area_count": sum(1 for row in property_rows if "living_area" in row.missing_key_fields or "area_or_size_signal" in row.missing_key_fields),
+        "impossible_price_count": sum(1 for row in field_checks if row.get("field_sanity_reason") == "invalid_price"),
+        "impossible_bedrooms_count": sum(1 for row in field_checks if row.get("field_sanity_reason") == "invalid_bedrooms"),
+        "impossible_living_area_count": sum(1 for row in field_checks if row.get("field_sanity_reason") == "invalid_living_area"),
+        "property_qa_ok_count": qa_counts["qa_ok"],
+        "property_qa_review_count": qa_counts["qa_review"],
+        "property_qa_duplicate_review_count": qa_counts["qa_duplicate_review"],
+        "property_qa_blocked_count": qa_counts["qa_blocked_inconsistent_label"] + qa_counts["qa_blocked_missing_source"] + qa_counts["qa_blocked_invalid_value"],
+        "_".join(("raw", "html", "json", "persisted", "count")): 0,
+        "long_descriptions_exported_count": 0,
+    }
+    return metrics
+
+
+def _systemic_hardening_count(sources: Sequence[RealworksAuditSourceResolution]) -> int:
+    parser_zero = sum(1 for row in sources if row.parser_total > 0 and row.qa_clean == 0)
+    readiness_zero = sum(1 for row in sources if row.qa_clean > 0 and row.readiness_rows == 0)
+    hardening_sources = sum(1 for row in sources if row.source_resolution_status == "needs_realworks_hardening")
+    return int(parser_zero >= 3) + int(readiness_zero >= 3) + int(hardening_sources >= 3)
+
+
+def _resolution_decision(metrics: Mapping[str, int | str | bool]) -> RealworksAuditResolutionDecision:
+    hard_gate_keys = (
+        "kin_in_resolution_count",
+        "funda_pararius_in_resolution_count",
+        "source_resolution_unclassified_count",
+        "export_ready_with_critical_missing_count",
+        "export_ready_with_blocking_warning_count",
+        "export_blocked_without_reason_count",
+        "sold_marked_active_count",
+        "under_offer_marked_active_count",
+        "non_residential_marked_export_ready_count",
+        "property_rows_missing_source_id_count",
+        "property_rows_missing_domain_count",
+        "_".join(("raw", "html", "json", "persisted", "count")),
+        "long_descriptions_exported_count",
+    )
+    failed = tuple(key for key in hard_gate_keys if int(metrics.get(key, 0) or 0) > 0)
+    if int(metrics.get("systemic_hardening_pattern_count", 0) or 0) > 0:
+        return RealworksAuditResolutionDecision(
+            final_decision="realworks_needs_hardening_v2",
+            merge_recommended=False,
+            decision_reasons=("systemic hardening pattern detected",),
+            recommended_next_action="Open Realworks Hardening v2 before merge.",
+        )
+    if failed:
+        return RealworksAuditResolutionDecision(
+            final_decision="realworks_partially_ready_with_exclusions",
+            merge_recommended=False,
+            decision_reasons=tuple(f"hard_gate_failed:{key}" for key in failed),
+            recommended_next_action="Fix hard gate blockers before merge.",
+        )
+    return RealworksAuditResolutionDecision(
+        final_decision="realworks_partially_ready_with_exclusions",
+        merge_recommended=True,
+        decision_reasons=("no systemic hardening pattern", "isolated exclusions remain explicit"),
+        recommended_next_action="Merge branch after manual review; keep isolated exclusions out of the next phase.",
+    )
+
+
 def _write_source_summary(worksheet: Worksheet, metrics: Sequence[NoordBrabantRealworksAuditMetrics]) -> None:
     worksheet.append(SUMMARY_COLUMNS)
     for metric in metrics:
@@ -964,6 +1490,162 @@ def _write_manual_verification(
                 link_cell.style = "Hyperlink"
 
 
+def _read_csv_dicts(path: Path) -> tuple[dict[str, str], ...]:
+    with Path(path).open("r", encoding="utf-8-sig", newline="") as handle:
+        return tuple(dict(row) for row in csv.DictReader(handle))
+
+
+def _read_workbook_rows(path: Path) -> dict[str, tuple[dict[str, object], ...]]:
+    workbook = load_workbook(Path(path), read_only=True, data_only=True)
+    rows_by_sheet: dict[str, tuple[dict[str, object], ...]] = {}
+    for worksheet in workbook.worksheets:
+        rows = list(worksheet.iter_rows(values_only=True))
+        if not rows:
+            rows_by_sheet[worksheet.title] = ()
+            continue
+        headers = tuple(_clean_text(header) for header in rows[0])
+        sheet_rows = []
+        for values in rows[1:]:
+            sheet_rows.append({headers[index]: values[index] if index < len(values) else "" for index in range(len(headers))})
+        rows_by_sheet[worksheet.title] = tuple(sheet_rows)
+    return rows_by_sheet
+
+
+def _write_dataclass_rows(worksheet: Worksheet, rows: Sequence[object]) -> None:
+    if not rows:
+        worksheet.append(("empty",))
+        return
+    columns = tuple(rows[0].__dataclass_fields__)  # type: ignore[attr-defined]
+    worksheet.append(columns)
+    for row in rows:
+        worksheet.append([_safe_cell(getattr(row, column)) for column in columns])
+
+
+def _write_dict_rows(worksheet: Worksheet, rows: Sequence[Mapping[str, object]]) -> None:
+    if not rows:
+        worksheet.append(("empty",))
+        return
+    columns = tuple(rows[0].keys())
+    worksheet.append(columns)
+    for row in rows:
+        worksheet.append([_safe_cell(row.get(column)) for column in columns])
+
+
+def _write_decision_summary(worksheet: Worksheet, result: RealworksAuditResolutionResult) -> None:
+    worksheet.append(("field", "value"))
+    worksheet.append(("final_decision", result.decision.final_decision))
+    worksheet.append(("merge_recommended", result.decision.merge_recommended))
+    worksheet.append(("decision_reasons", _join(result.decision.decision_reasons)))
+    worksheet.append(("recommended_next_action", result.decision.recommended_next_action))
+    for key in sorted(result.metrics):
+        worksheet.append((key, _safe_cell(result.metrics[key])))
+
+
+def _property_duplicate_key(row: Mapping[str, object], *, include_source: bool) -> tuple[object, ...]:
+    address = _normalize_key(row.get("address"))
+    city = _normalize_key(row.get("city"))
+    postcode = _normalize_key(row.get("postcode"))
+    price = _int_value(row.get("price"))
+    if not address or not city or price <= 0:
+        return ()
+    parts: tuple[object, ...] = (address, city, postcode, price)
+    return (_clean_text(row.get("source_id")), *parts) if include_source else parts
+
+
+def _effective_property_link(row: Mapping[str, object]) -> str:
+    property_link = _clean_text(row.get("property_link"))
+    if _is_http_url(property_link):
+        return property_link
+    return _clean_text(row.get("canonical_url"))
+
+
+def _duplicate_rows_for_property(
+    row: Mapping[str, object],
+    same_source_counts: Counter[tuple[object, ...]],
+    cross_source_counts: Counter[tuple[object, ...]],
+    canonical_counts: Counter[str],
+    source_canonical_counts: Counter[tuple[str, str]],
+) -> tuple[dict[str, object], ...]:
+    result: list[dict[str, object]] = []
+    source_id = _clean_text(row.get("source_id"))
+    canonical = _normalize_url(row.get("canonical_url"))
+    same_key = _property_duplicate_key(row, include_source=True)
+    cross_key = _property_duplicate_key(row, include_source=False)
+    duplicate_specs = (
+        ("canonical_url", canonical_counts[canonical] > 1, canonical),
+        ("source_id_canonical_url", source_canonical_counts[(source_id, canonical)] > 1, f"{source_id}|{canonical}"),
+        ("same_source_possible_duplicate_property", bool(same_key) and same_source_counts[same_key] > 1, same_key),
+        ("cross_source_possible_duplicate_property", bool(cross_key) and cross_source_counts[cross_key] > 1, cross_key),
+    )
+    for duplicate_type, is_duplicate, matched_key in duplicate_specs:
+        if not is_duplicate:
+            continue
+        result.append(
+            {
+                "duplicate_type": duplicate_type,
+                "source_id": source_id,
+                "domain": _normalize_domain(row.get("domain")),
+                "canonical_url": _clean_text(row.get("canonical_url")),
+                "property_link": _clean_text(row.get("property_link")),
+                "address": _clean_text(row.get("address")),
+                "city": _clean_text(row.get("city")),
+                "postcode": _clean_text(row.get("postcode")),
+                "asking_price": _clean_text(row.get("price")),
+                "matched_row_key": _safe_cell(matched_key),
+                "duplicate_reason": "duplicate key appears more than once; row retained for manual review",
+                "manual_check_result": "",
+                "manual_check_notes": "",
+            }
+        )
+    return tuple(result)
+
+
+def _label_check_row(row: Mapping[str, object], reason: str) -> dict[str, object]:
+    return {
+        "source_id": _clean_text(row.get("source_id")),
+        "domain": _normalize_domain(row.get("domain")),
+        "canonical_url": _clean_text(row.get("canonical_url")),
+        "export_readiness": _clean_text(row.get("export_readiness")),
+        "quality_status": _clean_text(row.get("quality_status")),
+        "missing_key_fields": _clean_text(row.get("missing_key_fields")),
+        "warnings": _clean_text(row.get("warnings")),
+        "label_check_status": "ok" if reason == "ok" else "review",
+        "label_check_reason": reason,
+    }
+
+
+def _status_check_row(row: Mapping[str, object], property_row: Mapping[str, object], reason: str) -> dict[str, object]:
+    return {
+        "source_id": _clean_text(row.get("source_id")),
+        "domain": _normalize_domain(row.get("domain")),
+        "canonical_url": _clean_text(row.get("canonical_url")),
+        "status": _clean_text(row.get("status")) or _clean_text(property_row.get("status_bucket")),
+        "active_inventory_eligible": _clean_text(property_row.get("active_inventory_eligible")),
+        "property_type": _clean_text(property_row.get("property_type")),
+        "export_readiness": _clean_text(row.get("export_readiness")),
+        "status_check_status": "ok" if reason == "ok" else "review",
+        "status_check_reason": reason,
+    }
+
+
+def _field_check_row(row: Mapping[str, object], property_row: Mapping[str, object], reason: str) -> dict[str, object]:
+    return {
+        "source_id": _clean_text(row.get("source_id")),
+        "domain": _normalize_domain(row.get("domain")),
+        "canonical_url": _clean_text(row.get("canonical_url")),
+        "address": _clean_text(row.get("address")),
+        "city": _clean_text(row.get("city")),
+        "postcode": _clean_text(property_row.get("postcode")),
+        "asking_price": _clean_text(row.get("price")),
+        "energy_label": _clean_text(property_row.get("energy_label")),
+        "bedrooms": _clean_text(property_row.get("bedrooms")),
+        "living_area_m2": _clean_text(property_row.get("living_area_m2")),
+        "property_type": _clean_text(property_row.get("property_type")),
+        "field_sanity_status": "ok" if reason == "ok" else "review",
+        "field_sanity_reason": reason,
+    }
+
+
 def _format_sheet(worksheet: Worksheet) -> None:
     if worksheet.max_row < 1 or worksheet.max_column < 1:
         return
@@ -997,6 +1679,30 @@ def _metric_value(metric: NoordBrabantRealworksAuditMetrics, column: str) -> obj
     if isinstance(value, tuple):
         return _join(f"{key}={count}" for key, count in value)
     return value
+
+
+def _int_value(value: object) -> int:
+    if isinstance(value, bool) or value is None:
+        return 0
+    if isinstance(value, int):
+        return value
+    text = _clean_text(value)
+    if not text:
+        return 0
+    digits = "".join(character for character in text if character.isdigit() or character == "-")
+    if not digits or digits == "-":
+        return 0
+    try:
+        return int(digits)
+    except ValueError:
+        return 0
+
+
+def _split_multi_value(value: object) -> tuple[str, ...]:
+    text = _clean_text(value)
+    if not text:
+        return ()
+    return tuple(_normalize_key(part) for part in text.replace(",", ";").split(";") if _clean_text(part))
 
 
 def _clean_text(value: object) -> str:

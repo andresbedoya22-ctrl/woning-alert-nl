@@ -255,8 +255,16 @@ runtime, parser-per-makelaar work, and global eligibility changes.
 
 Realworks Audit Input Handoff Repair v1 fixed the source-completion handoff schema after the audit runner correctly
 blocked a CSV missing `coverage_province` and `parser_family_candidate`. The producer now emits canonical input columns
-and a reconciliation CSV. The current source-completion run explains the ready count as `62` included Realworks rows and
-`26` verified rows excluded for manual scope check, with no unexplained row-count delta.
+and a reconciliation CSV. The regenerated source-completion run explains the ready count as `65` included Realworks
+rows and `26` verified rows excluded for manual scope check, with no unexplained row-count delta.
+
+Realworks Audit Resolution v1 confirms that local generated handoff files can be stale between workspaces. The stale
+CSV was moved aside and the handoff was regenerated from the repaired producer, yielding `65` canonical ready rows and a
+reconciliation of `91` verified Realworks sources: `65` ready, `26` manual-scope exclusions. The regenerated provincial
+audit produced `5` passed, `34` passed with review gaps, `24` no-current-listings, `2` fetch failures, `0` hardening
+candidates, and `304` readiness rows. Property-row QA found no hard-gate failures for duplicates, readiness labels,
+status consistency, source attribution, raw persistence, or long-description export. The decision remains
+`realworks_partially_ready_with_exclusions`; no Realworks Hardening v2 is justified from this run.
 
 ## Parser Family Runner v1
 

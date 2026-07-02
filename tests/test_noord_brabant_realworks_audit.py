@@ -23,6 +23,7 @@ from domek_wonen.pilots.noord_brabant_realworks_audit import (  # noqa: E402
     NoordBrabantRealworksAuditMetrics,
     decide_noord_brabant_realworks_family,
     load_noord_brabant_realworks_audit_sources,
+    resolve_noord_brabant_realworks_audit,
     run_noord_brabant_realworks_audit,
     validate_noord_brabant_realworks_audit_input_rows,
 )
@@ -449,6 +450,90 @@ def test_decision_variants() -> None:
     )
 
 
+def test_resolution_maps_source_statuses_and_writes_outputs(tmp_path: Path) -> None:
+    summary = tmp_path / "summary.csv"
+    _write_resolution_summary(
+        summary,
+        [
+            _summary_row("ready.nl__breda", "passed"),
+            _summary_row("review.nl__breda", "passed_with_review_gaps"),
+            _summary_row("empty.nl__breda", "no_current_listings", parser_total=0, qa_clean=0, rows=0),
+            _summary_row("failed.nl__breda", "listing_fetch_failed", parser_total=0, qa_clean=0, rows=0),
+        ],
+    )
+    workbook = _write_resolution_workbook(tmp_path / "audit.xlsx", summary)
+    result = resolve_noord_brabant_realworks_audit(
+        audit_summary_csv=summary,
+        audit_workbook=workbook,
+        output_csv=tmp_path / "resolution.csv",
+        output_workbook=tmp_path / "resolution.xlsx",
+    )
+    assert result.metrics["source_resolution_ready_count"] == 1
+    assert result.metrics["source_resolution_ready_with_review_gaps_count"] == 1
+    assert result.metrics["source_resolution_monitor_no_current_count"] == 1
+    assert result.metrics["source_resolution_exclude_fetch_failed_count"] == 1
+    assert result.metrics["systemic_hardening_pattern_count"] == 0
+    assert result.decision.final_decision == "realworks_partially_ready_with_exclusions"
+    assert result.output_csv_path and result.output_csv_path.exists()
+    output = load_workbook(result.output_workbook_path)
+    assert {
+        "Source Resolution",
+        "Ready Sources",
+        "Ready With Review Gaps",
+        "No Current Listings",
+        "Excluded Sources",
+        "Manual Review",
+        "Hardening Candidates",
+        "Property QA",
+        "Duplicate Properties",
+        "Readiness Label Checks",
+        "Status Consistency",
+        "Field Sanity",
+        "Decision Summary",
+    }.issubset(output.sheetnames)
+
+
+def test_resolution_triggers_hardening_v2_on_repeated_parser_failures(tmp_path: Path) -> None:
+    summary = tmp_path / "summary.csv"
+    _write_resolution_summary(
+        summary,
+        [
+            _summary_row(f"hard{i}.nl__breda", "needs_realworks_hardening", parser_total=5, qa_clean=0, rows=0)
+            for i in range(3)
+        ],
+    )
+    result = resolve_noord_brabant_realworks_audit(
+        audit_summary_csv=summary,
+        audit_workbook=_write_resolution_workbook(tmp_path / "audit.xlsx", summary),
+    )
+    assert result.metrics["source_resolution_needs_hardening_count"] == 3
+    assert result.metrics["systemic_hardening_pattern_count"] > 0
+    assert result.decision.final_decision == "realworks_needs_hardening_v2"
+
+
+def test_property_qa_detects_duplicates_and_hard_gate_issues(tmp_path: Path) -> None:
+    summary = tmp_path / "summary.csv"
+    _write_resolution_summary(summary, [_summary_row("example.nl__breda", "passed")])
+    workbook = _write_resolution_workbook(
+        tmp_path / "audit.xlsx",
+        summary,
+        manual_rows=[
+            _manual_row(),
+            _manual_row(),
+            _manual_row(canonical_url="https://example.nl/aanbod/woningaanbod/breda/koop/huis-456", price="", missing_key_fields="asking_price", export_readiness="export_ready"),
+            _manual_row(canonical_url="https://example.nl/aanbod/woningaanbod/breda/koop/huis-789", status="inactive_sold", export_readiness="export_ready"),
+        ],
+    )
+    result = resolve_noord_brabant_realworks_audit(audit_summary_csv=summary, audit_workbook=workbook)
+    assert result.metrics["duplicate_canonical_url_count"] >= 2
+    assert result.metrics["duplicate_source_canonical_url_count"] >= 2
+    assert result.metrics["same_source_possible_duplicate_property_count"] >= 2
+    assert result.metrics["cross_source_possible_duplicate_property_count"] >= 2
+    assert result.metrics["export_ready_with_critical_missing_count"] == 1
+    assert result.metrics["property_qa_duplicate_review_count"] >= 2
+    assert result.metrics["property_qa_blocked_count"] >= 1
+
+
 def test_static_scope_guardrails() -> None:
     tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
     imported = {
@@ -464,6 +549,131 @@ def test_static_scope_guardrails() -> None:
     assert "download" not in source.casefold()
     assert "ParserFamilyRunner" not in source
     assert "raw_html" not in source and "raw_json" not in source
+
+
+def _summary_row(
+    source_id: str,
+    status: str,
+    *,
+    parser_total: int = 1,
+    qa_clean: int = 1,
+    rows: int = 1,
+) -> dict[str, object]:
+    domain = source_id.split("__", 1)[0]
+    return {
+        "source_id": source_id,
+        "source_name": source_id,
+        "domain": domain,
+        "accepted_aanbod_url": f"https://{domain}/aanbod/woningaanbod/breda/koop",
+        "coverage_city": "Breda",
+        "coverage_gemeente": "Breda",
+        "aanbod_scope_status": "confirmed_nb_scope",
+        "access_policy_status": "allowed",
+        "robots_listing_allowed": "True",
+        "listing_fetch_status": "success",
+        "listing_http_status": "ok",
+        "parser_total": parser_total,
+        "parser_qa_clean": qa_clean,
+        "parser_qa_review": 0,
+        "parser_qa_rejected": 0,
+        "detail_attempted": rows,
+        "detail_succeeded": rows,
+        "detail_failed": 0,
+        "readiness_rows_built": rows,
+        "export_ready": rows,
+        "export_review": 0,
+        "export_blocked": 0,
+        "active_inventory_eligible": rows,
+        "inactive_status_count": 0,
+        "non_residential_count": 0,
+        "no_current_listings": status == "no_current_listings",
+        "top_warning": "",
+        "validation_status": status,
+        "validation_decision": status,
+        "recommended_next_action": status,
+    }
+
+
+def _write_resolution_summary(path: Path, rows: list[dict[str, object]]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    columns = list(_summary_row("example.nl__breda", "passed").keys())
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({column: row.get(column, "") for column in columns})
+    return path
+
+
+def _manual_row(**overrides: object) -> dict[str, object]:
+    row: dict[str, object] = {
+        "source_id": "example.nl__breda",
+        "domain": "example.nl",
+        "address": "Teststraat 1",
+        "city": "Breda",
+        "price": "425000",
+        "status": "active_available",
+        "accepted_aanbod_url": "https://example.nl/aanbod/woningaanbod/breda/koop",
+        "canonical_url": "https://example.nl/aanbod/woningaanbod/breda/koop/huis-123",
+        "property_link": "https://example.nl/aanbod/woningaanbod/breda/koop/huis-123",
+        "export_readiness": "export_ready",
+        "quality_status": "client_ready",
+        "missing_key_fields": "",
+        "warnings": "",
+        "manual_check_result": "",
+        "manual_check_notes": "",
+    }
+    row.update(overrides)
+    return row
+
+
+def _write_resolution_workbook(path: Path, summary: Path, manual_rows: list[dict[str, object]] | None = None) -> Path:
+    with summary.open(encoding="utf-8", newline="") as handle:
+        source_rows = list(csv.DictReader(handle))
+    manual_rows = manual_rows or [_manual_row()]
+    workbook = load_workbook(summary) if False else None
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Source Summary"
+    _append_dict_sheet(ws, source_rows)
+    manual_ws = wb.create_sheet("Manual Verification")
+    _append_dict_sheet(manual_ws, manual_rows)
+    props_ws = wb.create_sheet("Realworks Properties")
+    property_rows = []
+    for row in manual_rows:
+        property_rows.append(
+            {
+                "source_id": row["source_id"],
+                "source_domain": row["domain"],
+                "canonical_url": row["canonical_url"],
+                "address": row["address"],
+                "postcode": "4811 AA",
+                "city": row["city"],
+                "asking_price": row["price"],
+                "status_bucket": row["status"],
+                "quality_status": row["quality_status"],
+                "export_readiness": row["export_readiness"],
+                "active_inventory_eligible": "False",
+                "residential_classification": "residential",
+                "freshness_bucket": "unknown_age",
+                "lifecycle_events": "",
+                "missing_key_fields": row["missing_key_fields"],
+                "review_fields": "",
+                "warnings": row["warnings"],
+            }
+        )
+    _append_dict_sheet(props_ws, property_rows)
+    wb.save(path)
+    return path
+
+
+def _append_dict_sheet(worksheet, rows: list[dict[str, object]]) -> None:
+    columns = list(rows[0].keys()) if rows else ["empty"]
+    worksheet.append(columns)
+    for row in rows:
+        worksheet.append([row.get(column, "") for column in columns])
 
 
 def _metric(status: str) -> NoordBrabantRealworksAuditMetrics:

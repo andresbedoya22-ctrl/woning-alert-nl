@@ -28,12 +28,12 @@ invalid schema: it was missing `coverage_province` and `parser_family_candidate`
 required columns separately from row-level `non_realworks` counts, so a missing `parser_family_candidate` column cannot
 produce a false non-Realworks count.
 
-## Why only 62 sources
+## Canonical audit input
 
-The earlier documented completion run separated 91 verified Realworks sources into 65 ready audit inputs and 26 manual
-scope checks. The repaired handoff was regenerated from the current source-completion run and reconciled to 88 verified
-Realworks rows: 62 ready audit inputs and 26 `needs_manual_scope_check` rows. The current authorized audit count is 62,
-not 65.
+An intermediate local generated CSV was stale: it had `65` rows but missed `coverage_province` and
+`parser_family_candidate`, so it was not valid audit input. Regenerating from the repaired source-completion producer
+produced the canonical schema and reconciled `91` verified Realworks rows: `65` ready audit inputs and `26`
+`needs_manual_scope_check` rows. The current authorized audit count is `65`.
 
 The reconciliation artifact is:
 
@@ -41,7 +41,7 @@ The reconciliation artifact is:
 tmp/generated/noord_brabant_realworks_audit_input_reconciliation_v1.csv
 ```
 
-It shows `62` rows included as `included_in_canonical_audit_input` and `26` rows excluded as
+It shows `65` rows included as `included_in_canonical_audit_input` and `26` rows excluded as
 `excluded_pending_manual_scope_check`. KIN, unclear scope rows, missing accepted URL rows, property-detail URLs,
 Funda/Pararius URLs, and blocked/legal/manual-review rows remain hard-gated out.
 
@@ -138,24 +138,40 @@ Possible decisions are:
 
 The decision includes confidence, reasons, recommended next action, source exclusions, and hardening targets.
 
-The repaired provincial run attempted all `62` canonical input sources. Results:
+The stale local `tmp/generated/noord_brabant_realworks_audit_input_v1.csv` had `65` rows but missed
+`coverage_province` and `parser_family_candidate`, so it was moved aside and regenerated from the repaired
+source-completion producer. The regenerated canonical handoff contains `65` ready Realworks rows, while the
+reconciliation artifact records `91` verified Realworks sources: `65` ready for audit and `26` excluded pending manual
+scope check. KIN, manual-scope rows, Funda/Pararius, missing accepted URLs, and property-detail URLs remain hard-gated
+out.
 
-- sources passed: `6`
-- sources passed with review gaps: `32`
-- no current listings: `22`
+The regenerated provincial run attempted all `65` canonical input sources. Results:
+
+- sources passed: `5`
+- sources passed with review gaps: `34`
+- no current listings: `24`
 - listing fetch failed: `2`
 - sources needing hardening: `0`
-- parser rows: `305`
-- QA clean/review/rejected: `303 / 2 / 0`
-- detail attempted/succeeded/failed: `303 / 295 / 8`
-- readiness rows built: `295`
-- export ready/review/blocked: `194 / 98 / 3`
+- parser rows: `315`
+- QA clean/review/rejected: `312 / 3 / 0`
+- detail attempted/succeeded/failed: `312 / 304 / 8`
+- readiness rows built: `304`
+- export ready/review/blocked: `201 / 100 / 3`
 - family decision: `realworks_partially_ready_with_exclusions`
 
-Top field gaps were `garage`, `plot_area_m2`, `vve_active`, `bathrooms`, and `parking`. Top warnings were
-`description_not_stored`, `missing_coordinates`, `source_published_at_missing`, `cv_ketel_ownership_not_clear`, and
-`missing_vve_for_apartment`. Parser failure patterns were `no_current_listings`, `no_realworks_detail_urls_found`, and
-`listing_fetch_failed`.
+Realworks Audit Resolution v1 maps the source outcomes explicitly: `5` ready for Realworks family coverage, `34` ready
+with review gaps, `24` monitor-only because there are no current listings, `2` excluded fetch failures, `0` access
+blocked, `0` hardening candidates, and `0` manual-review source resolutions. `no_current_listings` is not counted as a
+parser failure, and the two fetch failures are isolated exclusions rather than systemic hardening evidence.
+
+Property Row QA & Deduplication reviewed all `304` readiness rows. It found `0` duplicate canonical URLs, `0`
+same-source possible duplicates, `0` cross-source possible duplicates, `0` export-ready rows with critical missing
+fields, `0` export-ready rows with blocking warnings, `0` blocked rows without reason, `0` sold or under-offer rows
+marked active, `0` non-residential rows marked export-ready, and `0` missing source attribution hard-gate failures. The
+field sanity report keeps non-blocking review gaps visible: `7` missing energy-label signals, `4` missing bedroom
+signals, and `3` missing living-area signals. The final resolution decision remains
+`realworks_partially_ready_with_exclusions`; Realworks Hardening v2 is not recommended because no systemic parser,
+detail, duplicate, label, status, or field-sanity pattern was found.
 
 ## Recommended next action
 
