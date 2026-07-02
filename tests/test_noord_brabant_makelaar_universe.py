@@ -270,6 +270,140 @@ def test_normalizes_slogans(tmp_path: Path) -> None:
     assert "Smart Move." in row.aliases
 
 
+def test_rejects_funda_as_official_domain(tmp_path: Path) -> None:
+    result = _build_result(
+        tmp_path,
+        [_funda_row("Quinten Vastgoed", city="Nuenen")],
+        completion_rows=[_completion_row("funda.nl__oirschot", "Quinten Vastgoed", "funda.nl")],
+    )
+    row = result.rows[0]
+
+    assert row.existing_domain == "funda.nl"
+    assert row.official_domain == ""
+    assert row.official_domain_status == "rejected_third_party_domain"
+
+
+def test_rejects_funda_aanbod_url_as_official_operational_url(tmp_path: Path) -> None:
+    result = _build_result(
+        tmp_path,
+        [_funda_row("Portal Makelaars")],
+        completion_rows=[
+            _completion_row(
+                "portal.nl__tilburg",
+                "Portal Makelaars",
+                "portal.nl",
+                accepted_aanbod_url="https://www.funda.nl/makelaars/tilburg/123-portal-makelaars/woningaanbod/koop",
+                aanbod_url_status="valid",
+            )
+        ],
+    )
+    row = result.rows[0]
+
+    assert row.official_aanbod_url == ""
+    assert row.official_aanbod_url_status == "rejected_third_party_portal"
+
+
+def test_egan_does_not_keep_funda_aanbod_as_valid(tmp_path: Path) -> None:
+    result = _build_result(
+        tmp_path,
+        [_funda_row("Egan Makelaardij B.V.", city="Breda")],
+        completion_rows=[_completion_row("egan.nl__breda", "Egan Makelaardij B.V.", "eganmakelaardij.nl")],
+        master_rows=[
+            _master_row(
+                "egan.nl__breda",
+                "Egan Makelaardij B.V.",
+                "eganmakelaardij.nl",
+                "https://www.funda.nl/makelaars/breda/19403-egan-makelaardij-bv/woningaanbod/koop/heel-nederland",
+            )
+        ],
+        seed_rows=[
+            _seed_row(
+                "Egan Makelaardij B.V.",
+                "eganmakelaardij.nl",
+                "https://www.funda.nl/makelaars/breda/19403-egan-makelaardij-bv/woningaanbod/koop/heel-nederland",
+            )
+        ],
+    )
+    row = result.rows[0]
+
+    assert row.official_domain == "eganmakelaardij.nl"
+    assert row.official_aanbod_url == ""
+    assert row.official_aanbod_url_status == "rejected_third_party_portal"
+    assert row.recommended_next_action == "verify_public_aanbod_url"
+
+
+def test_quinten_vastgoed_does_not_keep_funda_domain(tmp_path: Path) -> None:
+    result = _build_result(
+        tmp_path,
+        [_funda_row("Quinten Vastgoed", city="Nuenen")],
+        completion_rows=[
+            _completion_row(
+                "funda.nl__oirschot",
+                "Quinten Vastgoed",
+                "funda.nl",
+                accepted_aanbod_url="https://www.funda.nl/makelaarsmatch",
+                aanbod_url_status="suspect",
+            )
+        ],
+        master_rows=[
+            _master_row(
+                "funda.nl__oirschot",
+                "Quinten Vastgoed",
+                "funda.nl",
+                "https://www.funda.nl/makelaarsmatch",
+            )
+        ],
+    )
+    row = result.rows[0]
+
+    assert row.official_domain == ""
+    assert row.official_domain_status == "rejected_third_party_domain"
+    assert row.official_aanbod_url == ""
+    assert row.recommended_next_action == "legal_or_permission_review"
+
+
+def test_cleans_via_paul_slogan(tmp_path: Path) -> None:
+    row = _build_result(tmp_path, [_funda_row("Via Paul Makelaardij, via wie anders?!", city="Goirle")]).rows[0]
+
+    assert row.display_name == "Via Paul Makelaardij"
+    assert row.normalized_name == "via paul makelaardij"
+
+
+def test_cleans_kin_funda_topmakelaar_slogan(tmp_path: Path) -> None:
+    row = _build_result(tmp_path, [_funda_row("KIN Makelaars, Funda-topmakelaar van Brabant!", city="Oisterwijk")]).rows[0]
+
+    assert row.display_name == "KIN Makelaars"
+    assert row.normalized_name == "kin makelaars"
+
+
+def test_cleans_allround_slogan(tmp_path: Path) -> None:
+    row = _build_result(tmp_path, [_funda_row("Allround Makelaardij, beste makelaar in jouw regio", city="Goirle")]).rows[0]
+
+    assert row.display_name == "Allround Makelaardij"
+    assert row.normalized_name == "allround makelaardij"
+
+
+def test_cleans_appels_qualis_label(tmp_path: Path) -> None:
+    row = _build_result(tmp_path, [_funda_row("Appels Makelaardij B.V. | NVM-QUALIS", city="Goirle")]).rows[0]
+
+    assert row.display_name == "Appels Makelaardij B.V."
+    assert row.normalized_name == "appels makelaardij"
+
+
+def test_cleans_lemmens_sales_slogan(tmp_path: Path) -> None:
+    row = _build_result(tmp_path, [_funda_row("Lemmens Makelaardij , 200 verkopen met cijfer 9,8!", city="Tilburg")]).rows[0]
+
+    assert row.display_name == "Lemmens Makelaardij"
+    assert row.normalized_name == "lemmens makelaardij"
+
+
+def test_cleans_hoomz_smart_move_slogan(tmp_path: Path) -> None:
+    row = _build_result(tmp_path, [_funda_row('Hoomz - "Smart Move."')]).rows[0]
+
+    assert row.display_name == "Hoomz"
+    assert row.normalized_name == "hoomz"
+
+
 def test_keeps_truncated_names_in_manual_review(tmp_path: Path) -> None:
     result = _build_result(tmp_path, [_funda_row("Nathalie van Gisbergen Lom...", name_truncated="true", name_needs_manual_review="true")])
 
@@ -335,6 +469,80 @@ def test_matches_existing_master_by_domain(tmp_path: Path) -> None:
 
     assert row.official_domain == "alpha.nl"
     assert row.seen_in_existing_master == "yes"
+
+
+def test_kin_slogan_row_can_match_existing_brand_without_merging_unrelated_names(tmp_path: Path) -> None:
+    result = _build_result(
+        tmp_path,
+        [_funda_row("KIN Makelaars, Funda-topmakelaar van Brabant!", city="Oisterwijk")],
+        completion_rows=[
+            _completion_row(
+                "kinmakelaars.nl__tilburg",
+                "KIN Makelaars Tilburg B.V.",
+                "kinmakelaars.nl",
+                accepted_aanbod_url="https://kinmakelaars.nl/aanbod/wonen/te-koop",
+                aanbod_url_status="accepted",
+                delivery_mode="realworks",
+                parser_family_candidate="realworks_public",
+            )
+        ],
+        master_rows=[_master_row("kinmakelaars.nl__tilburg", "KIN Makelaars Tilburg B.V.", "kinmakelaars.nl", "https://kinmakelaars.nl/aanbod/wonen/te-koop")],
+    )
+    row = result.rows[0]
+
+    assert row.display_name == "KIN Makelaars"
+    assert row.official_domain == "kinmakelaars.nl"
+    assert row.parser_family_candidate == "realworks_public"
+    assert row.existing_source_id == "kinmakelaars.nl__tilburg"
+
+
+def test_kin_brand_fallback_beats_unknown_domain_exact_name_match(tmp_path: Path) -> None:
+    result = _build_result(
+        tmp_path,
+        [_funda_row("KIN Makelaars, Funda-topmakelaar van Brabant!", city="Oisterwijk")],
+        completion_rows=[
+            _completion_row(
+                "kinmakelaars.nl__tilburg",
+                "KIN Makelaars Tilburg B.V.",
+                "kinmakelaars.nl",
+                accepted_aanbod_url="https://kinmakelaars.nl/aanbod/wonen/te-koop",
+                aanbod_url_status="accepted",
+                delivery_mode="realworks",
+                parser_family_candidate="realworks_public",
+            )
+        ],
+        resolution_rows=[_resolution_row("KIN Makelaars", "", resolved_source_id="unknown-domain__gilze-en-rijen")],
+    )
+    row = result.rows[0]
+
+    assert row.existing_source_id == "kinmakelaars.nl__tilburg"
+    assert row.official_domain == "kinmakelaars.nl"
+    assert row.parser_family_candidate == "realworks_public"
+
+
+def test_branch_variants_for_hendriks_and_van_de_water_remain_separate(tmp_path: Path) -> None:
+    result = _build_result(
+        tmp_path,
+        [
+            _funda_row("Hendriks Makelaardij Breda", city="Breda"),
+            _funda_row("Hendriks Makelaardij Tilburg", city="Tilburg"),
+            _funda_row("Van de Water Makelaars Breda", city="Breda"),
+            _funda_row("Van de Water Makelaars Tilburg", city="Tilburg"),
+        ],
+        master_rows=[
+            _master_row("hendriks.nl__breda", "Hendriks Makelaardij Breda", "hendriks.nl"),
+            _master_row("hendriks.nl__tilburg", "Hendriks Makelaardij Tilburg", "hendriks.nl"),
+            _master_row("vandewater.nl__breda", "Van de Water Makelaars Breda", "vandewatergroep.nl"),
+            _master_row("vandewater.nl__tilburg", "Van de Water Makelaars Tilburg", "vandewatergroep.nl"),
+        ],
+    )
+    rows_by_name = {row.display_name: row for row in result.rows}
+
+    assert result.deduped_makelaars == 4
+    assert rows_by_name["Hendriks Makelaardij Breda"].existing_source_id == "hendriks.nl__breda"
+    assert rows_by_name["Hendriks Makelaardij Tilburg"].existing_source_id == "hendriks.nl__tilburg"
+    assert rows_by_name["Van de Water Makelaars Breda"].existing_source_id == "vandewater.nl__breda"
+    assert rows_by_name["Van de Water Makelaars Tilburg"].existing_source_id == "vandewater.nl__tilburg"
 
 
 def test_copies_known_accepted_aanbod_url_from_source_completion_when_available(tmp_path: Path) -> None:

@@ -70,7 +70,8 @@ The Makelaar Universe exposes:
 - lowercase for matching keys
 - remove legal suffixes such as `B.V.`, `BV`, `N.V.`
 - keep the original `display_name`
-- split clear slogans after ` - ` into aliases instead of merging them into the canonical name
+- split clear slogans and commercial labels after `,`, `|`, or ` - ` into aliases instead of merging them into the canonical name
+- strip labels such as `NVM-QUALIS`, `Qualis`, `Funda-topmakelaar`, `via wie anders?!`, `beste makelaar in jouw regio`, and similar sales/rating text from the normalized key
 - keep `Meerdere makelaars` as a generic bucket
 - keep truncated names in manual review
 - avoid weak over-merges for similar-but-not-identical names
@@ -80,9 +81,16 @@ The Makelaar Universe exposes:
 Matching is conservative and local-only:
 
 1. exact normalized-name match against source completion, source master, and seed artifacts
-2. domain/source-id enrichment when that exact name match already resolves locally
-3. missing-domain resolution reuse when a local resolution file already exists
-4. multiple equally strong candidates stay in manual review
+2. controlled brand fallback only when the observed row reduces to a strong local brand key and no exact branch-level match exists
+3. domain/source-id enrichment when that exact or strong brand match already resolves locally
+4. missing-domain resolution reuse when a local resolution file already exists
+5. multiple equally strong candidates stay in manual review
+
+Third-party guardrails:
+
+- `official_domain` must never promote `funda.nl`, `pararius.nl`, social-media domains, search domains, maps domains, or similar third-party portals/directories
+- `official_aanbod_url` must never accept Funda/Pararius URLs as operational aanbod evidence
+- third-party portal/domain evidence may remain visible only as rejected/manual-review context, not as accepted official source data
 
 ## Priority strategy
 

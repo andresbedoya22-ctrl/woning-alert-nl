@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 import re
 from typing import Iterable, Mapping
+from urllib.parse import urlparse
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
@@ -57,12 +58,49 @@ QUALITY_GATE_NAMES = (
 SLOGAN_PATTERNS = (
     re.compile(r"\bvia wie anders\b", re.IGNORECASE),
     re.compile(r"\bbeste makelaar\b", re.IGNORECASE),
+    re.compile(r"\bfunda-topmakelaar\b", re.IGNORECASE),
     re.compile(r"\bsmart move\b", re.IGNORECASE),
     re.compile(r"\bzelf uw huis verkopen\b", re.IGNORECASE),
+    re.compile(r"\bwelkom thuis\b", re.IGNORECASE),
+    re.compile(r"\bactief regio\b", re.IGNORECASE),
+    re.compile(r"\bbeoordeeld met\b", re.IGNORECASE),
+    re.compile(r"\bverkopen met cijfer\b", re.IGNORECASE),
+    re.compile(r"\bnvm-qualis\b", re.IGNORECASE),
+    re.compile(r"\bqualis\b", re.IGNORECASE),
 )
 LEGAL_SUFFIX_RE = re.compile(r"\b(b\.?\s*v\.?|n\.?\s*v\.?)\b", re.IGNORECASE)
 QUOTES_RE = re.compile(r"[\"'`“”‘’]+")
 MULTISPACE_RE = re.compile(r"\s+")
+MARKETING_SPLIT_RE = re.compile(r"\s*(?:\||,\s*|-\s+)\s*")
+BRAND_SUFFIX_RE = re.compile(r"^(.+?\b(?:makelaars?|makelaardij|vastgoed|wonen)\b)", re.IGNORECASE)
+MARKETING_START_PATTERNS = (
+    re.compile(r"^via wie anders\b", re.IGNORECASE),
+    re.compile(r"^funda-topmakelaar\b", re.IGNORECASE),
+    re.compile(r"^beste makelaar\b", re.IGNORECASE),
+    re.compile(r"^nvm-qualis\b", re.IGNORECASE),
+    re.compile(r"^qualis\b", re.IGNORECASE),
+    re.compile(r"^actief regio\b", re.IGNORECASE),
+    re.compile(r"^beoordeeld met\b", re.IGNORECASE),
+    re.compile(r"^\d+\s+verkopen\b", re.IGNORECASE),
+    re.compile(r"^welkom thuis\b", re.IGNORECASE),
+    re.compile(r"^smart move\b", re.IGNORECASE),
+)
+THIRD_PARTY_PORTAL_DOMAINS = {
+    "funda.nl",
+    "pararius.nl",
+    "facebook.com",
+    "instagram.com",
+    "linkedin.com",
+    "x.com",
+    "twitter.com",
+    "youtube.com",
+    "tiktok.com",
+    "google.com",
+    "google.nl",
+    "maps.google.com",
+    "bing.com",
+    "yelp.com",
+}
 
 
 @dataclass(slots=True)
@@ -143,6 +181,7 @@ class MakelaarUniverseResult:
 class _ObservedGroup:
     display_name: str
     normalized_name: str
+    brand_key: str = ""
     aliases: set[str] = field(default_factory=set)
     cities: Counter[str] = field(default_factory=Counter)
     pages_by_city: defaultdict[str, set[int]] = field(default_factory=lambda: defaultdict(set))
@@ -298,6 +337,7 @@ def _load_existing_index(
     source_seed_csv_path: Path | str | None,
 ) -> tuple[dict[str, object], list[str]]:
     entries_by_name: defaultdict[str, list[ExistingMakelaarMatch]] = defaultdict(list)
+    entries_by_brand: defaultdict[str, list[ExistingMakelaarMatch]] = defaultdict(list)
     entries_by_domain: dict[str, ExistingMakelaarMatch] = {}
     missing_optional_inputs: list[str] = []
 
@@ -321,12 +361,18 @@ def _load_existing_index(
         master_row = master_by_source_id.get(source_id, {})
         fingerprint_row = fingerprint_by_source_id.get(source_id, {})
         seed_row = seed_by_domain.get(domain, {})
-        match = ExistingMakelaarMatch(
+        official_domain = _first_party_domain(
+            domain,
+            _normalize_domain_field(master_row.get("root_domain") or master_row.get("website")),
+            _normalize_domain_field(seed_row.get("root_domain") or row.get("root_url") or seed_row.get("website")),
+        )
+        match = _sanitize_existing_match(
+            ExistingMakelaarMatch(
             source_id=source_id,
             source_name=source_name,
             domain=domain,
-            official_domain=domain,
-            official_domain_status="known" if domain else "unknown_explicit",
+            official_domain=official_domain,
+            official_domain_status="known" if official_domain else "unknown_explicit",
             official_aanbod_url=normalize_text(row.get("accepted_aanbod_url")) or normalize_text(master_row.get("aanbod_url")) or normalize_text(seed_row.get("koopaanbod_url")),
             official_aanbod_url_status=normalize_text(row.get("aanbod_url_status")) or normalize_text(master_row.get("aanbod_url_quality")) or normalize_text(seed_row.get("koopaanbod_url_quality")) or "unknown_explicit",
             platform_family_candidate=normalize_text(row.get("delivery_mode")) or normalize_text(row.get("platform_guess")) or normalize_text(fingerprint_row.get("detected_platform")),
@@ -334,8 +380,12 @@ def _load_existing_index(
             recommended_next_action=normalize_text(row.get("recommended_next_action")) or normalize_text(fingerprint_row.get("recommended_next_action")),
             manual_check_result=normalize_text(row.get("manual_check_result")),
             manual_check_notes=normalize_text(row.get("manual_check_notes")),
+            )
         )
         entries_by_name[_normalize_makelaar_name(source_name)].append(match)
+        brand_key = _derive_brand_key(source_name)
+        if brand_key:
+            entries_by_brand[brand_key].append(match)
         if domain:
             entries_by_domain[domain] = match
 
@@ -349,7 +399,8 @@ def _load_existing_index(
         if any(match.source_id == source_id for match in entries_by_name[normalized_name]):
             continue
         fingerprint_row = fingerprint_by_source_id.get(source_id, {})
-        match = ExistingMakelaarMatch(
+        match = _sanitize_existing_match(
+            ExistingMakelaarMatch(
             source_id=source_id,
             source_name=source_name,
             domain=domain,
@@ -360,8 +411,12 @@ def _load_existing_index(
             platform_family_candidate=normalize_text(fingerprint_row.get("detected_platform")),
             parser_family_candidate=_platform_to_parser_family(normalize_text(fingerprint_row.get("detected_platform"))),
             recommended_next_action=normalize_text(fingerprint_row.get("recommended_next_action")),
+            )
         )
         entries_by_name[normalized_name].append(match)
+        brand_key = _derive_brand_key(source_name)
+        if brand_key:
+            entries_by_brand[brand_key].append(match)
         if domain and domain not in entries_by_domain:
             entries_by_domain[domain] = match
 
@@ -373,7 +428,7 @@ def _load_existing_index(
         domain = _normalize_domain_field(row.get("root_domain") or row.get("domain") or row.get("website"))
         if any(match.domain == domain and domain for match in entries_by_name[normalized_name]):
             continue
-        entries_by_name[normalized_name].append(
+        match = _sanitize_existing_match(
             ExistingMakelaarMatch(
                 source_name=source_name,
                 domain=domain,
@@ -384,6 +439,10 @@ def _load_existing_index(
                 manual_check_notes=normalize_text(row.get("notes")),
             )
         )
+        entries_by_name[normalized_name].append(match)
+        brand_key = _derive_brand_key(source_name)
+        if brand_key:
+            entries_by_brand[brand_key].append(match)
 
     for normalized_name, resolution_rows in resolution_by_name.items():
         resolved = [row for row in resolution_rows if normalize_text(row.get("resolved_domain"))]
@@ -392,7 +451,7 @@ def _load_existing_index(
         if normalized_name in entries_by_name:
             continue
         best = resolved[0]
-        entries_by_name[normalized_name].append(
+        match = _sanitize_existing_match(
             ExistingMakelaarMatch(
                 source_id=normalize_text(best.get("resolved_source_id")),
                 source_name=normalize_text(best.get("raw_source_name")),
@@ -404,8 +463,12 @@ def _load_existing_index(
                 manual_check_notes=normalize_text(best.get("manual_check_notes")),
             )
         )
+        entries_by_name[normalized_name].append(match)
+        brand_key = _derive_brand_key(normalize_text(best.get("raw_source_name")))
+        if brand_key:
+            entries_by_brand[brand_key].append(match)
 
-    return {"by_name": entries_by_name, "by_domain": entries_by_domain}, missing_optional_inputs
+    return {"by_name": entries_by_name, "by_brand": entries_by_brand, "by_domain": entries_by_domain}, missing_optional_inputs
 
 
 def _read_optional_csv(path: Path | str | None, missing_optional_inputs: list[str]) -> list[dict[str, str]]:
@@ -425,6 +488,7 @@ def _group_observations(
 ) -> dict[str, _ObservedGroup]:
     groups: dict[str, _ObservedGroup] = {}
     by_name: Mapping[str, list[ExistingMakelaarMatch]] = existing_index["by_name"]  # type: ignore[index]
+    by_brand: Mapping[str, list[ExistingMakelaarMatch]] = existing_index["by_brand"]  # type: ignore[index]
     for obs in observations:
         normalized = _normalize_makelaar_name(obs.makelaar_name_clean_candidate or obs.makelaar_name_raw)
         if not normalized and not obs.generic_multiple_makelaars:
@@ -432,12 +496,14 @@ def _group_observations(
         if obs.generic_multiple_makelaars:
             normalized = _normalize_makelaar_name(GENERIC_MULTIPLE_NAME)
         display_name, slogan_alias = _canonical_display_name(obs.makelaar_name_raw)
+        brand_key = _derive_brand_key(display_name)
         if obs.generic_multiple_makelaars:
             display_name = GENERIC_MULTIPLE_NAME
+            brand_key = ""
         key = normalized or _normalize_makelaar_name(display_name)
         group = groups.get(key)
         if group is None:
-            group = _ObservedGroup(display_name=display_name, normalized_name=key)
+            group = _ObservedGroup(display_name=display_name, normalized_name=key, brand_key=brand_key)
             groups[key] = group
         group.aliases.add(normalize_text(obs.makelaar_name_raw))
         if slogan_alias:
@@ -457,6 +523,13 @@ def _group_observations(
     for group in groups.values():
         if group.normalized_name in by_name:
             group.matched_sources.extend(by_name[group.normalized_name])
+        if (
+            group.brand_key
+            and _allow_brand_fallback(group)
+            and group.brand_key in by_brand
+            and _should_extend_with_brand_candidates(group)
+        ):
+            group.matched_sources.extend(by_brand[group.brand_key])
         if group.truncated:
             group.needs_manual_review = True
     return groups
@@ -476,7 +549,7 @@ def _build_universe_row(group: _ObservedGroup) -> MakelaarUniverseRow:
         for city in sorted(group.pages_by_city)
     )
     seen_in_existing_master = "yes" if match.source_id or match.domain or match.official_domain else "no"
-    official_domain = match.official_domain or match.domain
+    official_domain = match.official_domain
     official_domain_status = match.official_domain_status or ("known" if official_domain else "unknown_explicit")
     official_aanbod_url = match.official_aanbod_url
     official_aanbod_url_status = match.official_aanbod_url_status or ("known" if official_aanbod_url else "unknown_explicit")
@@ -621,9 +694,13 @@ def _recommended_next_action(group: _ObservedGroup, match: ExistingMakelaarMatch
         return "exclude_generic_bucket_from_domain_resolution"
     if group.truncated:
         return "manual_name_expansion_review"
+    if "blocked_or_legal_review" in normalize_key(match.recommended_next_action):
+        return "legal_or_permission_review"
     if tier == "manual_review":
         return match.recommended_next_action or "manual_review_needed"
     if not match.official_domain:
+        if match.official_domain_status == "rejected_third_party_domain":
+            return "legal_or_permission_review"
         return "manual_official_domain_research_required"
     if not match.official_aanbod_url:
         return "verify_public_aanbod_url"
@@ -633,15 +710,13 @@ def _recommended_next_action(group: _ObservedGroup, match: ExistingMakelaarMatch
 
 
 def _normalize_makelaar_name(value: object) -> str:
-    text = normalize_text(value)
+    text = _strip_marketing_segments(normalize_text(value))
     if not text:
         return ""
     text = LEGAL_SUFFIX_RE.sub(" ", text)
     text = QUOTES_RE.sub("", text)
     text = re.sub(r"\([^)]*\)", " ", text)
     text = text.replace("+", " ")
-    if " - " in text:
-        text = text.split(" - ", 1)[0]
     text = re.sub(r"[!?.,;:]+", " ", text)
     text = MULTISPACE_RE.sub(" ", text).strip().lower()
     return text
@@ -651,11 +726,9 @@ def _canonical_display_name(raw_name: str) -> tuple[str, str]:
     raw = normalize_text(raw_name)
     if not raw:
         return "", ""
-    if " - " in raw:
-        left, right = raw.split(" - ", 1)
-        if any(pattern.search(right) for pattern in SLOGAN_PATTERNS) or _looks_marketing_slogan(right):
-            return left.strip(), right.strip().strip('"')
-    return raw, ""
+    cleaned, aliases = _split_display_and_aliases(raw)
+    slogan_alias = aliases[0] if aliases else ""
+    return cleaned, slogan_alias
 
 
 def _looks_marketing_slogan(value: str) -> bool:
@@ -663,7 +736,22 @@ def _looks_marketing_slogan(value: str) -> bool:
     if not text:
         return False
     lower = text.lower()
-    return any(token in lower for token in ("smart move", "via wie anders", "jouw regio", "zelf uw huis verkopen"))
+    return any(
+        token in lower
+        for token in (
+            "smart move",
+            "via wie anders",
+            "jouw regio",
+            "zelf uw huis verkopen",
+            "funda-topmakelaar",
+            "welkom thuis",
+            "actief regio",
+            "beoordeeld met",
+            "nvm-qualis",
+            "qualis",
+            "verkopen met cijfer",
+        )
+    )
 
 
 def _looks_truncated(value: str) -> bool:
@@ -692,6 +780,132 @@ def _platform_to_parser_family(detected_platform: str) -> str:
 
 def _normalize_domain_field(value: object) -> str:
     return normalize_domain(value)
+
+
+def _first_party_domain(*candidates: str) -> str:
+    for candidate in candidates:
+        domain = _normalize_domain_field(candidate)
+        if domain and not _is_third_party_domain(domain):
+            return domain
+    return ""
+
+
+def _sanitize_existing_match(match: ExistingMakelaarMatch) -> ExistingMakelaarMatch:
+    sanitized = ExistingMakelaarMatch(**asdict(match))
+    candidate_domain = _first_party_domain(sanitized.official_domain, sanitized.domain)
+    if candidate_domain:
+        sanitized.official_domain = candidate_domain
+        sanitized.official_domain_status = "known"
+    elif sanitized.official_domain or sanitized.domain:
+        sanitized.official_domain = ""
+        sanitized.official_domain_status = "rejected_third_party_domain"
+        sanitized.manual_check_notes = _append_note(sanitized.manual_check_notes, "third_party_domain_rejected")
+    else:
+        sanitized.official_domain = ""
+        sanitized.official_domain_status = sanitized.official_domain_status or "unknown_explicit"
+
+    if _is_rejected_official_aanbod_url(sanitized.official_aanbod_url):
+        sanitized.official_aanbod_url = ""
+        sanitized.official_aanbod_url_status = "rejected_third_party_portal"
+        sanitized.manual_check_notes = _append_note(sanitized.manual_check_notes, "third_party_aanbod_rejected")
+    elif not sanitized.official_aanbod_url:
+        sanitized.official_aanbod_url_status = sanitized.official_aanbod_url_status or "unknown_explicit"
+
+    if not sanitized.recommended_next_action and sanitized.official_domain_status == "rejected_third_party_domain":
+        sanitized.recommended_next_action = "legal_or_permission_review"
+    return sanitized
+
+
+def _is_third_party_domain(domain: str) -> bool:
+    normalized = _normalize_domain_field(domain)
+    if not normalized:
+        return False
+    return any(normalized == candidate or normalized.endswith(f".{candidate}") for candidate in THIRD_PARTY_PORTAL_DOMAINS)
+
+
+def _is_rejected_official_aanbod_url(url: str) -> bool:
+    parsed_domain = _extract_url_domain(url)
+    return bool(parsed_domain and _is_third_party_domain(parsed_domain))
+
+
+def _extract_url_domain(url: str) -> str:
+    text = normalize_text(url)
+    if not text:
+        return ""
+    try:
+        parsed = urlparse(text)
+    except ValueError:
+        return ""
+    return _normalize_domain_field(parsed.netloc or parsed.path.split("/", 1)[0])
+
+
+def _split_display_and_aliases(raw_name: str) -> tuple[str, list[str]]:
+    raw = normalize_text(raw_name)
+    if not raw:
+        return "", []
+    aliases: list[str] = []
+    parts = [part.strip() for part in MARKETING_SPLIT_RE.split(raw) if part.strip()]
+    if not parts:
+        return "", []
+    kept = [parts[0]]
+    for part in parts[1:]:
+        if _is_marketing_segment(part):
+            aliases.append(part.strip().strip('"'))
+            continue
+        kept.append(part)
+    cleaned = kept[0].strip() if kept else raw
+    return cleaned or raw, aliases
+
+
+def _strip_marketing_segments(raw_name: str) -> str:
+    cleaned, _ = _split_display_and_aliases(raw_name)
+    return cleaned
+
+
+def _is_marketing_segment(value: str) -> bool:
+    text = normalize_text(value).strip().strip('"')
+    if not text:
+        return False
+    if any(pattern.search(text) for pattern in SLOGAN_PATTERNS):
+        return True
+    if any(pattern.search(text) for pattern in MARKETING_START_PATTERNS):
+        return True
+    lower = text.lower()
+    if re.search(r"\b\d+(?:[.,]\d+)?\b", lower) and ("verkopen" in lower or "cijfer" in lower):
+        return True
+    return _looks_marketing_slogan(text)
+
+
+def _derive_brand_key(value: str) -> str:
+    text = _strip_marketing_segments(normalize_text(value))
+    if not text:
+        return ""
+    match = BRAND_SUFFIX_RE.search(text)
+    if not match:
+        return ""
+    return _normalize_makelaar_name(match.group(1))
+
+
+def _allow_brand_fallback(group: _ObservedGroup) -> bool:
+    if group.normalized_name == group.brand_key:
+        return True
+    return bool(group.slogan_aliases)
+
+
+def _should_extend_with_brand_candidates(group: _ObservedGroup) -> bool:
+    if not group.matched_sources:
+        return True
+    return not any(
+        match.official_domain or match.official_aanbod_url or match.parser_family_candidate
+        for match in group.matched_sources
+    )
+
+
+def _append_note(existing: str, note: str) -> str:
+    tokens = [token.strip() for token in existing.split(" | ") if token.strip()]
+    if note not in tokens:
+        tokens.append(note)
+    return " | ".join(tokens)
 
 
 def _parse_bool(value: object) -> bool:
