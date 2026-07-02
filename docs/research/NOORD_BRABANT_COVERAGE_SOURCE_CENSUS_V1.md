@@ -261,6 +261,45 @@ Generated local artifacts:
 
 Generated artifacts remain local and must not be committed.
 
+## Missing Domain External Resolution v1
+
+Missing Domain External Resolution adds an explicit controlled mode after Source Completion:
+
+```powershell
+python scripts/run_noord_brabant_coverage_source_census.py --allow-live-http --completion-scope-verification --missing-domain-external-resolution --max-passes 8 --max-requests-per-domain 10 --timeout-seconds 15
+```
+
+The mode reads the Missing Domain Queue, attempts a bounded resolution for every row, and writes all outcomes with
+attempt counts, candidate counts, evidence previews, reasons, and next actions. It first matches existing sources by
+normalized name, alias, or raw id. If no existing source matches, it generates at most eight conservative candidate
+domains from local domain hints and deterministic official-domain guesses.
+
+Candidate verification is deliberately strict. Funda, Pararius, search/social pages, maps, directories, comparison
+sites, and third-party portal domains are rejected as official domains. HTTP checks use only standard-library requests,
+a clear User-Agent, request caps, and `robots_gate.can_fetch(domain, path)` before fetching. Root/homepage content must
+show source-name or alias evidence plus makelaar/real-estate context; common contact and aanbod paths are checked only
+after the candidate remains plausible. Evidence previews are capped and sanitized; raw HTML/JSON, long descriptions,
+and images are not written.
+
+Resolution statuses are `resolved_to_existing_source`, `resolved_to_new_source`, `confirmed_duplicate`,
+`confirmed_inactive_or_no_longer_trading`, `confirmed_no_official_domain_found`, and
+`needs_manual_domain_research`. Verified new domains are deduped by normalized domain before being added as source
+candidates. New-source candidates start conservatively as no-public-aanbod until accepted aanbod URL and parser-family
+verification can prove stronger operational readiness. Accepted aanbod URL checks continue to reject Funda/Pararius,
+off-domain URLs, property-detail URLs, and third-party-only URLs.
+
+Generated local artifacts:
+
+- `tmp/generated/noord_brabant_missing_domain_external_resolution_v1.xlsx`
+- `tmp/generated/noord_brabant_missing_domain_external_resolution_v1.csv`
+- `tmp/generated/noord_brabant_missing_domain_external_resolution_v1_review_queue.csv`
+- `tmp/generated/noord_brabant_source_completion_scope_verification_v2.csv`
+- `tmp/generated/noord_brabant_source_completion_scope_verification_v2.xlsx`
+
+Added hard gates include unresolved rows without attempts, resolved third-party domains, resolved domains without
+official evidence, duplicate domain creation, Funda/Pararius or property-detail accepted aanbod URLs, raw payload
+markers, and long-description export.
+
 ### Realworks audit handoff repair
 
 The first Noord-Brabant Realworks Audit v1 attempt found that the handoff CSV could be regenerated with an incomplete

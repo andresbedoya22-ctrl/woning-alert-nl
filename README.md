@@ -481,6 +481,25 @@ The Realworks audit input CSV contains only verified `realworks_public` records 
 scope status ready for the later Noord-Brabant Realworks audit. KIN remains classified as `ogonline_xhr` and is excluded
 from Realworks audit input.
 
+## Missing Domain External Resolution v1
+
+The coverage census runner also supports:
+
+```powershell
+python scripts/run_noord_brabant_coverage_source_census.py --allow-live-http --completion-scope-verification --missing-domain-external-resolution --max-passes 8 --max-requests-per-domain 10 --timeout-seconds 15
+```
+
+This controlled follow-up attempts every Missing Domain Queue row. It first resolves duplicates or existing sources by
+local name/alias/raw-id evidence, then checks at most eight conservative official-domain candidates per row. Funda,
+Pararius, search/social/maps pages, directories, comparison sites, and third-party portals are rejected as operational
+official domains. Verified new domains are deduped before becoming source candidates, and accepted aanbod URLs still
+reject property-detail, off-domain, Funda/Pararius, and third-party-only URLs.
+
+Live checks remain opt-in, sequential, capped, standard-library based, and guarded by `robots_gate.can_fetch`. The mode
+writes local generated resolution artifacts plus Source Completion v2 CSV/XLSX files under `tmp/generated/`; these are
+not committed. It does not run matching, alerts, advisor email, n8n, dashboard, DB/migrations, full inventory, browser
+automation, proxies, bypass behavior, LLM runtime, parser-per-makelaar logic, or `data/raw` changes.
+
 ## Noord-Brabant Realworks Audit v1
 
 `scraper/src/domek_wonen/pilots/noord_brabant_realworks_audit.py` audits only the ready
